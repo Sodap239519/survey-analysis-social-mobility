@@ -92,8 +92,18 @@ class HouseholdImport implements ToCollection, WithCustomCsvSettings
             }
 
             if (!empty($firstName) || !empty($citizenId)) {
+                // Search by household + is_head to ensure at most one head per household.
+                // firstOrCreate intentionally does not update on re-import to preserve
+                // any manual corrections made after the initial import.
+                // If citizen_id is available, include it as a secondary search key so that
+                // re-importing the same person (even across different households) avoids
+                // creating duplicates.
+                $searchKeys = ['household_id' => $household->id, 'is_head' => true];
+                if (!empty($citizenId)) {
+                    $searchKeys['citizen_id'] = $citizenId;
+                }
                 Person::firstOrCreate(
-                    ['household_id' => $household->id, 'is_head' => true],
+                    $searchKeys,
                     [
                         'title'      => $title,
                         'first_name' => $firstName,
