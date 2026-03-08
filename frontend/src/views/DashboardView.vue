@@ -392,14 +392,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
 import { useAuthStore } from '../stores/auth'
+import { useDashboardFilters } from '../composables/useDashboardFilters'
 
 const store = useDashboardStore()
 const auth = useAuthStore()
 
-const filters = ref({ survey_year: '', district: '', subdistrict: '', period: 'after' })
+const { filters, load, initYears } = useDashboardFilters('after')
 
 const POVERTY_DESC = {
   1: 'ระดับ 1 (1.00–1.74): อยู่ลำบาก',
@@ -536,20 +537,8 @@ function radarGrid(pct) {
   }).join(' ')
 }
 
-async function load() {
-  const params = {}
-  if (filters.value.survey_year) params.survey_year = filters.value.survey_year
-  if (filters.value.district) params.district = filters.value.district
-  if (filters.value.subdistrict) params.subdistrict = filters.value.subdistrict
-  if (filters.value.period) params.period = filters.value.period
-  await store.fetch(params)
-}
-
 onMounted(async () => {
-  await store.fetchYears()
-  if (store.years.length > 0) {
-    filters.value.survey_year = store.years[0]
-  }
+  await initYears()
   load()
 })
 </script>

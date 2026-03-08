@@ -320,16 +320,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDashboardStore } from '../stores/dashboard'
+import { useDashboardFilters } from '../composables/useDashboardFilters'
 
 const route = useRoute()
 const store = useDashboardStore()
 
 const slug = computed(() => route.params.slug)
 
-const filters = ref({ survey_year: '', district: '', subdistrict: '', period: 'after' })
+const { filters, load, initYears } = useDashboardFilters('after')
 
 const POVERTY_DESC = {
   1: 'ระดับ 1: อยู่ลำบาก',
@@ -489,22 +490,8 @@ function radarGrid(pct) {
   }).join(' ')
 }
 
-async function load() {
-  const params = {}
-  if (filters.value.survey_year) params.survey_year = filters.value.survey_year
-  if (filters.value.district) params.district = filters.value.district
-  if (filters.value.subdistrict) params.subdistrict = filters.value.subdistrict
-  if (filters.value.period) params.period = filters.value.period
-  await store.fetch(params)
-}
-
-onMounted(async () => {
-  await store.fetchYears()
-  if (store.years.length > 0 && !filters.value.survey_year) {
-    filters.value.survey_year = store.years[0]
-  }
-  load()
-})
+// Reload when slug changes (navigating between capital pages)
+watch(slug, () => load())
 
 // Reload when slug changes (navigating between capital pages)
 watch(slug, () => load())

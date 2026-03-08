@@ -337,11 +337,18 @@ class DashboardController extends Controller
             });
         }
 
+        $row = $query->selectRaw('
+            COUNT(DISTINCT district_name)   AS district_count,
+            COUNT(DISTINCT subdistrict_name) AS subdistrict_count,
+            COUNT(DISTINCT village_name)    AS village_count,
+            COUNT(DISTINCT house_code)      AS household_count
+        ')->first();
+
         return [
-            'districts'   => (clone $query)->whereNotNull('district_name')->distinct('district_name')->count('district_name'),
-            'subdistricts'=> (clone $query)->whereNotNull('subdistrict_name')->distinct('subdistrict_name')->count('subdistrict_name'),
-            'villages'    => (clone $query)->whereNotNull('village_name')->distinct('village_name')->count('village_name'),
-            'households'  => (clone $query)->distinct('house_code')->count('house_code'),
+            'districts'   => $row ? (int) $row->district_count : 0,
+            'subdistricts'=> $row ? (int) $row->subdistrict_count : 0,
+            'villages'    => $row ? (int) $row->village_count : 0,
+            'households'  => $row ? (int) $row->household_count : 0,
         ];
     }
 
