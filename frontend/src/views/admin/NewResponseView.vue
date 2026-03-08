@@ -73,6 +73,16 @@
                 <span class="choice-weight">({{ c.weight }}pt)</span>
               </label>
             </div>
+            <!-- "อื่นๆ" text input for multi-select -->
+            <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && hasOtherSelected(q, answers[q.id])" class="other-input-wrap">
+              <label class="other-input-label">โปรดระบุรายละเอียด (อื่นๆ)</label>
+              <input
+                type="text"
+                v-model="otherTexts[q.id]"
+                placeholder="ระบุรายละเอียด..."
+                class="other-input"
+              />
+            </div>
 
             <!-- Single select -->
             <div v-else-if="q.type === 'single_select'" class="choices-grid">
@@ -92,6 +102,16 @@
                 <span class="choice-text">{{ c.choice_key }}) {{ c.text_th }}</span>
                 <span class="choice-weight">({{ c.weight }}pt)</span>
               </label>
+            </div>
+            <!-- "อื่นๆ" text input for single-select -->
+            <div v-if="q.type === 'single_select' && hasSingleOtherSelected(q, singleAnswers[q.id])" class="other-input-wrap">
+              <label class="other-input-label">โปรดระบุรายละเอียด (อื่นๆ)</label>
+              <input
+                type="text"
+                v-model="otherTexts[q.id]"
+                placeholder="ระบุรายละเอียด..."
+                class="other-input"
+              />
             </div>
 
             <!-- Numeric -->
@@ -149,6 +169,8 @@ const answers = ref({})
 const singleAnswers = ref({})
 // numericAnswers[questionId] = number
 const numericAnswers = ref({})
+// otherTexts[questionId] = string  for "อื่นๆ" free-text input
+const otherTexts = ref({})
 
 const submitting = ref(false)
 const submitError = ref('')
@@ -190,6 +212,23 @@ function handleCheckboxChange(question, choice) {
       return c && !isExclusiveChoice(c)
     })
   }
+}
+
+// Detect if a choice text represents "อื่นๆ" (other) by checking for Thai "อื่นๆ" or "อื่น ๆ" patterns
+function isOtherChoice(choice) {
+  return choice.text_th?.includes('อื่นๆ') || choice.text_th?.includes('อื่น ๆ')
+}
+
+// Check if any "อื่นๆ" choice is currently selected in the given list of selected IDs
+function hasOtherSelected(question, selectedIds) {
+  if (!selectedIds?.length) return false
+  return question.choices?.some(c => isOtherChoice(c) && selectedIds.includes(c.id))
+}
+
+// Convenience helper for single-select: checks a single selected choice ID
+function hasSingleOtherSelected(question, selectedId) {
+  if (!selectedId) return false
+  return question.choices?.some(c => isOtherChoice(c) && c.id === selectedId)
 }
 
 const capitalColors = {
@@ -239,13 +278,19 @@ async function submit() {
   for (const [qId, choiceIds] of Object.entries(answers.value)) {
     if (choiceIds?.length) {
       payload.answers[qId] = { selected_choice_ids: choiceIds }
+      if (otherTexts.value[qId]) {
+        payload.answers[qId].value_text = otherTexts.value[qId]
+      }
     }
   }
 
   // Single-select answers
   for (const [qId, choiceId] of Object.entries(singleAnswers.value)) {
     if (choiceId) {
-      payload.answers[qId] = { selected_choice_ids: [choiceId] }
+      payload.answers[qId] = payload.answers[qId] || { selected_choice_ids: [choiceId] }
+      if (otherTexts.value[qId]) {
+        payload.answers[qId].value_text = otherTexts.value[qId]
+      }
     }
   }
 
@@ -399,6 +444,29 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+/* "อื่นๆ" free-text input */
+.other-input-wrap {
+  margin-top: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 480px;
+}
+.other-input-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  margin-bottom: 0;
+}
+.other-input {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+.other-input:focus {
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+}
+
 .numeric-input {
   max-width: 280px;
 }
@@ -421,5 +489,6 @@ onMounted(async () => {
   .choice-label { width: 100%; }
   .numeric-input { max-width: 100%; }
   .submit-btn { width: 100%; }
+  .other-input-wrap { max-width: 100%; }
 }
 </style>
