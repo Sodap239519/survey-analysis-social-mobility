@@ -27,10 +27,10 @@
           <tbody>
             <tr v-for="r in responses.data" :key="r.id">
               <td><code>{{ r.household?.house_code || '—' }}</code></td>
-              <td><span class="badge" :style="{background: r.period === 'after' ? '#0284c7' : '#475569'}">{{ r.period }}</span></td>
+              <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ r.period }}</span></td>
               <td>{{ r.survey_year || '—' }}</td>
               <td>
-                <span v-if="r.poverty_level" class="badge" :style="{background: levelColor(r.poverty_level)}">
+                <span v-if="r.poverty_level" class="badge" :style="{background: levelColor(r.poverty_level), color: '#fff'}">
                   ระดับ {{ r.poverty_level }}
                 </span>
                 <span v-else class="text-muted">—</span>

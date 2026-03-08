@@ -1,7 +1,7 @@
 <template>
   <div>
-    <div class="flex justify-between items-center mb-6">
-      <h2 style="font-size:1.25rem;font-weight:700">➕ บันทึกการสำรวจใหม่</h2>
+    <div class="page-header">
+      <h2 class="page-title">บันทึกการสำรวจใหม่</h2>
       <RouterLink to="/admin/responses" class="btn btn-secondary">← กลับ</RouterLink>
     </div>
 
@@ -10,10 +10,10 @@
       <form @submit.prevent="submit">
         <!-- Basic info -->
         <div class="card mb-4">
-          <h3 class="card-title">ข้อมูลพื้นฐาน</h3>
+          <h3 class="card-section-title">ข้อมูลพื้นฐาน</h3>
           <div class="form-grid">
             <div class="form-group">
-              <label>รหัสบ้าน (house_code)</label>
+              <label>รหัสบ้าน</label>
               <input v-model="form.house_code" placeholder="เช่น 30010001662" required />
             </div>
             <div class="form-group">
@@ -40,52 +40,73 @@
 
         <!-- Questions by capital -->
         <div v-for="cap in questions" :key="cap.id" class="card mb-4">
-          <h3 class="card-title" :style="{'color': capitalColor(cap.slug)}">
+          <h3 class="card-section-title capital-title" :style="{'color': capitalColor(cap.slug)}">
             {{ capIcon(cap.slug) }} {{ cap.name_th }}
           </h3>
           <div v-for="q in cap.questions" :key="q.id" class="question-block">
-            <p class="question-text">{{ q.question_key }}: {{ q.text_th }}
-              <span class="text-muted text-sm">({{ q.max_score }} คะแนน)</span>
+            <p class="question-text">
+              <span class="question-key">{{ q.question_key }}</span>
+              {{ q.text_th }}
+              <span class="question-score">({{ q.max_score }} คะแนน)</span>
             </p>
 
             <!-- Multi-select -->
             <div v-if="q.type === 'multi_select' || q.type === 'special_q6'" class="choices-grid">
-              <label v-for="c in q.choices" :key="c.id" class="choice-label">
+              <label
+                v-for="c in q.choices"
+                :key="c.id"
+                class="choice-label"
+                :class="{
+                  'choice-selected': answers[q.id]?.includes(c.id),
+                  'choice-disabled': isChoiceDisabled(q, c)
+                }"
+              >
                 <input
                   type="checkbox"
                   :value="c.id"
                   v-model="answers[q.id]"
-                  @change="handleExclusive(q, c)"
-                  style="width:auto;margin-right:6px"
+                  @change="handleCheckboxChange(q, c)"
+                  :disabled="isChoiceDisabled(q, c)"
+                  class="choice-checkbox"
                 />
-                {{ c.choice_key }}) {{ c.text_th }}
-                <span class="text-muted text-sm">({{ c.weight }}pt)</span>
+                <span class="choice-text">{{ c.choice_key }}) {{ c.text_th }}</span>
+                <span class="choice-weight">({{ c.weight }}pt)</span>
               </label>
             </div>
 
             <!-- Single select -->
             <div v-else-if="q.type === 'single_select'" class="choices-grid">
-              <label v-for="c in q.choices" :key="c.id" class="choice-label">
+              <label
+                v-for="c in q.choices"
+                :key="c.id"
+                class="choice-label"
+                :class="{ 'choice-selected': singleAnswers[q.id] === c.id }"
+              >
                 <input
                   type="radio"
                   :name="'q' + q.id"
                   :value="c.id"
                   v-model="singleAnswers[q.id]"
-                  style="width:auto;margin-right:6px"
+                  class="choice-checkbox"
                 />
-                {{ c.choice_key }}) {{ c.text_th }}
-                <span class="text-muted text-sm">({{ c.weight }}pt)</span>
+                <span class="choice-text">{{ c.choice_key }}) {{ c.text_th }}</span>
+                <span class="choice-weight">({{ c.weight }}pt)</span>
               </label>
             </div>
 
             <!-- Numeric -->
             <div v-else-if="q.type === 'numeric'">
-              <input type="number" v-model.number="numericAnswers[q.id]" placeholder="จำนวน (บาท/เดือน)" style="max-width:300px" />
+              <input type="number" v-model.number="numericAnswers[q.id]" placeholder="จำนวน (บาท/เดือน)" class="numeric-input" />
               <p class="text-sm text-muted mt-2">หรือเลือกช่วงรายได้:</p>
               <div class="choices-grid mt-2">
-                <label v-for="c in q.choices" :key="c.id" class="choice-label">
-                  <input type="radio" :name="'q' + q.id" :value="c.id" v-model="singleAnswers[q.id]" style="width:auto;margin-right:6px" />
-                  {{ c.text_th }}
+                <label
+                  v-for="c in q.choices"
+                  :key="c.id"
+                  class="choice-label"
+                  :class="{ 'choice-selected': singleAnswers[q.id] === c.id }"
+                >
+                  <input type="radio" :name="'q' + q.id" :value="c.id" v-model="singleAnswers[q.id]" class="choice-checkbox" />
+                  <span class="choice-text">{{ c.text_th }}</span>
                 </label>
               </div>
             </div>
@@ -93,11 +114,13 @@
         </div>
 
         <div v-if="submitError" class="error mb-4">{{ submitError }}</div>
-        <div v-if="submitSuccess" class="success mb-4">บันทึกสำเร็จ!</div>
+        <div v-if="submitSuccess" class="success mb-4">✓ บันทึกสำเร็จ! กำลังนำทาง...</div>
 
-        <button class="btn btn-primary" type="submit" :disabled="submitting">
-          {{ submitting ? 'กำลังบันทึก...' : 'บันทึกการสำรวจ' }}
-        </button>
+        <div class="submit-row">
+          <button class="btn btn-primary submit-btn" type="submit" :disabled="submitting">
+            {{ submitting ? 'กำลังบันทึก...' : 'บันทึกการสำรวจ' }}
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -120,7 +143,7 @@ const form = ref({
   surveyor_name: '',
 })
 
-// answers[questionId] = [choiceId, ...]  for multi-select
+// answers[questionId] = [choiceId, ...]  for multi-select (must be arrays)
 const answers = ref({})
 // singleAnswers[questionId] = choiceId   for single-select / radio
 const singleAnswers = ref({})
@@ -131,23 +154,53 @@ const submitting = ref(false)
 const submitError = ref('')
 const submitSuccess = ref(false)
 
+// Keywords that indicate an exclusive "none" type choice
+const EXCLUSIVE_KEYWORDS = ['ไม่ได้', 'ไม่เคย', 'ไม่มี', 'ยังไม่เคย', 'ไม่ทำ']
+
+function isExclusiveChoice(choice) {
+  if (choice.is_exclusive) return true
+  return EXCLUSIVE_KEYWORDS.some(kw => choice.text_th?.includes(kw))
+}
+
+function hasExclusiveSelected(question) {
+  const selected = answers.value[question.id] || []
+  return question.choices?.some(c => isExclusiveChoice(c) && selected.includes(c.id))
+}
+
+function isChoiceDisabled(question, choice) {
+  if (isExclusiveChoice(choice)) return false
+  return hasExclusiveSelected(question)
+}
+
+function handleCheckboxChange(question, choice) {
+  if (!Array.isArray(answers.value[question.id])) {
+    answers.value[question.id] = []
+  }
+  const selected = answers.value[question.id]
+
+  if (isExclusiveChoice(choice)) {
+    if (selected.includes(choice.id)) {
+      // Exclusive selected — keep only this one
+      answers.value[question.id] = [choice.id]
+    }
+  } else {
+    // Non-exclusive selected — remove any exclusive choices
+    answers.value[question.id] = selected.filter(id => {
+      const c = question.choices?.find(ch => ch.id === id)
+      return c && !isExclusiveChoice(c)
+    })
+  }
+}
+
 const capitalColors = {
-  human: '#818cf8', physical: '#34d399', financial: '#fbbf24',
-  natural: '#4ade80', social: '#f472b6'
+  human: '#6366f1', physical: '#10b981', financial: '#f59e0b',
+  natural: '#22c55e', social: '#ec4899'
 }
 
 function capitalColor(slug) { return capitalColors[slug] || '#94a3b8' }
 function capIcon(slug) {
   const icons = { human: '👤', physical: '🏠', financial: '💰', natural: '🌿', social: '🤝' }
   return icons[slug] || '📌'
-}
-
-function handleExclusive(question, choice) {
-  if (!choice.is_exclusive) return
-  if (answers.value[question.id]?.includes(choice.id)) {
-    // Keep only this exclusive choice
-    answers.value[question.id] = [choice.id]
-  }
 }
 
 async function submit() {
@@ -219,6 +272,14 @@ onMounted(async () => {
   try {
     const res = await api.get('/questions')
     questions.value = res.data
+    // Initialize all multi-select answers as empty arrays
+    for (const cap of res.data) {
+      for (const q of cap.questions || []) {
+        if (q.type === 'multi_select' || q.type === 'special_q6') {
+          answers.value[q.id] = []
+        }
+      }
+    }
   } finally {
     loadingQuestions.value = false
   }
@@ -226,18 +287,66 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.page-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 1rem;
 }
-.question-block {
+.card-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
   margin-bottom: 1.25rem;
+  color: var(--color-text);
+  padding-bottom: 0.625rem;
+  border-bottom: 2px solid var(--color-border);
+}
+.capital-title {
+  font-size: 1rem;
+}
+.question-block {
+  margin-bottom: 1.5rem;
   padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--color-border);
 }
-.question-block:last-child { border-bottom: none; }
-.question-text { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; }
+.question-block:last-child { border-bottom: none; margin-bottom: 0; }
+.question-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.question-key {
+  display: inline-block;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-right: 0.375rem;
+}
+.question-score {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  margin-left: 0.25rem;
+}
+
+/* Choices */
 .choices-grid {
   display: flex;
   flex-wrap: wrap;
@@ -246,18 +355,71 @@ onMounted(async () => {
 .choice-label {
   display: flex;
   align-items: center;
-  font-size: 0.8rem;
-  background: var(--color-surface-alt);
-  border-radius: 6px;
-  padding: 0.3rem 0.6rem;
+  gap: 0.375rem;
+  font-size: 0.85rem;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
   cursor: pointer;
   color: var(--color-text);
   user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 44px;
 }
-.choice-label:hover { background: #475569; }
-.card-title {
+.choice-label:hover:not(.choice-disabled) {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+.choice-selected {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+}
+.choice-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.choice-checkbox {
+  width: 18px !important;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.choice-text {
+  flex: 1;
+  line-height: 1.3;
+}
+.choice-weight {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.numeric-input {
+  max-width: 280px;
+}
+
+.submit-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0 1rem;
+}
+.submit-btn {
+  min-width: 180px;
   font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
+  padding: 0.75rem 2rem;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .form-grid { grid-template-columns: 1fr 1fr; }
+  .choices-grid { flex-direction: column; }
+  .choice-label { width: 100%; }
+  .numeric-input { max-width: 100%; }
+  .submit-btn { width: 100%; }
 }
 </style>
