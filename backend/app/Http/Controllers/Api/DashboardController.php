@@ -348,6 +348,8 @@ class DashboardController extends Controller
 
                 $diff = (float) $afterScore - (float) $beforeMap[$householdId];
 
+                // Use a small epsilon (0.01) to absorb floating-point rounding differences;
+                // scores that fall within this margin are considered unchanged ("same").
                 if ($diff > 0.01) {
                     $levels[$level]['improved']++;
                 } elseif ($diff < -0.01) {

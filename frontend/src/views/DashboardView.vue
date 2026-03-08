@@ -191,7 +191,7 @@
                 font-family="Prompt, sans-serif"
                 fill="#0ea5e9"
                 font-weight="700"
-              >{{ capitalAverages[capitals[i]?.slug] }}</text>
+              >{{ capitalAverages[capitals.value[i]?.slug] }}</text>
               <text :x="radarCx + 4" :y="radarCy - 25 + 2" font-size="8" fill="#94a3b8">25</text>
               <text :x="radarCx + 4" :y="radarCy - 50 + 2" font-size="8" fill="#94a3b8">50</text>
               <text :x="radarCx + 4" :y="radarCy - 75 + 2" font-size="8" fill="#94a3b8">75</text>
