@@ -8,6 +8,11 @@ const routes = [
     component: () => import('../views/DashboardView.vue'),
   },
   {
+    path: '/capital/:slug',
+    name: 'capital-detail',
+    component: () => import('../views/CapitalView.vue'),
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('../views/LoginView.vue'),

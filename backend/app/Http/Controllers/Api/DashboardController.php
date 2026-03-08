@@ -74,10 +74,21 @@ class DashboardController extends Controller
         // Summary poverty levels across all responses
         $overallPoverty = $this->getOverallPovertyLevels(clone $responseQuery);
 
+        // Geographic totals (districts, subdistricts, villages, households)
+        $geoTotals = $this->getGeographicTotals($district, $subdistrict, $surveyYear);
+
+        // Average scores per capital (for Radar Chart)
+        $capitalAverages = $this->getCapitalAverages(clone $responseQuery);
+
         return response()->json([
             'total_house_codes'    => $totalHouseCodes,
             'total_respondents'    => $totalRespondents,
             'total_responses'      => $totalResponses,
+            'total_districts'      => $geoTotals['districts'],
+            'total_subdistricts'   => $geoTotals['subdistricts'],
+            'total_villages'       => $geoTotals['villages'],
+            'total_households'     => $geoTotals['households'],
+            'capital_averages'     => $capitalAverages,
             'poverty_by_capital'   => $povertyByCapital,
             'overall_poverty'      => $overallPoverty,
             'mobility'             => $mobility,
@@ -302,5 +313,54 @@ class DashboardController extends Controller
         if ($x < 2.50) return 2;
         if ($x < 3.25) return 3;
         return 4;
+    }
+
+    private function getGeographicTotals(?string $district, ?string $subdistrict, ?int $surveyYear): array
+    {
+        $query = Household::query();
+
+        if ($surveyYear) {
+            $query->where('survey_year', $surveyYear);
+        }
+
+        if ($district) {
+            $query->where(function ($q) use ($district) {
+                $q->where('district_name', 'like', "%{$district}%")
+                  ->orWhere('district_code', $district);
+            });
+        }
+
+        if ($subdistrict) {
+            $query->where(function ($q) use ($subdistrict) {
+                $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
+                  ->orWhere('subdistrict_code', $subdistrict);
+            });
+        }
+
+        return [
+            'districts'   => (clone $query)->whereNotNull('district_name')->distinct('district_name')->count('district_name'),
+            'subdistricts'=> (clone $query)->whereNotNull('subdistrict_name')->distinct('subdistrict_name')->count('subdistrict_name'),
+            'villages'    => (clone $query)->whereNotNull('village_name')->distinct('village_name')->count('village_name'),
+            'households'  => (clone $query)->distinct('house_code')->count('house_code'),
+        ];
+    }
+
+    private function getCapitalAverages($query): array
+    {
+        $row = (clone $query)->selectRaw('
+            AVG(score_human)     as avg_human,
+            AVG(score_physical)  as avg_physical,
+            AVG(score_financial) as avg_financial,
+            AVG(score_natural)   as avg_natural,
+            AVG(score_social)    as avg_social
+        ')->first();
+
+        return [
+            'human'     => $row ? round((float) $row->avg_human, 1) : 0,
+            'physical'  => $row ? round((float) $row->avg_physical, 1) : 0,
+            'financial' => $row ? round((float) $row->avg_financial, 1) : 0,
+            'natural'   => $row ? round((float) $row->avg_natural, 1) : 0,
+            'social'    => $row ? round((float) $row->avg_social, 1) : 0,
+        ];
     }
 }
