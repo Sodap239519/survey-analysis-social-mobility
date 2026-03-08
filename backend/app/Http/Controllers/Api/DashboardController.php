@@ -342,6 +342,7 @@ class DashboardController extends Controller
                     continue;
                 }
 
+                // Map 0-100 score to 1-4 scale; thresholds at 1.75, 2.50, 3.25
                 $x = 1.0 + ((float) $afterScore / 100.0) * 3.0;
                 $level = $this->povertyLevel($x);
 
