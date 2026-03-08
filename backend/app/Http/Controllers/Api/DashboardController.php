@@ -25,12 +25,17 @@ class DashboardController extends Controller
         $district    = $request->query('district');
         $subdistrict = $request->query('subdistrict');
         $period      = $request->query('period', 'after');
+        $surveyYear  = $request->query('survey_year') ? (int) $request->query('survey_year') : null;
 
         // จำนวนรหัสบ้านทั้งหมด (DISTINCT house_code from imported households)
         $totalHouseCodes = Household::distinct('house_code')->count('house_code');
 
         // Filter survey responses
         $responseQuery = SurveyResponse::query()->where('period', $period);
+
+        if ($surveyYear) {
+            $responseQuery->where('survey_year', $surveyYear);
+        }
 
         if ($district) {
             $responseQuery->whereHas('household', function ($q) use ($district) {
@@ -58,13 +63,13 @@ class DashboardController extends Controller
         $povertyByCapital = $this->getPovertyByCapital(clone $responseQuery);
 
         // Mobility counts (before vs after)
-        $mobility = $this->getMobilityCounts($district, $subdistrict);
+        $mobility = $this->getMobilityCounts($district, $subdistrict, $surveyYear);
 
         // Per-capital mobility counts (before vs after for each capital)
-        $mobilityByCapital = $this->getMobilityByCapital($district, $subdistrict);
+        $mobilityByCapital = $this->getMobilityByCapital($district, $subdistrict, $surveyYear);
 
         // District/subdistrict breakdown
-        $byDistrict = $this->getByDistrict($period, $district, $subdistrict);
+        $byDistrict = $this->getByDistrict($period, $district, $subdistrict, $surveyYear);
 
         // Summary poverty levels across all responses
         $overallPoverty = $this->getOverallPovertyLevels(clone $responseQuery);
@@ -79,6 +84,19 @@ class DashboardController extends Controller
             'mobility_by_capital'  => $mobilityByCapital,
             'by_district'          => $byDistrict,
         ]);
+    }
+
+    public function years(): JsonResponse
+    {
+        $years = SurveyResponse::query()
+            ->whereNotNull('survey_year')
+            ->distinct()
+            ->orderBy('survey_year', 'desc')
+            ->pluck('survey_year')
+            ->map(fn ($y) => (int) $y)
+            ->values();
+
+        return response()->json($years);
     }
 
     private function getPovertyByCapital($query): array
@@ -131,7 +149,7 @@ class DashboardController extends Controller
         return $levels;
     }
 
-    private function getMobilityCounts(?string $district, ?string $subdistrict): array
+    private function getMobilityCounts(?string $district, ?string $subdistrict, ?int $surveyYear = null): array
     {
         // Compare before vs after for households that have both periods
         $beforeQuery = SurveyResponse::query()->where('period', 'before')
@@ -139,6 +157,11 @@ class DashboardController extends Controller
 
         $afterQuery = SurveyResponse::query()->where('period', 'after')
             ->whereNotNull('score_aggregate');
+
+        if ($surveyYear) {
+            $beforeQuery->where('survey_year', $surveyYear);
+            $afterQuery->where('survey_year', $surveyYear);
+        }
 
         if ($district) {
             $filter = function ($q) use ($district) {
@@ -180,7 +203,7 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getMobilityByCapital(?string $district, ?string $subdistrict): array
+    private function getMobilityByCapital(?string $district, ?string $subdistrict, ?int $surveyYear = null): array
     {
         $capitals = [
             'human'     => 'score_human',
@@ -195,6 +218,11 @@ class DashboardController extends Controller
         foreach ($capitals as $slug => $scoreCol) {
             $beforeQuery = SurveyResponse::query()->where('period', 'before')->whereNotNull($scoreCol);
             $afterQuery  = SurveyResponse::query()->where('period', 'after')->whereNotNull($scoreCol);
+
+            if ($surveyYear) {
+                $beforeQuery->where('survey_year', $surveyYear);
+                $afterQuery->where('survey_year', $surveyYear);
+            }
 
             if ($district) {
                 $beforeQuery->whereHas('household', function ($q) use ($district) {
@@ -247,12 +275,16 @@ class DashboardController extends Controller
         return $result;
     }
 
-    private function getByDistrict(string $period, ?string $district, ?string $subdistrict): array
+    private function getByDistrict(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear = null): array
     {
         $query = Household::query()
             ->selectRaw('district_name, district_code, COUNT(DISTINCT house_code) as house_count')
             ->groupBy('district_name', 'district_code')
             ->orderBy('district_name');
+
+        if ($surveyYear) {
+            $query->where('survey_year', $surveyYear);
+        }
 
         if ($district) {
             $query->where(function ($q) use ($district) {

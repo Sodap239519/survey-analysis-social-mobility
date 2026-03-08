@@ -6,6 +6,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const data = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const years = ref([])
 
   async function fetch(params = {}) {
     loading.value = true
@@ -20,5 +21,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  return { data, loading, error, fetch }
+  async function fetchYears() {
+    try {
+      const res = await api.get('/years')
+      years.value = res.data
+    } catch {
+      years.value = []
+    }
+  }
+
+  return { data, loading, error, years, fetch, fetchYears }
 })

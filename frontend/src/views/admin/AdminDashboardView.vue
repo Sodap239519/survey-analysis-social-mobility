@@ -27,6 +27,13 @@
     <!-- Filters -->
     <div class="dash-filters">
       <div class="form-group" style="flex:1;min-width:140px">
+        <label>ปี พ.ศ.</label>
+        <select v-model="filters.survey_year" @change="load">
+          <option value="">ทุกปี</option>
+          <option v-for="y in store.years" :key="y" :value="y">{{ y }}</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;min-width:140px">
         <label>อำเภอ</label>
         <input v-model="filters.district" placeholder="กรองตามอำเภอ..." @change="load" />
       </div>
@@ -326,7 +333,7 @@ const store = useDashboardStore()
 const auth = useAuthStore()
 
 const activeTab = ref('overview')
-const filters = ref({ district: '', subdistrict: '', period: 'after' })
+const filters = ref({ survey_year: '', district: '', subdistrict: '', period: 'after' })
 
 const tabs = [
   { slug: 'overview',  nameTh: 'ภาพรวม',     icon: 'fi-rr-apps' },
@@ -402,13 +409,20 @@ function povertyColor(level) {
 
 async function load() {
   const params = {}
+  if (filters.value.survey_year) params.survey_year = filters.value.survey_year
   if (filters.value.district) params.district = filters.value.district
   if (filters.value.subdistrict) params.subdistrict = filters.value.subdistrict
   if (filters.value.period) params.period = filters.value.period
   await store.fetch(params)
 }
 
-onMounted(load)
+onMounted(async () => {
+  await store.fetchYears()
+  if (store.years.length > 0) {
+    filters.value.survey_year = store.years[0]
+  }
+  load()
+})
 </script>
 
 <style scoped>
