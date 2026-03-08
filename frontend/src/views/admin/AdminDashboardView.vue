@@ -184,7 +184,7 @@
                 font-family="Prompt, sans-serif"
                 fill="#0ea5e9"
                 font-weight="700"
-              >{{ capitalAverages[capitals.value[i]?.slug] }}</text>
+              >{{ capitalAverages[capitals[i]?.slug] }}</text>
               <text :x="radarCx + 4" :y="radarCy - 25 + 2" font-size="8" fill="#94a3b8">25</text>
               <text :x="radarCx + 4" :y="radarCy - 50 + 2" font-size="8" fill="#94a3b8">50</text>
               <text :x="radarCx + 4" :y="radarCy - 75 + 2" font-size="8" fill="#94a3b8">75</text>
@@ -533,12 +533,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useDashboardStore } from '../../stores/dashboard'
 import { useAuthStore } from '../../stores/auth'
 
 const store = useDashboardStore()
 const auth = useAuthStore()
+const route = useRoute()
 
 const activeTab = ref('overview')
 const filters = ref({ survey_year: '', district: '', subdistrict: '', period: 'after' })
@@ -726,6 +728,13 @@ onMounted(async () => {
     filters.value.survey_year = store.years[0]
   }
   load()
+})
+
+watch(() => route.fullPath, async () => {
+  if (!store.loading) {
+    await store.fetchYears()
+    load()
+  }
 })
 </script>
 
