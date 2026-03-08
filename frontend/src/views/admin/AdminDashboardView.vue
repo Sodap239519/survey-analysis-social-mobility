@@ -131,7 +131,47 @@
         </div>
       </div>
 
-      <!-- District breakdown -->
+      <!-- Per-capital mobility comparison chart -->
+      <div class="bento-cap-mobility card">
+        <h3 class="card-title"><i class="fi fi-rr-chart-histogram"></i> การเปลี่ยนแปลงแต่ละด้านทุน (ก่อน → หลัง)</h3>
+        <div class="cap-mobility-list">
+          <div v-for="cap in capitals" :key="cap.slug" class="cap-mobility-row">
+            <span class="cap-mob-name">
+              <i class="fi cap-mob-icon" :class="cap.icon" :style="{ color: cap.color }"></i>
+              <span class="cap-mob-label">{{ cap.nameTh }}</span>
+            </span>
+            <div class="cap-mob-bars">
+              <div
+                class="cap-mob-bar improved"
+                :style="{ width: mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) + '%' }"
+                :title="'ดีขึ้น: ' + capitalMobility(cap.slug).improved"
+              ></div>
+              <div
+                class="cap-mob-bar same"
+                :style="{ width: mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) + '%' }"
+                :title="'เท่าเดิม: ' + capitalMobility(cap.slug).same"
+              ></div>
+              <div
+                class="cap-mob-bar decreased"
+                :style="{ width: mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) + '%' }"
+                :title="'แย่ลง: ' + capitalMobility(cap.slug).decreased"
+              ></div>
+            </div>
+            <div class="cap-mob-counts">
+              <span class="cap-mob-count improved"><i class="fi fi-rr-arrow-trend-up"></i> {{ capitalMobility(cap.slug).improved }}</span>
+              <span class="cap-mob-count same"><i class="fi fi-rr-arrow-right"></i> {{ capitalMobility(cap.slug).same }}</span>
+              <span class="cap-mob-count decreased"><i class="fi fi-rr-arrow-trend-down"></i> {{ capitalMobility(cap.slug).decreased }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="cap-mob-legend">
+          <span class="cap-mob-legend-item improved"><span class="cap-mob-dot"></span>ดีขึ้น</span>
+          <span class="cap-mob-legend-item same"><span class="cap-mob-dot"></span>เท่าเดิม</span>
+          <span class="cap-mob-legend-item decreased"><span class="cap-mob-dot"></span>แย่ลง</span>
+        </div>
+      </div>
+
+      <!-- District breakdown (overview tab) -->
       <div class="bento-district card" v-if="store.data.by_district?.length">
         <h3 class="card-title"><i class="fi fi-rr-map-marker"></i> จำนวนรหัสบ้านตามอำเภอ</h3>
         <div class="table-wrap">
@@ -154,8 +194,6 @@
         </div>
       </div>
     </div>
-
-    <!-- ── CAPITAL TAB (human/physical/financial/natural/social) ── -->
     <div v-else-if="store.data && activeTab !== 'overview'" class="capital-detail">
       <div v-for="cap in capitals.filter(c => c.slug === activeTab)" :key="cap.slug">
         <!-- Capital header banner -->
@@ -177,13 +215,13 @@
           </div>
           <div class="bento-stat card">
             <div class="stat-icon-wrap" style="--ic:#22c55e"><i class="fi fi-rr-check"></i></div>
-            <div class="stat-label">ระดับพอเพียง (4)</div>
+            <div class="stat-label">ระดับอยู่ดี (4)</div>
             <div class="stat-value" style="color:#22c55e">{{ capitalPoverty(cap.slug)[4] }}</div>
             <div class="stat-sub">คนที่มีระดับดีที่สุด</div>
           </div>
           <div class="bento-stat card">
             <div class="stat-icon-wrap" style="--ic:#ef4444"><i class="fi fi-rr-cross-circle"></i></div>
-            <div class="stat-label">ระดับยากจนมาก (1)</div>
+            <div class="stat-label">ระดับอยู่ลำบาก (1)</div>
             <div class="stat-value" style="color:#ef4444">{{ capitalPoverty(cap.slug)[1] }}</div>
             <div class="stat-sub">คนที่ต้องการความช่วยเหลือ</div>
           </div>
@@ -210,26 +248,41 @@
           </div>
         </div>
 
-        <!-- Mobility indicator (overall) -->
+        <!-- Mobility indicator for this capital -->
         <div class="bento-mobility card">
-          <h3 class="card-title"><i class="fi fi-rr-arrows-alt"></i> การเคลื่อนย้ายทางสังคม (ภาพรวม)</h3>
+          <h3 class="card-title"><i class="fi fi-rr-arrows-alt"></i> การเปลี่ยนแปลง — {{ cap.nameTh }} (ก่อน → หลัง)</h3>
           <div class="mobility-pills">
             <div class="mobility-pill improved">
               <i class="fi fi-rr-arrow-trend-up mobility-icon"></i>
-              <div class="mobility-count">{{ store.data.mobility.improved }}</div>
+              <div class="mobility-count">{{ capitalMobility(cap.slug).improved }}</div>
               <div class="mobility-label">ดีขึ้น</div>
             </div>
             <div class="mobility-pill same">
               <i class="fi fi-rr-arrow-right mobility-icon"></i>
-              <div class="mobility-count">{{ store.data.mobility.same }}</div>
+              <div class="mobility-count">{{ capitalMobility(cap.slug).same }}</div>
               <div class="mobility-label">เท่าเดิม</div>
             </div>
             <div class="mobility-pill decreased">
               <i class="fi fi-rr-arrow-trend-down mobility-icon"></i>
-              <div class="mobility-count">{{ store.data.mobility.decreased }}</div>
+              <div class="mobility-count">{{ capitalMobility(cap.slug).decreased }}</div>
               <div class="mobility-label">แย่ลง</div>
             </div>
           </div>
+          <div class="cap-mob-bars mt-2" style="border-radius:999px;overflow:hidden;height:14px;">
+            <div
+              class="cap-mob-bar improved"
+              :style="{ width: mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) + '%' }"
+            ></div>
+            <div
+              class="cap-mob-bar same"
+              :style="{ width: mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) + '%' }"
+            ></div>
+            <div
+              class="cap-mob-bar decreased"
+              :style="{ width: mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) + '%' }"
+            ></div>
+          </div>
+          <p class="text-muted text-sm mt-2">เปรียบเทียบ score ทุน{{ cap.nameTh }} ก่อนและหลังเข้าร่วมโครงการ</p>
         </div>
 
         <!-- District breakdown -->
@@ -288,12 +341,12 @@ const tabs = [
 const capitals = computed(() => tabs.filter(t => t.slug !== 'overview'))
 
 const POVERTY_DESC = {
-  1: 'ระดับ 1 (1.00–1.74): ยากจนมาก',
-  2: 'ระดับ 2 (1.75–2.49): ยากจน',
-  3: 'ระดับ 3 (2.50–3.24): เปราะบาง',
-  4: 'ระดับ 4 (3.25–4.00): พอเพียง',
+  1: 'ระดับ 1 (1.00–1.74): อยู่ลำบาก',
+  2: 'ระดับ 2 (1.75–2.49): อยู่ยาก',
+  3: 'ระดับ 3 (2.50–3.24): พออยู่ได้',
+  4: 'ระดับ 4 (3.25–4.00): อยู่ดี',
 }
-const POVERTY_LEVEL_NAMES = { 1: 'ยากจนมาก', 2: 'ยากจน', 3: 'เปราะบาง', 4: 'พอเพียง' }
+const POVERTY_LEVEL_NAMES = { 1: 'อยู่ลำบาก', 2: 'อยู่ยาก', 3: 'พออยู่ได้', 4: 'อยู่ดี' }
 
 const overallPoverty = computed(() => store.data?.overall_poverty || { 1: 0, 2: 0, 3: 0, 4: 0 })
 const overallTotal = computed(() => Object.values(overallPoverty.value).reduce((a, b) => a + b, 0))
@@ -316,6 +369,24 @@ function capitalPoverty(slug) {
 
 function capitalTotal(slug) {
   return Object.values(capitalPoverty(slug)).reduce((a, b) => a + b, 0)
+}
+
+const mobilityByCapital = computed(() => store.data?.mobility_by_capital || {})
+
+function capitalMobility(slug) {
+  return mobilityByCapital.value[slug] || { improved: 0, same: 0, decreased: 0 }
+}
+
+function mobilityTotal(slug) {
+  const m = capitalMobility(slug)
+  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)
+}
+
+function mobilityPct(count, total) {
+  const c = Number(count) || 0
+  const t = Number(total) || 0
+  if (t <= 0) return 0
+  return Math.round((c / t) * 100)
 }
 
 function povertyPct(count, total) {
@@ -514,22 +585,50 @@ onMounted(load)
   gap: 1rem;
 }
 
+/* ── Per-capital mobility chart ── */
+.bento-cap-mobility { grid-column: span 3; }
+.cap-mobility-list { display: flex; flex-direction: column; gap: 0.65rem; }
+.cap-mobility-row { display: flex; align-items: center; gap: 0.6rem; }
+.cap-mob-name { display: flex; align-items: center; gap: 0.35rem; min-width: 120px; flex-shrink: 0; }
+.cap-mob-icon { font-size: 1rem; }
+.cap-mob-label { font-size: 0.75rem; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap-mob-bars { flex: 1; height: 12px; display: flex; border-radius: 999px; overflow: hidden; background: var(--color-surface-alt); min-width: 80px; }
+.cap-mob-bar { height: 100%; transition: width 0.5s ease; min-width: 0; }
+.cap-mob-bar.improved { background: #22c55e; }
+.cap-mob-bar.same { background: #94a3b8; }
+.cap-mob-bar.decreased { background: #ef4444; }
+.cap-mob-counts { display: flex; gap: 0.3rem; flex-shrink: 0; }
+.cap-mob-count { font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 4px; display: flex; align-items: center; gap: 2px; }
+.cap-mob-count i { font-size: 0.65rem; }
+.cap-mob-count.improved { color: #22c55e; background: rgba(34,197,94,0.1); }
+.cap-mob-count.same { color: #64748b; background: rgba(100,116,139,0.1); }
+.cap-mob-count.decreased { color: #ef4444; background: rgba(239,68,68,0.1); }
+.cap-mob-legend { margin-top: 0.75rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.cap-mob-legend-item { font-size: 0.7rem; color: var(--color-text-muted); display: flex; align-items: center; gap: 4px; }
+.cap-mob-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cap-mob-legend-item.improved .cap-mob-dot { background: #22c55e; }
+.cap-mob-legend-item.same .cap-mob-dot { background: #94a3b8; }
+.cap-mob-legend-item.decreased .cap-mob-dot { background: #ef4444; }
+.mt-2 { margin-top: 0.5rem; }
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .bento-grid { grid-template-columns: 1fr 1fr; }
-  .bento-poverty, .bento-district { grid-column: span 2; }
+  .bento-poverty, .bento-district, .bento-cap-mobility { grid-column: span 2; }
   .bento-mobility { grid-column: span 2; }
   .cap-stats-row { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 600px) {
   .admin-dashboard { padding: 0; }
   .bento-grid { grid-template-columns: 1fr; }
-  .bento-poverty, .bento-district, .bento-mobility { grid-column: span 1; }
+  .bento-poverty, .bento-district, .bento-mobility, .bento-cap-mobility { grid-column: span 1; }
   .dash-filters { flex-direction: column; }
   .capital-tabs { gap: 0.25rem; }
   .capital-tab { font-size: 0.76rem; padding: 0.4rem 0.625rem; }
   .cap-stats-row { grid-template-columns: 1fr; }
   .cap-banner { flex-direction: column; text-align: center; }
+  .cap-mob-name { min-width: 80px; }
+  .cap-mob-counts { flex-direction: column; gap: 0.15rem; }
 }
 </style>
 

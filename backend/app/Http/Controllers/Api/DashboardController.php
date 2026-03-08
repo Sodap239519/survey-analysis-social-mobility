@@ -60,6 +60,9 @@ class DashboardController extends Controller
         // Mobility counts (before vs after)
         $mobility = $this->getMobilityCounts($district, $subdistrict);
 
+        // Per-capital mobility counts (before vs after for each capital)
+        $mobilityByCapital = $this->getMobilityByCapital($district, $subdistrict);
+
         // District/subdistrict breakdown
         $byDistrict = $this->getByDistrict($period, $district, $subdistrict);
 
@@ -67,13 +70,14 @@ class DashboardController extends Controller
         $overallPoverty = $this->getOverallPovertyLevels(clone $responseQuery);
 
         return response()->json([
-            'total_house_codes'  => $totalHouseCodes,
-            'total_respondents'  => $totalRespondents,
-            'total_responses'    => $totalResponses,
-            'poverty_by_capital' => $povertyByCapital,
-            'overall_poverty'    => $overallPoverty,
-            'mobility'           => $mobility,
-            'by_district'        => $byDistrict,
+            'total_house_codes'    => $totalHouseCodes,
+            'total_respondents'    => $totalRespondents,
+            'total_responses'      => $totalResponses,
+            'poverty_by_capital'   => $povertyByCapital,
+            'overall_poverty'      => $overallPoverty,
+            'mobility'             => $mobility,
+            'mobility_by_capital'  => $mobilityByCapital,
+            'by_district'          => $byDistrict,
         ]);
     }
 
@@ -174,6 +178,73 @@ class DashboardController extends Controller
             'same'      => $same,
             'decreased' => $decreased,
         ];
+    }
+
+    private function getMobilityByCapital(?string $district, ?string $subdistrict): array
+    {
+        $capitals = [
+            'human'     => 'score_human',
+            'physical'  => 'score_physical',
+            'financial' => 'score_financial',
+            'natural'   => 'score_natural',
+            'social'    => 'score_social',
+        ];
+
+        $result = [];
+
+        foreach ($capitals as $slug => $scoreCol) {
+            $beforeQuery = SurveyResponse::query()->where('period', 'before')->whereNotNull($scoreCol);
+            $afterQuery  = SurveyResponse::query()->where('period', 'after')->whereNotNull($scoreCol);
+
+            if ($district) {
+                $beforeQuery->whereHas('household', function ($q) use ($district) {
+                    $q->where('district_name', 'like', "%{$district}%");
+                });
+                $afterQuery->whereHas('household', function ($q) use ($district) {
+                    $q->where('district_name', 'like', "%{$district}%");
+                });
+            }
+
+            if ($subdistrict) {
+                $beforeQuery->whereHas('household', function ($q) use ($subdistrict) {
+                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
+                });
+                $afterQuery->whereHas('household', function ($q) use ($subdistrict) {
+                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
+                });
+            }
+
+            $beforeMap = $beforeQuery->pluck($scoreCol, 'household_id')->toArray();
+            $afterMap  = $afterQuery->pluck($scoreCol, 'household_id')->toArray();
+
+            $improved  = 0;
+            $same      = 0;
+            $decreased = 0;
+
+            foreach ($afterMap as $householdId => $afterScore) {
+                if (!isset($beforeMap[$householdId])) {
+                    continue;
+                }
+
+                $diff = (float) $afterScore - (float) $beforeMap[$householdId];
+
+                if ($diff > 0.01) {
+                    $improved++;
+                } elseif ($diff < -0.01) {
+                    $decreased++;
+                } else {
+                    $same++;
+                }
+            }
+
+            $result[$slug] = [
+                'improved'  => $improved,
+                'same'      => $same,
+                'decreased' => $decreased,
+            ];
+        }
+
+        return $result;
     }
 
     private function getByDistrict(string $period, ?string $district, ?string $subdistrict): array
