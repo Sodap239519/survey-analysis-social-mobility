@@ -111,18 +111,44 @@
           <div class="stat-sub">ครั้งที่บันทึก</div>
         </div>
 
-        <!-- Poverty levels -->
+        <!-- Poverty Levels — Area/Line Chart -->
         <div class="bento-poverty card">
           <h3 class="card-title"><i class="fi fi-rr-stats"></i> การกระจายระดับความยากจน (รวม)</h3>
-          <div class="poverty-bars">
-            <div v-for="level in 4" :key="level" class="poverty-bar-row">
-              <span class="poverty-label">{{ POVERTY_LEVEL_NAMES[level] }}</span>
-              <div class="poverty-bar-bg">
-                <div class="poverty-bar-fill" :style="{ width: povertyPct(overallPoverty[level], overallTotal) + '%', background: povertyColor(level) }"></div>
-              </div>
-              <span class="poverty-count">{{ overallPoverty[level] }}</span>
-            </div>
-          </div>
+          <svg viewBox="0 0 420 165" class="poverty-area-svg" aria-label="Area chart of poverty distribution by level">
+            <defs>
+              <linearGradient id="adminPovAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.22"/>
+                <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.02"/>
+              </linearGradient>
+            </defs>
+            <!-- Horizontal grid lines -->
+            <line v-for="frac in [0.25, 0.5, 0.75]" :key="frac"
+              x1="50" x2="390"
+              :y1="(overallAreaChart.baseY - frac * overallAreaChart.chartH).toFixed(1)"
+              :y2="(overallAreaChart.baseY - frac * overallAreaChart.chartH).toFixed(1)"
+              stroke="#f1f5f9" stroke-width="1"
+            />
+            <!-- Baseline -->
+            <line x1="50" x2="390" :y1="overallAreaChart.baseY" :y2="overallAreaChart.baseY" stroke="#e2e8f0" stroke-width="1.5"/>
+            <!-- Area fill -->
+            <path :d="overallAreaChart.areaPath" fill="url(#adminPovAreaGrad)"/>
+            <!-- Smooth line -->
+            <path :d="overallAreaChart.linePath" fill="none" stroke="#0ea5e9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Data points and count labels -->
+            <g v-for="pt in overallAreaChart.points" :key="pt.level">
+              <circle :cx="pt.x" :cy="pt.y" r="6" :fill="povertyColor(pt.level)" stroke="#fff" stroke-width="2"/>
+              <text :x="pt.x" :y="(pt.y - 13).toFixed(1)" text-anchor="middle" font-size="10" font-weight="700"
+                :fill="povertyColor(pt.level)" font-family="Prompt, sans-serif">{{ pt.count }}</text>
+            </g>
+            <!-- X-axis level labels -->
+            <text v-for="pt in overallAreaChart.points" :key="'xl-' + pt.level"
+              :x="pt.x" :y="overallAreaChart.baseY + 16"
+              text-anchor="middle" font-size="9.5" fill="#64748b" font-family="Prompt, sans-serif"
+            >{{ POVERTY_LEVEL_NAMES[pt.level] }}</text>
+            <!-- Y-axis value hints -->
+            <text x="46" :y="overallAreaChart.topY + 2" text-anchor="end" font-size="8" fill="#94a3b8" font-family="Prompt, sans-serif">{{ overallAreaChart.maxCount }}</text>
+            <text x="46" :y="(overallAreaChart.baseY - overallAreaChart.chartH * 0.5 + 2).toFixed(1)" text-anchor="end" font-size="8" fill="#94a3b8" font-family="Prompt, sans-serif">{{ Math.round(overallAreaChart.maxCount * 0.5) }}</text>
+          </svg>
           <div class="poverty-legend">
             <span v-for="(desc, level) in POVERTY_DESC" :key="level" class="poverty-legend-item">
               <span class="legend-dot" :style="{ background: povertyColor(Number(level)) }"></span>
@@ -461,43 +487,60 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Mobility indicator for this capital -->
-        <div class="bento-mobility card">
-          <h3 class="card-title"><i class="fi fi-rr-arrows-alt"></i> การเปลี่ยนแปลง — {{ cap.nameTh }} (ก่อน → หลัง)</h3>
-          <div class="mobility-pills">
-            <div class="mobility-pill improved">
-              <i class="fi fi-rr-arrow-trend-up mobility-icon"></i>
-              <div class="mobility-count">{{ capitalMobility(cap.slug).improved }}</div>
-              <div class="mobility-label">ดีขึ้น</div>
+          <!-- Mobility chart for this capital -->
+          <div class="bento-mobility card">
+            <h3 class="card-title"><i class="fi fi-rr-arrows-alt"></i> การยกระดับ/เปลี่ยนแปลง — {{ cap.nameTh }} (ก่อน → หลัง)</h3>
+            <div class="mobility-pills">
+              <div class="mobility-pill improved">
+                <i class="fi fi-rr-arrow-trend-up mobility-icon"></i>
+                <div class="mobility-count">{{ capitalMobility(cap.slug).improved }}</div>
+                <div class="mobility-label">ดีขึ้น</div>
+              </div>
+              <div class="mobility-pill same">
+                <i class="fi fi-rr-arrow-right mobility-icon"></i>
+                <div class="mobility-count">{{ capitalMobility(cap.slug).same }}</div>
+                <div class="mobility-label">คงที่</div>
+              </div>
+              <div class="mobility-pill decreased">
+                <i class="fi fi-rr-arrow-trend-down mobility-icon"></i>
+                <div class="mobility-count">{{ capitalMobility(cap.slug).decreased }}</div>
+                <div class="mobility-label">แย่ลง</div>
+              </div>
             </div>
-            <div class="mobility-pill same">
-              <i class="fi fi-rr-arrow-right mobility-icon"></i>
-              <div class="mobility-count">{{ capitalMobility(cap.slug).same }}</div>
-              <div class="mobility-label">คงที่</div>
+            <!-- Enhanced stacked bar chart -->
+            <div class="mob-stacked-wrap mt-3">
+              <div class="mob-stacked-bar">
+                <div class="mob-seg improved"
+                  :style="{ flex: capitalMobility(cap.slug).improved || 0.01 }"
+                  :title="`ดีขึ้น: ${capitalMobility(cap.slug).improved}`">
+                  <span v-if="mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) >= 10" class="mob-seg-pct">
+                    {{ mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) }}%
+                  </span>
+                </div>
+                <div class="mob-seg same"
+                  :style="{ flex: capitalMobility(cap.slug).same || 0.01 }"
+                  :title="`คงที่: ${capitalMobility(cap.slug).same}`">
+                  <span v-if="mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) >= 10" class="mob-seg-pct">
+                    {{ mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) }}%
+                  </span>
+                </div>
+                <div class="mob-seg decreased"
+                  :style="{ flex: capitalMobility(cap.slug).decreased || 0.01 }"
+                  :title="`แย่ลง: ${capitalMobility(cap.slug).decreased}`">
+                  <span v-if="mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) >= 10" class="mob-seg-pct">
+                    {{ mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) }}%
+                  </span>
+                </div>
+              </div>
+              <div class="mob-stacked-legend">
+                <span class="mob-stacked-legend-item improved"><i class="fi fi-rr-arrow-trend-up"></i> ดีขึ้น {{ mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) }}%</span>
+                <span class="mob-stacked-legend-item same"><i class="fi fi-rr-arrow-right"></i> คงที่ {{ mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) }}%</span>
+                <span class="mob-stacked-legend-item decreased"><i class="fi fi-rr-arrow-trend-down"></i> แย่ลง {{ mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) }}%</span>
+              </div>
             </div>
-            <div class="mobility-pill decreased">
-              <i class="fi fi-rr-arrow-trend-down mobility-icon"></i>
-              <div class="mobility-count">{{ capitalMobility(cap.slug).decreased }}</div>
-              <div class="mobility-label">แย่ลง</div>
-            </div>
+            <p class="text-muted text-sm mt-2">เปรียบเทียบ score ทุน{{ cap.nameTh }} ก่อนและหลังเข้าร่วมโครงการ</p>
           </div>
-          <div class="cap-mob-bars mt-2" style="border-radius:999px;overflow:hidden;height:14px;">
-            <div
-              class="cap-mob-bar improved"
-              :style="{ width: mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) + '%' }"
-            ></div>
-            <div
-              class="cap-mob-bar same"
-              :style="{ width: mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) + '%' }"
-            ></div>
-            <div
-              class="cap-mob-bar decreased"
-              :style="{ width: mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) + '%' }"
-            ></div>
-          </div>
-          <p class="text-muted text-sm mt-2">เปรียบเทียบ score ทุน{{ cap.nameTh }} ก่อนและหลังเข้าร่วมโครงการ</p>
         </div>
 
         <!-- District breakdown -->
@@ -566,6 +609,31 @@ const POVERTY_LEVEL_NAMES = { 1: 'อยู่ลำบาก', 2: 'อยู่
 
 const overallPoverty = computed(() => store.data?.overall_poverty || { 1: 0, 2: 0, 3: 0, 4: 0 })
 const overallTotal = computed(() => Object.values(overallPoverty.value).reduce((a, b) => a + b, 0))
+
+// ─── Overview poverty area chart ──────────────────────────────────────────
+const overallAreaChart = computed(() => {
+  const padL = 50, padR = 30, padT = 32, padB = 30
+  const svgW = 420, svgH = 165
+  const chartW = svgW - padL - padR
+  const chartH = svgH - padT - padB
+  const baseY = svgH - padB
+  const topY = padT
+  const counts = [1, 2, 3, 4].map(l => Number(overallPoverty.value[l]) || 0)
+  const maxCount = Math.max(...counts, 1)
+  const points = [1, 2, 3, 4].map((l, i) => ({
+    level: l,
+    count: counts[i],
+    x: parseFloat((padL + (i / 3) * chartW).toFixed(1)),
+    y: parseFloat((baseY - (counts[i] / maxCount) * chartH).toFixed(1)),
+  }))
+  let linePath = `M ${points[0].x} ${points[0].y}`
+  for (let i = 1; i < points.length; i++) {
+    const dx = (points[i].x - points[i - 1].x) * 0.4
+    linePath += ` C ${(points[i - 1].x + dx).toFixed(1)} ${points[i - 1].y} ${(points[i].x - dx).toFixed(1)} ${points[i].y} ${points[i].x} ${points[i].y}`
+  }
+  const areaPath = linePath + ` L ${points[3].x} ${baseY} L ${points[0].x} ${baseY} Z`
+  return { points, linePath, areaPath, maxCount, baseY, topY, chartH }
+})
 
 const capitalPovertyMap = computed(() => {
   const base = { 1: 0, 2: 0, 3: 0, 4: 0 }
@@ -889,6 +957,29 @@ watch(() => route.fullPath, async () => {
 .poverty-legend-item { font-size: 0.7rem; color: var(--color-text-muted); display: flex; align-items: center; gap: 4px; }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 
+/* ── Poverty area chart ── */
+.poverty-area-svg { width: 100%; height: auto; overflow: visible; display: block; }
+
+/* ── Enhanced mobility stacked bar ── */
+.mob-stacked-bar {
+  display: flex;
+  height: 38px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-surface-alt);
+  margin-bottom: 0.5rem;
+}
+.mob-seg { height: 100%; min-width: 0; transition: flex 0.5s ease; display: flex; align-items: center; justify-content: center; }
+.mob-seg.improved { background: #22c55e; }
+.mob-seg.same { background: #94a3b8; }
+.mob-seg.decreased { background: #ef4444; }
+.mob-seg-pct { font-size: 0.72rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.mob-stacked-legend { display: flex; gap: 0.625rem; flex-wrap: wrap; font-size: 0.72rem; }
+.mob-stacked-legend-item { display: flex; align-items: center; gap: 0.25rem; font-weight: 600; }
+.mob-stacked-legend-item.improved { color: #22c55e; }
+.mob-stacked-legend-item.same { color: #64748b; }
+.mob-stacked-legend-item.decreased { color: #ef4444; }
+
 /* ── Mobility ── */
 .mobility-pills { display: flex; gap: 0.75rem; justify-content: space-around; flex-wrap: wrap; }
 .mobility-pill { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.75rem 1rem; border-radius: var(--radius-md); min-width: 70px; }
@@ -980,9 +1071,11 @@ watch(() => route.fullPath, async () => {
 }
 .cap-detail-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
 }
+/* Override overview span rules inside the capital detail grid */
+.cap-detail-grid .bento-poverty { grid-column: span 1; }
 .cap-donut-center { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
 .donut-svg-lg { width: 140px; height: 140px; overflow: visible; flex-shrink: 0; }
 .donut-legend { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -999,7 +1092,8 @@ watch(() => route.fullPath, async () => {
   .bento-radar { grid-column: span 1; }
   .bento-mobility { grid-column: span 2; }
   .cap-stats-row { grid-template-columns: 1fr 1fr; }
-  .cap-detail-grid { grid-template-columns: 1fr; }
+  .cap-detail-grid { grid-template-columns: 1fr 1fr; }
+  .cap-detail-grid .bento-mobility { grid-column: span 2; }
 }
 @media (max-width: 600px) {
   .admin-dashboard { padding: 0; }
@@ -1013,5 +1107,7 @@ watch(() => route.fullPath, async () => {
   .cap-banner { flex-direction: column; text-align: center; }
   .cap-mob-name { min-width: 80px; }
   .cap-mob-counts { flex-direction: column; gap: 0.15rem; }
+  .cap-detail-grid { grid-template-columns: 1fr; }
+  .cap-detail-grid .bento-mobility { grid-column: span 1; }
 }
 </style>
