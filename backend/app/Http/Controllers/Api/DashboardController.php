@@ -67,6 +67,7 @@ class DashboardController extends Controller
 
         // Per-capital mobility counts (before vs after for each capital)
         $mobilityByCapital = $this->getMobilityByCapital($district, $subdistrict, $surveyYear);
+        $mobilityByCapitalByLevel = $this->getMobilityByCapitalByLevel($district, $subdistrict, $surveyYear);
 
         // District/subdistrict breakdown
         $byDistrict = $this->getByDistrict($period, $district, $subdistrict, $surveyYear);
@@ -92,8 +93,9 @@ class DashboardController extends Controller
             'poverty_by_capital'   => $povertyByCapital,
             'overall_poverty'      => $overallPoverty,
             'mobility'             => $mobility,
-            'mobility_by_capital'  => $mobilityByCapital,
-            'by_district'          => $byDistrict,
+            'mobility_by_capital'          => $mobilityByCapital,
+            'mobility_by_capital_by_level' => $mobilityByCapitalByLevel,
+            'by_district'                  => $byDistrict,
         ]);
     }
 
@@ -281,6 +283,80 @@ class DashboardController extends Controller
                 'same'      => $same,
                 'decreased' => $decreased,
             ];
+        }
+
+        return $result;
+    }
+
+    private function getMobilityByCapitalByLevel(?string $district, ?string $subdistrict, ?int $surveyYear): array
+    {
+        $capitals = [
+            'human'     => 'score_human',
+            'physical'  => 'score_physical',
+            'financial' => 'score_financial',
+            'natural'   => 'score_natural',
+            'social'    => 'score_social',
+        ];
+
+        $result = [];
+
+        foreach ($capitals as $slug => $scoreCol) {
+            $beforeQuery = SurveyResponse::query()->where('period', 'before')->whereNotNull($scoreCol);
+            $afterQuery  = SurveyResponse::query()->where('period', 'after')->whereNotNull($scoreCol);
+
+            if ($surveyYear) {
+                $beforeQuery->where('survey_year', $surveyYear);
+                $afterQuery->where('survey_year', $surveyYear);
+            }
+
+            if ($district) {
+                $beforeQuery->whereHas('household', function ($q) use ($district) {
+                    $q->where('district_name', 'like', "%{$district}%");
+                });
+                $afterQuery->whereHas('household', function ($q) use ($district) {
+                    $q->where('district_name', 'like', "%{$district}%");
+                });
+            }
+
+            if ($subdistrict) {
+                $beforeQuery->whereHas('household', function ($q) use ($subdistrict) {
+                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
+                });
+                $afterQuery->whereHas('household', function ($q) use ($subdistrict) {
+                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
+                });
+            }
+
+            $beforeMap = $beforeQuery->pluck($scoreCol, 'household_id')->toArray();
+            $afterMap  = $afterQuery->pluck($scoreCol, 'household_id')->toArray();
+
+            $levels = [
+                1 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+                2 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+                3 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+                4 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+            ];
+
+            foreach ($afterMap as $householdId => $afterScore) {
+                if (!isset($beforeMap[$householdId])) {
+                    continue;
+                }
+
+                $x = 1.0 + ((float) $afterScore / 100.0) * 3.0;
+                $level = $this->povertyLevel($x);
+
+                $diff = (float) $afterScore - (float) $beforeMap[$householdId];
+
+                if ($diff > 0.01) {
+                    $levels[$level]['improved']++;
+                } elseif ($diff < -0.01) {
+                    $levels[$level]['decreased']++;
+                } else {
+                    $levels[$level]['same']++;
+                }
+            }
+
+            $result[$slug] = $levels;
         }
 
         return $result;
