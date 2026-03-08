@@ -242,9 +242,10 @@ onMounted(load)
   gap: 1rem;
 }
 .dash-title {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   margin-bottom: 0.25rem;
+  color: var(--color-text);
 }
 
 .dash-filters {
@@ -252,10 +253,11 @@ onMounted(load)
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 1.5rem;
-  background: var(--color-surface);
+  background: #fff;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 1rem;
+  box-shadow: var(--shadow-sm);
 }
 
 /* Bento grid */
@@ -271,8 +273,8 @@ onMounted(load)
   flex-direction: column;
   gap: 0.25rem;
 }
-.stat-label { font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-.stat-value { font-size: 2.5rem; font-weight: 800; color: var(--color-primary); line-height: 1; }
+.stat-label { font-size: 0.775rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.stat-value { font-size: 2.25rem; font-weight: 800; color: var(--color-primary); line-height: 1.1; }
 .stat-sub { font-size: 0.75rem; color: var(--color-text-muted); }
 
 .bento-poverty {
@@ -289,7 +291,7 @@ onMounted(load)
 }
 
 .card-title {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   margin-bottom: 1rem;
   color: var(--color-text);
@@ -299,21 +301,21 @@ onMounted(load)
 .poverty-bars { display: flex; flex-direction: column; gap: 0.6rem; }
 .poverty-bar-row { display: flex; align-items: center; gap: 0.5rem; }
 .poverty-label { font-size: 0.75rem; color: var(--color-text-muted); width: 60px; flex-shrink: 0; }
-.poverty-bar-bg { flex: 1; height: 12px; background: var(--color-surface-alt); border-radius: 999px; overflow: hidden; }
+.poverty-bar-bg { flex: 1; height: 10px; background: var(--color-surface-alt); border-radius: 999px; overflow: hidden; }
 .poverty-bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; min-width: 2px; }
-.poverty-count { font-size: 0.75rem; font-weight: 700; width: 40px; text-align: right; }
+.poverty-count { font-size: 0.75rem; font-weight: 700; width: 40px; text-align: right; color: var(--color-text); }
 .poverty-legend { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .poverty-legend-item { font-size: 0.7rem; color: var(--color-text-muted); display: flex; align-items: center; gap: 4px; }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
 /* Mobility */
-.mobility-pills { display: flex; gap: 1rem; justify-content: space-around; }
-.mobility-pill { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.75rem 1rem; border-radius: 12px; min-width: 70px; }
-.mobility-pill.improved { background: rgba(34,197,94,0.15); border: 1px solid #22c55e; }
-.mobility-pill.same { background: rgba(148,163,184,0.15); border: 1px solid #94a3b8; }
-.mobility-pill.decreased { background: rgba(239,68,68,0.15); border: 1px solid #ef4444; }
+.mobility-pills { display: flex; gap: 0.75rem; justify-content: space-around; flex-wrap: wrap; }
+.mobility-pill { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.75rem 1rem; border-radius: var(--radius-md); min-width: 70px; }
+.mobility-pill.improved { background: rgba(34,197,94,0.1); border: 1.5px solid #22c55e; }
+.mobility-pill.same { background: rgba(100,116,139,0.08); border: 1.5px solid #94a3b8; }
+.mobility-pill.decreased { background: rgba(239,68,68,0.08); border: 1.5px solid #ef4444; }
 .mobility-icon { font-size: 1.25rem; }
-.mobility-count { font-size: 1.5rem; font-weight: 800; }
+.mobility-count { font-size: 1.5rem; font-weight: 800; color: var(--color-text); }
 .mobility-label { font-size: 0.7rem; color: var(--color-text-muted); }
 
 /* Capital cards */
@@ -325,7 +327,7 @@ onMounted(load)
 .cap-level-label { font-size: 0.7rem; color: var(--color-text-muted); width: 36px; flex-shrink: 0; }
 .cap-level-bar-bg { flex: 1; height: 8px; background: var(--color-surface-alt); border-radius: 999px; overflow: hidden; }
 .cap-level-bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; min-width: 2px; }
-.cap-level-count { font-size: 0.7rem; font-weight: 600; width: 30px; text-align: right; }
+.cap-level-count { font-size: 0.7rem; font-weight: 600; width: 30px; text-align: right; color: var(--color-text); }
 
 @media (max-width: 900px) {
   .bento-grid { grid-template-columns: 1fr 1fr; }
@@ -333,8 +335,10 @@ onMounted(load)
   .bento-mobility { grid-column: span 2; }
 }
 @media (max-width: 600px) {
+  .dashboard-page { padding: 1rem; }
   .bento-grid { grid-template-columns: 1fr; }
   .bento-poverty, .bento-district, .bento-mobility { grid-column: span 1; }
   .dash-filters { flex-direction: column; }
+  .dash-title { font-size: 1.15rem; }
 }
 </style>
