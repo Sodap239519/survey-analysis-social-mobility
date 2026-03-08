@@ -5,6 +5,24 @@
       <RouterLink to="/admin/responses/new" class="btn btn-primary">➕ เพิ่มการสำรวจ</RouterLink>
     </div>
 
+    <div class="flex gap-4 mb-4" style="flex-wrap:wrap">
+      <div class="form-group" style="min-width:140px">
+        <label>ปี พ.ศ.</label>
+        <select v-model="filterYear" @change="load">
+          <option value="">ทุกปี</option>
+          <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
+        </select>
+      </div>
+      <div class="form-group" style="min-width:140px">
+        <label>ช่วงเวลา</label>
+        <select v-model="filterPeriod" @change="load">
+          <option value="">ทุกช่วงเวลา</option>
+          <option value="after">หลังโครงการ</option>
+          <option value="before">ก่อนโครงการ</option>
+        </select>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading">กำลังโหลด...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
@@ -14,7 +32,7 @@
             <tr>
               <th>รหัสบ้าน</th>
               <th>ช่วงเวลา</th>
-              <th>ปี</th>
+              <th>ปี พ.ศ.</th>
               <th>ระดับความยากจน</th>
               <th>คะแนนรวม</th>
               <th>ทุนมนุษย์</th>
@@ -63,11 +81,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '../../api'
+import { useAvailableYears } from '../../composables/useAvailableYears'
 
 const responses = ref({ data: [], total: 0, last_page: 1 })
 const loading = ref(false)
 const error = ref('')
 const page = ref(1)
+const filterPeriod = ref('')
+const { availableYears, selectedYear: filterYear, loadYears } = useAvailableYears()
 
 function levelColor(level) {
   const colors = { 1: '#ef4444', 2: '#f97316', 3: '#eab308', 4: '#22c55e' }
@@ -78,7 +99,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get('/responses', { params: { page: page.value } })
+    const params = { page: page.value }
+    if (filterYear.value) params.survey_year = filterYear.value
+    if (filterPeriod.value) params.period = filterPeriod.value
+    const res = await api.get('/responses', { params })
     responses.value = res.data
   } catch (e) {
     error.value = e.response?.data?.message || 'เกิดข้อผิดพลาด'
@@ -90,5 +114,8 @@ async function load() {
 function prevPage() { page.value--; load() }
 function nextPage() { page.value++; load() }
 
-onMounted(load)
+onMounted(async () => {
+  await loadYears()
+  load()
+})
 </script>

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     // Dashboard - public read-only
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/years', [DashboardController::class, 'years']);
 
     // Questions / choices - public read-only (for form generation)
     Route::get('/questions', [QuestionController::class, 'index']);

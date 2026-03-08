@@ -25,6 +25,10 @@ class HouseholdController extends Controller
             });
         }
 
+        if ($request->filled('survey_year')) {
+            $query->where('survey_year', (int) $request->survey_year);
+        }
+
         $households = $query->orderBy('house_code')
             ->paginate($request->integer('per_page', 20));
 

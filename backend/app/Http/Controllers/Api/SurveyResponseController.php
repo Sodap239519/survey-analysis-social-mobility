@@ -26,6 +26,10 @@ class SurveyResponseController extends Controller
             $query->where('period', $request->period);
         }
 
+        if ($request->filled('survey_year')) {
+            $query->where('survey_year', (int) $request->survey_year);
+        }
+
         return response()->json($query->paginate($request->integer('per_page', 20)));
     }
 
