@@ -136,6 +136,46 @@
         </div>
       </div>
 
+      <!-- Per-capital mobility comparison chart -->
+      <div class="bento-cap-mobility card">
+        <h3 class="card-title">การเปลี่ยนแปลงแต่ละด้านทุน (ก่อน → หลัง)</h3>
+        <div class="cap-mobility-list">
+          <div v-for="cap in capitals" :key="cap.slug" class="cap-mobility-row">
+            <span class="cap-mob-name" :title="cap.nameTh">
+              <span class="cap-mob-icon">{{ cap.icon }}</span>
+              <span class="cap-mob-label">{{ cap.nameTh }}</span>
+            </span>
+            <div class="cap-mob-bars">
+              <div
+                class="cap-mob-bar improved"
+                :style="{ width: mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) + '%' }"
+                :title="'ดีขึ้น: ' + capitalMobility(cap.slug).improved"
+              ></div>
+              <div
+                class="cap-mob-bar same"
+                :style="{ width: mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) + '%' }"
+                :title="'เท่าเดิม: ' + capitalMobility(cap.slug).same"
+              ></div>
+              <div
+                class="cap-mob-bar decreased"
+                :style="{ width: mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) + '%' }"
+                :title="'แย่ลง: ' + capitalMobility(cap.slug).decreased"
+              ></div>
+            </div>
+            <div class="cap-mob-counts">
+              <span class="cap-mob-count improved">↑{{ capitalMobility(cap.slug).improved }}</span>
+              <span class="cap-mob-count same">→{{ capitalMobility(cap.slug).same }}</span>
+              <span class="cap-mob-count decreased">↓{{ capitalMobility(cap.slug).decreased }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="cap-mob-legend">
+          <span class="cap-mob-legend-item improved"><span class="cap-mob-dot"></span>ดีขึ้น</span>
+          <span class="cap-mob-legend-item same"><span class="cap-mob-dot"></span>เท่าเดิม</span>
+          <span class="cap-mob-legend-item decreased"><span class="cap-mob-dot"></span>แย่ลง</span>
+        </div>
+      </div>
+
       <!-- District breakdown -->
       <div class="bento-district card" v-if="store.data.by_district?.length">
         <h3 class="card-title">จำนวนรหัสบ้านตามอำเภอ</h3>
@@ -178,10 +218,10 @@ const auth = useAuthStore()
 const filters = ref({ district: '', subdistrict: '', period: 'after' })
 
 const POVERTY_DESC = {
-  1: 'ระดับ 1 (1.00–1.74): ยากจนมาก',
-  2: 'ระดับ 2 (1.75–2.49): ยากจน',
-  3: 'ระดับ 3 (2.50–3.24): เปราะบาง',
-  4: 'ระดับ 4 (3.25–4.00): พอเพียง',
+  1: 'ระดับ 1 (1.00–1.74): อยู่ลำบาก',
+  2: 'ระดับ 2 (1.75–2.49): อยู่ยาก',
+  3: 'ระดับ 3 (2.50–3.24): พออยู่ได้',
+  4: 'ระดับ 4 (3.25–4.00): อยู่ดี',
 }
 
 const capitals = [
@@ -194,6 +234,22 @@ const capitals = [
 
 const overallPoverty = computed(() => store.data?.overall_poverty || { 1: 0, 2: 0, 3: 0, 4: 0 })
 const overallTotal = computed(() => Object.values(overallPoverty.value).reduce((a, b) => a + b, 0))
+
+const mobilityByCapital = computed(() => store.data?.mobility_by_capital || {})
+
+function capitalMobility(slug) {
+  return mobilityByCapital.value[slug] || { improved: 0, same: 0, decreased: 0 }
+}
+
+function mobilityTotal(slug) {
+  const m = capitalMobility(slug)
+  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)
+}
+
+function mobilityPct(count, total) {
+  if (!total) return 0
+  return Math.round((count / total) * 100)
+}
 
 function capitalPoverty(slug) {
   return store.data?.poverty_by_capital?.[slug] || { 1: 0, 2: 0, 3: 0, 4: 0 }
@@ -329,16 +385,43 @@ onMounted(load)
 .cap-level-bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; min-width: 2px; }
 .cap-level-count { font-size: 0.7rem; font-weight: 600; width: 30px; text-align: right; color: var(--color-text); }
 
+/* Per-capital mobility chart */
+.bento-cap-mobility {
+  grid-column: span 3;
+}
+.cap-mobility-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.cap-mobility-row { display: flex; align-items: center; gap: 0.6rem; }
+.cap-mob-name { display: flex; align-items: center; gap: 0.3rem; min-width: 130px; flex-shrink: 0; }
+.cap-mob-icon { font-size: 1rem; }
+.cap-mob-label { font-size: 0.75rem; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap-mob-bars { flex: 1; height: 12px; display: flex; border-radius: 999px; overflow: hidden; background: var(--color-surface-alt); min-width: 80px; }
+.cap-mob-bar { height: 100%; transition: width 0.5s ease; min-width: 0; }
+.cap-mob-bar.improved { background: #22c55e; }
+.cap-mob-bar.same { background: #94a3b8; }
+.cap-mob-bar.decreased { background: #ef4444; }
+.cap-mob-counts { display: flex; gap: 0.35rem; flex-shrink: 0; }
+.cap-mob-count { font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.3rem; border-radius: 4px; }
+.cap-mob-count.improved { color: #22c55e; background: rgba(34,197,94,0.1); }
+.cap-mob-count.same { color: #64748b; background: rgba(100,116,139,0.1); }
+.cap-mob-count.decreased { color: #ef4444; background: rgba(239,68,68,0.1); }
+.cap-mob-legend { margin-top: 0.75rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.cap-mob-legend-item { font-size: 0.7rem; color: var(--color-text-muted); display: flex; align-items: center; gap: 4px; }
+.cap-mob-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cap-mob-legend-item.improved .cap-mob-dot { background: #22c55e; }
+.cap-mob-legend-item.same .cap-mob-dot { background: #94a3b8; }
+.cap-mob-legend-item.decreased .cap-mob-dot { background: #ef4444; }
+
 @media (max-width: 900px) {
   .bento-grid { grid-template-columns: 1fr 1fr; }
-  .bento-poverty, .bento-district { grid-column: span 2; }
+  .bento-poverty, .bento-district, .bento-cap-mobility { grid-column: span 2; }
   .bento-mobility { grid-column: span 2; }
 }
 @media (max-width: 600px) {
   .dashboard-page { padding: 1rem; }
   .bento-grid { grid-template-columns: 1fr; }
-  .bento-poverty, .bento-district, .bento-mobility { grid-column: span 1; }
+  .bento-poverty, .bento-district, .bento-mobility, .bento-cap-mobility { grid-column: span 1; }
   .dash-filters { flex-direction: column; }
   .dash-title { font-size: 1.15rem; }
+  .cap-mob-name { min-width: 90px; }
 }
 </style>
