@@ -39,4 +39,5 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
 
     // Import
     Route::post('/import/households', [ImportController::class, 'importHouseholds']);
+    Route::get('/import/stats', [ImportController::class, 'stats']);
 });

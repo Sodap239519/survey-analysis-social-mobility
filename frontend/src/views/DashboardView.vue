@@ -105,7 +105,7 @@
           <div class="stat-icon-wrap" style="--ic:#0ea5e9"><i class="fi fi-rr-home"></i></div>
           <div class="stat-label">จำนวนรหัสบ้าน</div>
           <div class="stat-value">{{ store.data.total_house_codes.toLocaleString() }}</div>
-          <div class="stat-sub">รหัสบ้านที่นำเข้าทั้งหมด</div>
+          <div class="stat-sub">ครัวเรือนที่มีการสำรวจ</div>
         </div>
         <div class="bento-stat card">
           <div class="stat-icon-wrap" style="--ic:#6366f1"><i class="fi fi-rr-user"></i></div>
@@ -396,21 +396,25 @@
 
         <!-- District breakdown -->
         <div class="bento-district card" v-if="store.data.by_district?.length">
-          <h3 class="card-title"><i class="fi fi-rr-map-marker"></i> จำนวนรหัสบ้านตามอำเภอ</h3>
+          <h3 class="card-title"><i class="fi fi-rr-map-marker"></i> สรุปการสำรวจตามอำเภอ</h3>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>อำเภอ</th>
                   <th>รหัส</th>
-                  <th style="text-align:right">รหัสบ้าน</th>
+                  <th style="text-align:right">ตำบล</th>
+                  <th style="text-align:right">หมู่บ้าน</th>
+                  <th style="text-align:right">ครัวเรือน</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="d in store.data.by_district" :key="d.district_code">
                   <td>{{ d.district_name || '—' }}</td>
                   <td class="text-muted">{{ d.district_code }}</td>
-                  <td style="text-align:right;font-weight:700">{{ d.house_count }}</td>
+                  <td style="text-align:right">{{ d.subdistrict_count }}</td>
+                  <td style="text-align:right">{{ d.village_count }}</td>
+                  <td style="text-align:right;font-weight:700">{{ d.household_count }}</td>
                 </tr>
               </tbody>
             </table>
@@ -565,21 +569,25 @@
 
         <!-- District breakdown -->
         <div class="bento-district card" v-if="store.data.by_district?.length">
-          <h3 class="card-title"><i class="fi fi-rr-map-marker"></i> จำนวนรหัสบ้านตามอำเภอ</h3>
+          <h3 class="card-title"><i class="fi fi-rr-map-marker"></i> สรุปการสำรวจตามอำเภอ</h3>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>อำเภอ</th>
                   <th>รหัส</th>
-                  <th style="text-align:right">รหัสบ้าน</th>
+                  <th style="text-align:right">ตำบล</th>
+                  <th style="text-align:right">หมู่บ้าน</th>
+                  <th style="text-align:right">ครัวเรือน</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="d in store.data.by_district" :key="d.district_code">
                   <td>{{ d.district_name || '—' }}</td>
                   <td class="text-muted">{{ d.district_code }}</td>
-                  <td style="text-align:right;font-weight:700">{{ d.house_count }}</td>
+                  <td style="text-align:right">{{ d.subdistrict_count }}</td>
+                  <td style="text-align:right">{{ d.village_count }}</td>
+                  <td style="text-align:right;font-weight:700">{{ d.household_count }}</td>
                 </tr>
               </tbody>
             </table>
