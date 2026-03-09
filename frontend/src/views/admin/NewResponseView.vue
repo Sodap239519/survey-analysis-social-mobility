@@ -36,6 +36,32 @@
               <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
             </div>
           </div>
+          <!-- Optional location fields (used when auto-creating a new household) -->
+          <details class="location-details">
+            <summary class="location-summary">ข้อมูลที่ตั้ง (สำหรับรหัสบ้านใหม่)</summary>
+            <div class="form-grid mt-3">
+              <div class="form-group">
+                <label>จังหวัด</label>
+                <input v-model="form.province_name" placeholder="เช่น นครราชสีมา" />
+              </div>
+              <div class="form-group">
+                <label>อำเภอ</label>
+                <input v-model="form.district_name" placeholder="เช่น เมืองนครราชสีมา" />
+              </div>
+              <div class="form-group">
+                <label>ตำบล</label>
+                <input v-model="form.subdistrict_name" placeholder="เช่น ในเมือง" />
+              </div>
+              <div class="form-group">
+                <label>ชื่อหมู่บ้าน</label>
+                <input v-model="form.village_name" placeholder="เช่น บ้านหนองแวง" />
+              </div>
+              <div class="form-group">
+                <label>หมู่ที่</label>
+                <input v-model="form.village_no" placeholder="เช่น 5" />
+              </div>
+            </div>
+          </details>
         </div>
 
         <!-- Questions by capital -->
@@ -161,6 +187,11 @@ const form = ref({
   survey_year: 2568,
   surveyed_at: '',
   surveyor_name: '',
+  province_name: '',
+  district_name: '',
+  subdistrict_name: '',
+  village_name: '',
+  village_no: '',
 })
 
 // answers[questionId] = [choiceId, ...]  for multi-select (must be arrays)
@@ -247,19 +278,27 @@ async function submit() {
   submitError.value = ''
   submitSuccess.value = false
 
-  // Resolve household_id from house_code
+  // Resolve household_id from house_code; auto-create if not found
   let householdId
   try {
     const res = await api.get('/households', { params: { search: form.value.house_code, per_page: 1 } })
     const hh = res.data.data?.find(h => h.house_code === form.value.house_code)
     if (!hh) {
-      submitError.value = `ไม่พบรหัสบ้าน "${form.value.house_code}" — กรุณานำเข้าข้อมูลก่อน`
-      submitting.value = false
-      return
+      // Auto-create household with the provided house_code and optional location data
+      const createRes = await api.post('/households', {
+        house_code:       form.value.house_code,
+        province_name:    form.value.province_name || null,
+        district_name:    form.value.district_name || null,
+        subdistrict_name: form.value.subdistrict_name || null,
+        village_name:     form.value.village_name || null,
+        village_no:       form.value.village_no || null,
+      })
+      householdId = createRes.data.id
+    } else {
+      householdId = hh.id
     }
-    householdId = hh.id
   } catch (e) {
-    submitError.value = 'ไม่สามารถค้นหารหัสบ้านได้'
+    submitError.value = e.response?.data?.message || 'ไม่สามารถค้นหา/สร้างรหัสบ้านได้'
     submitting.value = false
     return
   }
@@ -332,6 +371,21 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* Location details collapsible */
+.location-details {
+  margin-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+}
+.location-summary {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.location-summary:hover { color: var(--color-primary); }
+
 .page-header {
   display: flex;
   justify-content: space-between;
