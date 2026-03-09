@@ -20,7 +20,20 @@ class ImportController extends Controller
         ]);
 
         $import = new HouseholdImport();
-        Excel::import($import, $request->file('file'));
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Import failed', [
+                'file'  => $request->file('file')->getClientOriginalName(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'ไม่สามารถนำเข้าไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์และลองอีกครั้ง',
+            ], 422);
+        }
 
         // Log this import
         ImportLog::create([
