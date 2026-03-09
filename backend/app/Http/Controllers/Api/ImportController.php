@@ -35,13 +35,14 @@ class ImportController extends Controller
             ], 422);
         }
 
-        // Log this import
+        // Log this import (store rows for history detail view)
         ImportLog::create([
             'user_id'        => $request->user()?->id,
             'filename'       => $request->file('file')->getClientOriginalName(),
             'imported_count' => $import->imported,
             'exists_count'   => $import->exists,
             'skipped_count'  => $import->skipped,
+            'rows_json'      => $import->rows,
         ]);
 
         return response()->json([
@@ -50,6 +51,22 @@ class ImportController extends Controller
             'exists'   => $import->exists,
             'skipped'  => $import->skipped,
             'rows'     => $import->rows,
+        ]);
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        $log = ImportLog::with('user:id,name')->findOrFail($id);
+
+        return response()->json([
+            'id'             => $log->id,
+            'filename'       => $log->filename,
+            'imported_count' => $log->imported_count,
+            'exists_count'   => $log->exists_count,
+            'skipped_count'  => $log->skipped_count,
+            'imported_by'    => $log->user?->name ?? 'ระบบ',
+            'imported_at'    => $log->created_at?->toDateTimeString(),
+            'rows'           => $log->rows_json ?? [],
         ]);
     }
 
