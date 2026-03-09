@@ -32,6 +32,10 @@ class PersonController extends Controller
             });
         }
 
+        if ($request->filled('citizen_id')) {
+            $query->where('citizen_id', $request->citizen_id);
+        }
+
         return response()->json($query->paginate($request->integer('per_page', 20)));
     }
 
@@ -48,6 +52,7 @@ class PersonController extends Controller
             'first_name'   => 'nullable|string',
             'last_name'    => 'nullable|string',
             'citizen_id'   => 'nullable|string',
+            'birthdate'    => 'nullable|date',
             'phone'        => 'nullable|string',
             'is_head'      => 'nullable|boolean',
         ]);
@@ -64,6 +69,7 @@ class PersonController extends Controller
             'first_name' => 'nullable|string',
             'last_name'  => 'nullable|string',
             'citizen_id' => 'nullable|string',
+            'birthdate'  => 'nullable|date',
             'phone'      => 'nullable|string',
             'is_head'    => 'nullable|boolean',
         ]);

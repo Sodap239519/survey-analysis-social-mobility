@@ -371,16 +371,7 @@ class DashboardController extends Controller
     private function getByDistrict(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear = null): array
     {
         // Only count households that have survey responses (exclude import-only households)
-        $query = Household::query()
-            ->whereHas('surveyResponses', function ($q) use ($period, $surveyYear) {
-                $q->where('period', $period);
-                if ($surveyYear) {
-                    $q->where('survey_year', $surveyYear);
-                }
-            })
-            ->selectRaw('district_name, district_code, COUNT(DISTINCT house_code) as house_count')
-            ->groupBy('district_name', 'district_code')
-            ->orderBy('district_name');
+        $responseQuery = SurveyResponse::query()->where('period', $period);
 
         if ($surveyYear) {
             $responseQuery->where('survey_year', $surveyYear);
@@ -428,12 +419,7 @@ class DashboardController extends Controller
     private function getGeographicTotals(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear): array
     {
         // Only count households that have survey responses (exclude import-only households)
-        $query = Household::query()->whereHas('surveyResponses', function ($q) use ($period, $surveyYear) {
-            $q->where('period', $period);
-            if ($surveyYear) {
-                $q->where('survey_year', $surveyYear);
-            }
-        });
+        $responseQuery = SurveyResponse::query()->where('period', $period);
 
         if ($surveyYear) {
             $responseQuery->where('survey_year', $surveyYear);

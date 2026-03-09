@@ -79,7 +79,6 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { ref, onMounted } from 'vue'
 import api from '../../api'
 
 const file = ref(null)
@@ -96,18 +95,6 @@ function onFile(e) {
   error.value = ''
 }
 
-async function loadStats() {
-  statsLoading.value = true
-  try {
-    const res = await api.get('/import/stats')
-    stats.value = res.data
-  } catch {
-    // ignore stats load errors silently
-  } finally {
-    statsLoading.value = false
-  }
-}
-
 async function upload() {
   if (!file.value) return
   loading.value = true
@@ -120,15 +107,12 @@ async function upload() {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     result.value = res.data
-    await loadStats()
   } catch (e) {
     error.value = e.response?.data?.message || JSON.stringify(e.response?.data?.errors) || 'เกิดข้อผิดพลาด'
   } finally {
     loading.value = false
   }
 }
-
-onMounted(loadStats)
 </script>
 
 <style scoped>
