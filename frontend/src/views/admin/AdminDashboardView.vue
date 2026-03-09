@@ -3,8 +3,8 @@
     <!-- Page header -->
     <div class="page-header">
       <div>
-        <h2 class="page-title">แดชบอร์ดวิเคราะห์ความเคลื่อนไหวทางสังคม</h2>
-        <p class="text-muted text-sm mt-1">ยินดีต้อนรับ <strong>{{ auth.user?.name || 'Admin' }}</strong> — Social Mobility Survey Analysis</p>
+        <h1 class="page-title">แดชบอร์ดวิเคราะห์ความเคลื่อนไหวทางสังคม</h1>
+        <p class="text-muted text-sm mt-1">ยินดีต้อนรับ <strong>{{ auth.user?.name || 'Admin' }}</strong> — โครงการการพัฒนาและยกระดับแพลตฟอร์มเพื่อการแก้ไขปัญหาความยากจน จังหวัดนครราชสีมา (ระยะที่ 2)</p>
       </div>
     </div>
 
@@ -26,7 +26,7 @@
 
     <!-- Filters -->
     <div class="dash-filters">
-      <div class="form-group" style="flex:1;min-width:140px">
+      <div class="form-group" style="flex:0 0 100px;min-width:80px;max-width:120px">
         <label>ปี พ.ศ.</label>
         <select v-model="filters.survey_year" @change="load">
           <option value="">ทุกปี</option>
@@ -48,9 +48,11 @@
           <option value="before">ก่อนโครงการ</option>
         </select>
       </div>
+      <div class="form-group">
       <button class="btn btn-primary" style="margin-top:1.5rem;flex-shrink:0" @click="load">
         <i class="fi fi-rr-refresh"></i> รีเฟรช
       </button>
+      </div>
     </div>
 
     <!-- Loading / Error -->
@@ -221,7 +223,7 @@
 
         <!-- Mobility -->
         <div class="bento-mobility card">
-          <h3 class="card-title"><i class="fi fi-rr-arrows-alt"></i> การเคลื่อนย้ายทางสังคม</h3>
+          <h3 class="card-title"><i class="fi fi-rr-arrows-alt"></i> การเคลื่อนย้ายทางสังคม (Before → After)</h3>
           <div class="mobility-pills">
             <div class="mobility-pill improved">
               <i class="fi fi-rr-arrow-trend-up mobility-icon"></i>
@@ -284,7 +286,7 @@
 
         <!-- Per-capital mobility comparison chart -->
         <div class="bento-cap-mobility card">
-          <h3 class="card-title"><i class="fi fi-rr-chart-histogram"></i> การเปลี่ยนแปลงแต่ละด้านทุน (ก่อน → หลัง)</h3>
+          <h3 class="card-title"><i class="fi fi-rr-chart-histogram"></i> การเปลี่ยนแปลงแต่ละด้านทุน (Before → After)</h3>
           <div class="cap-mobility-list">
             <div v-for="cap in capitals" :key="cap.slug" class="cap-mobility-row">
               <span class="cap-mob-name">

@@ -4,8 +4,8 @@
     <header class="dash-header">
       <div class="dash-header-inner">
         <div>
-          <h1 class="dash-title"><i class="fi fi-rr-chart-pie"></i> แดชบอร์ดการวิเคราะห์การเคลื่อนย้ายทางสังคม</h1>
-          <p class="text-muted text-sm">Social Mobility Survey Analysis — จังหวัดนครราชสีมา</p>
+          <h1 class="dash-title"><i class="fi fi-rr-chart-pie"></i> การวิเคราะห์การเคลื่อนย้ายทางสังคม</h1>
+          <p class="text-muted text-sm">โครงการการพัฒนาและยกระดับแพลตฟอร์มเพื่อการแก้ไขปัญหาความยากจน จังหวัดนครราชสีมา (ระยะที่ 2)</p>
         </div>
         <div class="dash-header-actions">
           <RouterLink v-if="!auth.isLoggedIn" to="/login" class="btn btn-secondary">เข้าสู่ระบบ (Admin)</RouterLink>
@@ -32,7 +32,7 @@
 
     <!-- Filters -->
     <div class="dash-filters">
-      <div class="form-group" style="flex:1;min-width:140px">
+      <div class="form-group" style="flex:0 0 100px;min-width:80px;max-width:120px">
         <label>ปี พ.ศ.</label>
         <select v-model="filters.survey_year" @change="load">
           <option value="">ทุกปี</option>
@@ -54,9 +54,11 @@
           <option value="before">ก่อนโครงการ</option>
         </select>
       </div>
+      <div class="form-group">
       <button class="btn btn-primary" style="margin-top:1.5rem;flex-shrink:0" @click="load">
         <i class="fi fi-rr-refresh"></i> รีเฟรช
       </button>
+      </div>
     </div>
 
     <!-- Loading / Error -->
@@ -302,7 +304,7 @@
 
         <!-- Per-capital mobility comparison chart -->
         <div class="bento-cap-mobility card">
-          <h3 class="card-title"><i class="fi fi-rr-chart-histogram"></i> การเปลี่ยนแปลงแต่ละด้านทุน (ก่อน → หลัง)</h3>
+          <h3 class="card-title"><i class="fi fi-rr-chart-histogram"></i> การเปลี่ยนแปลงแต่ละด้านทุน (Before → After)</h3>
           <div class="cap-mobility-list">
             <div v-for="cap in capitals" :key="cap.slug" class="cap-mobility-row">
               <span class="cap-mob-name">
@@ -901,6 +903,20 @@ watch(() => route.fullPath, async () => {
   padding: 0.875rem 1rem;
   box-shadow: var(--shadow-sm);
   align-items: flex-end;
+}
+
+@media (max-width: 768px) {
+  .dash-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dash-filters .form-group,
+  .dash-filters button.btn {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin-right: 0;
+  }
 }
 
 /* ── Geographic Stats Bar ── */
