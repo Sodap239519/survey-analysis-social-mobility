@@ -60,7 +60,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get('/persons', { params: { search: search.value, page: page.value } })
+    const res = await api.get('/persons', { params: { search: search.value, page: page.value, has_responses: 1 } })
     persons.value = res.data
   } catch (e) {
     error.value = e.response?.data?.message || 'เกิดข้อผิดพลาด'

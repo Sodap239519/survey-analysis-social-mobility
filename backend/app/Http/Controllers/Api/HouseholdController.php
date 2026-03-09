@@ -13,6 +13,11 @@ class HouseholdController extends Controller
     {
         $query = Household::query();
 
+        // When has_responses=1, only return households that have at least one survey response
+        if ($request->boolean('has_responses')) {
+            $query->whereHas('surveyResponses');
+        }
+
         if ($request->filled('district')) {
             $query->where('district_name', 'like', '%' . $request->district . '%');
         }
