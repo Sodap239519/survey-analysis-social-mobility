@@ -34,6 +34,7 @@ use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
 class HouseholdImport implements ToCollection, WithCustomCsvSettings
 {
     public int $imported = 0;
+    public int $exists   = 0;
     public int $skipped  = 0;
 
     /** @var array<int, array<string, mixed>> */
@@ -129,6 +130,10 @@ class HouseholdImport implements ToCollection, WithCustomCsvSettings
             $this->imported++;
             // wasRecentlyCreated is set to true by Laravel's Model::save() for new records;
             // firstOrCreate() sets it only when the record is newly inserted, not when found.
+            $status = $household->wasRecentlyCreated ? 'created' : 'exists';
+            if ($status === 'exists') {
+                $this->exists++;
+            }
             $this->rows[] = [
                 'house_code'       => $household->house_code,
                 'village_name'     => $household->village_name,
@@ -136,7 +141,7 @@ class HouseholdImport implements ToCollection, WithCustomCsvSettings
                 'district_name'    => $household->district_name,
                 'province_name'    => $household->province_name,
                 'survey_year'      => $household->survey_year,
-                'status'           => $household->wasRecentlyCreated ? 'created' : 'exists',
+                'status'           => $status,
             ];
         }
     }
