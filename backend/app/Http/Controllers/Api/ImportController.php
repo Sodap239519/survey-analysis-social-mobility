@@ -20,7 +20,14 @@ class ImportController extends Controller
         ]);
 
         $import = new HouseholdImport();
-        Excel::import($import, $request->file('file'));
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'เกิดข้อผิดพลาดขณะนำเข้าไฟล์: ' . $e->getMessage(),
+            ], 422);
+        }
 
         // Log this import
         ImportLog::create([

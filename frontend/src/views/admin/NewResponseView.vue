@@ -35,6 +35,10 @@
               <label>ชื่อผู้สำรวจ</label>
               <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
             </div>
+            <div class="form-group">
+              <label>ชื่อรุ่น (Model Name)</label>
+              <input v-model="form.model_name" placeholder="เช่น รุ่นที่ 1 / Model A" />
+            </div>
           </div>
 
           <!-- Informant data -->
@@ -222,6 +226,7 @@ const form = ref({
   survey_year: 2568,
   surveyed_at: '',
   surveyor_name: '',
+  model_name: '',
   // Informant personal data
   person_title: '',
   person_first_name: '',
@@ -390,6 +395,7 @@ async function submit() {
     survey_year: form.value.survey_year,
     surveyed_at: form.value.surveyed_at || null,
     surveyor_name: form.value.surveyor_name || null,
+    model_name: form.value.model_name || null,
     answers: {},
   }
 

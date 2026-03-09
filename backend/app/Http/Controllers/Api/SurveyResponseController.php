@@ -67,6 +67,7 @@ class SurveyResponseController extends Controller
             'survey_round'  => 'nullable|integer',
             'surveyed_at'   => 'nullable|date',
             'surveyor_name' => 'nullable|string',
+            'model_name'    => 'nullable|string|max:255',
             'answers'       => 'nullable|array',
             'answers.*.selected_choice_ids' => 'nullable|array',
             'answers.*.value_text'          => 'nullable|string',
@@ -81,6 +82,7 @@ class SurveyResponseController extends Controller
             'survey_round'  => $validated['survey_round'] ?? null,
             'surveyed_at'   => $validated['surveyed_at'] ?? null,
             'surveyor_name' => $validated['surveyor_name'] ?? null,
+            'model_name'    => $validated['model_name'] ?? null,
         ]);
 
         // Create answer records
@@ -111,6 +113,7 @@ class SurveyResponseController extends Controller
             'survey_round'  => 'nullable|integer',
             'surveyed_at'   => 'nullable|date',
             'surveyor_name' => 'nullable|string',
+            'model_name'    => 'nullable|string|max:255',
             'answers'       => 'nullable|array',
             'answers.*.selected_choice_ids' => 'nullable|array',
             'answers.*.value_text'          => 'nullable|string',

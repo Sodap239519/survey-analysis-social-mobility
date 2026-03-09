@@ -10,7 +10,7 @@ class SurveyResponse extends Model
 {
     protected $fillable = [
         'household_id', 'person_id', 'period', 'survey_year', 'survey_round',
-        'surveyed_at', 'surveyor_name',
+        'surveyed_at', 'surveyor_name', 'model_name',
         'score_human', 'score_physical', 'score_financial',
         'score_natural', 'score_social', 'score_aggregate',
         'poverty_level', 'raw_data',

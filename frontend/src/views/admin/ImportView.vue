@@ -20,6 +20,17 @@
       </button>
     </div>
 
+    <!-- Upload progress status card -->
+    <div v-if="loading" class="card mt-4" style="max-width:500px;border-left:4px solid #2563eb">
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <div class="upload-spinner"></div>
+        <div>
+          <div style="font-weight:700;color:#2563eb">กำลังนำเข้าข้อมูล...</div>
+          <div class="text-sm text-muted">กรุณารอสักครู่ กำลังประมวลผลไฟล์ <strong>{{ file?.name }}</strong></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Post-Upload Result Summary -->
     <div v-if="result" class="mt-6">
       <div class="card mb-4" style="max-width:500px">
@@ -386,5 +397,18 @@ onMounted(() => {
 .mt-8 { margin-top: 2rem; }
 .mb-4 { margin-bottom: 1rem; }
 .mb-6 { margin-bottom: 1.5rem; }
+.mt-4 { margin-top: 1rem; }
+.upload-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #bfdbfe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 </style>
 
