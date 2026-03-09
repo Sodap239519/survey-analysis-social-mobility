@@ -14,6 +14,11 @@ class PersonController extends Controller
     {
         $query = Person::with('household');
 
+        // When has_responses=1, only return persons linked to at least one survey response
+        if ($request->boolean('has_responses')) {
+            $query->whereHas('surveyResponses');
+        }
+
         if ($request->filled('household_id')) {
             $query->where('household_id', $request->household_id);
         }

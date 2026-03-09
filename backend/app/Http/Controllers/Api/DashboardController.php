@@ -12,11 +12,11 @@ use Illuminate\Http\Request;
  * DashboardController
  *
  * Returns metrics for the Bento-style dashboard:
- * - จำนวนรหัสบ้าน (distinct house_code from all imported households)
- * - จำนวนผู้ตอบ (distinct respondents)
+ * - จำนวนรหัสบ้าน (distinct house_code from households that have survey responses only)
+ * - จำนวนผู้ตอบ (distinct respondents from survey responses)
  * - counts by poverty level (4) for each of 5 capitals
  * - mobility counts improved/same/decreased
- * - counts by district/subdistrict
+ * - counts by district/subdistrict (responses only, excludes import-only data)
  */
 class DashboardController extends Controller
 {
@@ -79,7 +79,7 @@ class DashboardController extends Controller
         $overallPoverty = $this->getOverallPovertyLevels(clone $responseQuery);
 
         // Geographic totals (districts, subdistricts, villages, households)
-        $geoTotals = $this->getGeographicTotals($district, $subdistrict, $surveyYear);
+        $geoTotals = $this->getGeographicTotals($period, $district, $subdistrict, $surveyYear);
 
         // Average scores per capital (for Radar Chart)
         $capitalAverages = $this->getCapitalAverages(clone $responseQuery);
@@ -370,8 +370,17 @@ class DashboardController extends Controller
 
     private function getByDistrict(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear = null): array
     {
-        // Only count households that appear in survey responses
-        $responseQuery = SurveyResponse::query()->where('period', $period);
+        // Only count households that have survey responses (exclude import-only households)
+        $query = Household::query()
+            ->whereHas('surveyResponses', function ($q) use ($period, $surveyYear) {
+                $q->where('period', $period);
+                if ($surveyYear) {
+                    $q->where('survey_year', $surveyYear);
+                }
+            })
+            ->selectRaw('district_name, district_code, COUNT(DISTINCT house_code) as house_count')
+            ->groupBy('district_name', 'district_code')
+            ->orderBy('district_name');
 
         if ($surveyYear) {
             $responseQuery->where('survey_year', $surveyYear);
@@ -416,10 +425,15 @@ class DashboardController extends Controller
         return 4;
     }
 
-    private function getGeographicTotals(?string $district, ?string $subdistrict, ?int $surveyYear): array
+    private function getGeographicTotals(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear): array
     {
-        // Base: only households that actually have survey responses
-        $responseQuery = SurveyResponse::query();
+        // Only count households that have survey responses (exclude import-only households)
+        $query = Household::query()->whereHas('surveyResponses', function ($q) use ($period, $surveyYear) {
+            $q->where('period', $period);
+            if ($surveyYear) {
+                $q->where('survey_year', $surveyYear);
+            }
+        });
 
         if ($surveyYear) {
             $responseQuery->where('survey_year', $surveyYear);

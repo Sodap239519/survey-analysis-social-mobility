@@ -75,7 +75,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const params = { search: search.value, page: page.value }
+    const params = { search: search.value, page: page.value, has_responses: 1 }
     if (filterYear.value) params.survey_year = filterYear.value
     const res = await api.get('/households', { params })
     households.value = res.data

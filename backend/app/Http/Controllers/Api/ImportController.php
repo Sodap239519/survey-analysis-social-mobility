@@ -24,6 +24,7 @@ class ImportController extends Controller
             'message'  => 'Import completed',
             'imported' => $import->imported,
             'skipped'  => $import->skipped,
+            'rows'     => $import->rows,
         ]);
     }
 
