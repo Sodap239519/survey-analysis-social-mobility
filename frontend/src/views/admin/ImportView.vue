@@ -22,8 +22,8 @@
         </button>
       </div>
 
-      <!-- WIP Checklist Card -->
-      <div class="card checklist-card">
+      <!-- WIP Checklist Card — visible only during active import -->
+      <div v-if="loading" class="card checklist-card">
         <h3 class="section-title">⚙️ กระบวนการนำเข้า</h3>
         <div class="checklist-steps">
           <div
@@ -102,89 +102,24 @@
     <!-- ───────────── PERSISTENT STATS (always visible) ───────────── -->
     <div class="mt-8">
 
-      <!-- 1. Import History (as clickable card-links) -->
+      <!-- 1. Import History -->
       <div class="card mb-6">
         <h3 class="section-title">🕒 ประวัติการนำเข้า</h3>
         <div v-if="historyLoading" class="text-muted text-sm">กำลังโหลด...</div>
         <div v-else-if="!history.length" class="text-muted text-sm">ยังไม่มีประวัติการนำเข้า</div>
         <div v-else class="history-list">
-          <button
+          <div
             v-for="log in history"
             :key="log.id"
             class="history-item"
-            :class="{ active: selectedHistoryId === log.id }"
-            @click="selectHistory(log.id)"
           >
-            <div class="history-item-main">
-              <span class="history-filename">{{ log.filename || '—' }}</span>
-              <span class="history-date text-muted">{{ formatDateTime(log.imported_at) }}</span>
-            </div>
-            <div class="history-item-stats">
-              <span class="badge badge-new">+{{ log.imported_count }} ใหม่</span>
-              <span class="badge badge-exists">{{ log.exists_count }} ซ้ำ</span>
-              <span class="badge badge-skipped">{{ log.skipped_count }} ข้าม</span>
-              <span class="history-by text-muted">{{ log.imported_by }}</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <!-- History Detail Panel -->
-      <div v-if="selectedHistoryId" class="card mb-6">
-        <div v-if="historyDetailLoading" class="text-muted text-sm">กำลังโหลดรายละเอียด...</div>
-        <div v-else-if="historyDetail">
-          <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap">
-            <h3 class="section-title" style="margin-bottom:0">📋 รายละเอียดการนำเข้า: {{ historyDetail.filename }}</h3>
-            <button class="btn-close" @click="clearHistoryDetail">✕ ปิด</button>
+            <span class="history-filename">{{ log.filename || '—' }}</span>
+            <span class="history-date text-muted">{{ formatDateTime(log.imported_at) }}</span>
+            <span class="badge badge-new">+{{ log.imported_count }} ใหม่</span>
+            <span class="badge badge-exists">{{ log.exists_count }} ซ้ำ</span>
+            <span class="badge badge-skipped">{{ log.skipped_count }} ข้าม</span>
+            <span class="history-by text-muted">{{ log.imported_by }}</span>
           </div>
-          <div class="result-cards mb-4" style="max-width:500px">
-            <div class="result-card result-card-new">
-              <div class="result-card-icon">📥</div>
-              <div class="result-card-value">{{ historyDetail.imported_count }}</div>
-              <div class="result-card-label">แถวใหม่</div>
-            </div>
-            <div class="result-card result-card-exists">
-              <div class="result-card-icon">🔄</div>
-              <div class="result-card-value">{{ historyDetail.exists_count }}</div>
-              <div class="result-card-label">มีอยู่แล้ว</div>
-            </div>
-            <div class="result-card result-card-skipped">
-              <div class="result-card-icon">⚠️</div>
-              <div class="result-card-value">{{ historyDetail.skipped_count }}</div>
-              <div class="result-card-label">ข้ามแถว</div>
-            </div>
-          </div>
-          <div v-if="historyDetail.rows && historyDetail.rows.length" class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>รหัสบ้าน</th>
-                  <th>ชื่อหมู่บ้าน</th>
-                  <th>ตำบล</th>
-                  <th>อำเภอ</th>
-                  <th>จังหวัด</th>
-                  <th>ปีสำรวจ</th>
-                  <th>สถานะ</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, i) in historyDetail.rows" :key="i">
-                  <td><code>{{ row.house_code || '—' }}</code></td>
-                  <td>{{ row.village_name || '—' }}</td>
-                  <td>{{ row.subdistrict_name || '—' }}</td>
-                  <td>{{ row.district_name || '—' }}</td>
-                  <td>{{ row.province_name || '—' }}</td>
-                  <td>{{ row.survey_year || '—' }}</td>
-                  <td>
-                    <span v-if="row.status === 'created'" style="color:#2563eb;font-weight:600">✓ นำเข้าใหม่</span>
-                    <span v-else-if="row.status === 'exists'" style="color:#6b7280">↩ มีอยู่แล้ว</span>
-                    <span v-else style="color:#ef4444">✕ ข้าม</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="text-muted text-sm">ไม่มีข้อมูลรายละเอียดแถว (อาจเป็นการนำเข้าก่อนอัปเดตระบบ)</div>
         </div>
       </div>
 
@@ -205,46 +140,6 @@
         <div class="stat-mini card">
           <div class="stat-mini-value">{{ stats.total_households.toLocaleString() }}</div>
           <div class="stat-mini-label">จำนวนครัวเรือน</div>
-        </div>
-      </div>
-
-      <div v-if="stats" class="chart-row mb-6">
-        <!-- 3. Capital Bar Chart (5 ทุน) -->
-        <div class="card chart-card">
-          <h3 class="section-title">📊 ค่าเฉลี่ยศักยภาพ 5 ทุน</h3>
-          <div v-if="!hasCapitalData" class="text-muted text-sm">ยังไม่มีข้อมูลการสำรวจ</div>
-          <div v-else class="bar-chart">
-            <div v-for="cap in stats.capital_averages" :key="cap.slug" class="bar-row">
-              <span class="bar-label">{{ cap.nameTh }}</span>
-              <div class="bar-bg">
-                <div
-                  class="bar-fill bar-fill-capital"
-                  :style="{ width: cap.avg + '%' }"
-                ></div>
-              </div>
-              <span class="bar-value">{{ cap.avg }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. Poverty Level Bar Chart (4 ระดับ) -->
-        <div class="card chart-card">
-          <h3 class="section-title">📊 การกระจายระดับความยากจน</h3>
-          <div v-if="!hasPovertyData" class="text-muted text-sm">ยังไม่มีข้อมูลการสำรวจ</div>
-          <div v-else class="bar-chart">
-            <div v-for="level in 4" :key="level" class="bar-row">
-              <span class="bar-label">{{ POVERTY_NAMES[level] }}</span>
-              <div class="bar-bg">
-                <div
-                  class="bar-fill"
-                  :style="{ width: povertyPct(stats.poverty_levels[level]) + '%', background: POVERTY_COLORS[level] }"
-                ></div>
-              </div>
-              <span class="bar-value" :style="{ color: POVERTY_COLORS[level] }">
-                {{ stats.poverty_levels[level] }}
-              </span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -289,10 +184,6 @@ const stats = ref(null)
 const history = ref([])
 const historyLoading = ref(false)
 
-const selectedHistoryId = ref(null)
-const historyDetail = ref(null)
-const historyDetailLoading = ref(false)
-
 // WIP checklist steps
 const stepLabels = ['อัปโหลด', 'ตรวจสอบ', 'บันทึก', 'สรุปผล', 'เสร็จสิ้น']
 const VALIDATE_DELAY_MS = 600
@@ -315,41 +206,8 @@ function completeAllSteps() {
   steps.value.forEach(s => { s.state = 'done' })
 }
 
-const POVERTY_NAMES = {
-  1: 'ระดับ 1 (อยู่ลำบาก)',
-  2: 'ระดับ 2 (อยู่ยาก)',
-  3: 'ระดับ 3 (อยู่ได้)',
-  4: 'ระดับ 4 (อยู่ดี)',
-}
-
-const POVERTY_COLORS = {
-  1: '#ef4444',
-  2: '#f97316',
-  3: '#eab308',
-  4: '#22c55e',
-}
-
 const createdCount = computed(() => result.value?.rows?.filter(r => r.status === 'created').length ?? 0)
 const existsCount = computed(() => result.value?.rows?.filter(r => r.status === 'exists').length ?? 0)
-
-const hasCapitalData = computed(() =>
-  stats.value?.capital_averages?.some(c => c.avg > 0)
-)
-
-const hasPovertyData = computed(() => {
-  const pl = stats.value?.poverty_levels
-  return pl && Object.values(pl).some(v => v > 0)
-})
-
-const povertyMax = computed(() => {
-  const pl = stats.value?.poverty_levels
-  if (!pl) return 1
-  return Math.max(...Object.values(pl), 1)
-})
-
-function povertyPct(count) {
-  return Math.round((count / povertyMax.value) * 100)
-}
 
 function formatDateTime(dt) {
   if (!dt) return '—'
@@ -385,29 +243,6 @@ async function loadHistory() {
   } finally {
     historyLoading.value = false
   }
-}
-
-async function selectHistory(id) {
-  if (selectedHistoryId.value === id) {
-    clearHistoryDetail()
-    return
-  }
-  selectedHistoryId.value = id
-  historyDetail.value = null
-  historyDetailLoading.value = true
-  try {
-    const res = await api.get(`/import/history/${id}`)
-    historyDetail.value = res.data
-  } catch {
-    historyDetail.value = null
-  } finally {
-    historyDetailLoading.value = false
-  }
-}
-
-function clearHistoryDetail() {
-  selectedHistoryId.value = null
-  historyDetail.value = null
 }
 
 async function upload() {
@@ -466,7 +301,7 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  align-items: flex-start;
+  align-items: stretch;
 }
 .upload-card {
   flex: 1;
@@ -582,85 +417,54 @@ onMounted(() => {
   color: #dc2626;
 }
 
-/* ── History list as card-links ── */
+/* ── History list ── */
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 .history-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem 1rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.875rem;
   border-radius: 0.5rem;
   border: 1px solid var(--color-border, #e5e7eb);
   background: var(--color-bg, #fff);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s, background 0.15s;
-  width: 100%;
-}
-.history-item:hover {
-  border-color: #93c5fd;
-  background: #f0f7ff;
-}
-.history-item.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-}
-.history-item-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 0.25rem;
 }
 .history-filename {
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--color-text, #111827);
+  flex: 1;
+  min-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .history-date {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   white-space: nowrap;
+  flex-shrink: 0;
 }
-.history-item-stats {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+.history-by {
+  font-size: 0.82rem;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .badge {
   display: inline-flex;
   align-items: center;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
+  flex-shrink: 0;
 }
 .badge-new    { background: #dbeafe; color: #1d4ed8; }
 .badge-exists { background: #f3f4f6; color: #6b7280; }
 .badge-skipped { background: #fee2e2; color: #dc2626; }
-.history-by {
-  font-size: 0.78rem;
-  margin-left: auto;
-}
-
-/* ── Close button ── */
-.btn-close {
-  padding: 0.2rem 0.6rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.4rem;
-  background: #f9fafb;
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: #6b7280;
-  transition: background 0.15s;
-}
-.btn-close:hover {
-  background: #f3f4f6;
-}
 
 /* ── Persistent stats ── */
 .stats-bar {
@@ -682,53 +486,6 @@ onMounted(() => {
   font-size: 0.78rem;
   color: var(--color-text-muted);
   margin-top: 0.1rem;
-}
-.chart-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-.chart-card {
-  flex: 1;
-  min-width: 280px;
-}
-.bar-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-.bar-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.bar-label {
-  flex: 0 0 120px;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  text-align: right;
-}
-.bar-bg {
-  flex: 1;
-  height: 14px;
-  background: #f1f5f9;
-  border-radius: 7px;
-  overflow: hidden;
-}
-.bar-fill {
-  height: 100%;
-  border-radius: 7px;
-  transition: width 0.4s ease;
-}
-.bar-fill-capital {
-  background: var(--color-primary, #2563eb);
-}
-.bar-value {
-  flex: 0 0 36px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-align: right;
-  color: var(--color-text);
 }
 
 /* ── Utilities ── */
