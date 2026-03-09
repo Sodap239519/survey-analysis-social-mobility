@@ -36,32 +36,67 @@
               <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
             </div>
           </div>
-          <!-- Optional location fields (used when auto-creating a new household) -->
-          <details class="location-details">
-            <summary class="location-summary">ข้อมูลที่ตั้ง (สำหรับรหัสบ้านใหม่)</summary>
-            <div class="form-grid mt-3">
+
+          <!-- Informant data -->
+          <div class="informant-section">
+            <h4 class="informant-title">ข้อมูลผู้ให้ข้อมูล</h4>
+            <div class="form-grid">
               <div class="form-group">
-                <label>จังหวัด</label>
-                <input v-model="form.province_name" placeholder="เช่น นครราชสีมา" />
+                <label>คำนำหน้า</label>
+                <input v-model="form.person_title" placeholder="เช่น นาย / นาง / นางสาว" />
               </div>
               <div class="form-group">
-                <label>อำเภอ</label>
-                <input v-model="form.district_name" placeholder="เช่น เมืองนครราชสีมา" />
+                <label>ชื่อ</label>
+                <input v-model="form.person_first_name" placeholder="ชื่อ" />
+              </div>
+              <div class="form-group">
+                <label>นามสกุล</label>
+                <input v-model="form.person_last_name" placeholder="นามสกุล" />
+              </div>
+              <div class="form-group">
+                <label>เลขบัตรประชาชน</label>
+                <input v-model="form.person_citizen_id" placeholder="x-xxxx-xxxxx-xx-x" maxlength="17" />
+              </div>
+              <div class="form-group">
+                <label>วันเกิด</label>
+                <input v-model="form.person_birthdate" type="date" />
+              </div>
+              <div class="form-group">
+                <label>เบอร์โทรศัพท์</label>
+                <input v-model="form.person_phone" placeholder="0xx-xxx-xxxx" />
+              </div>
+            </div>
+            <div class="form-grid mt-3">
+              <div class="form-group">
+                <label>บ้านเลขที่</label>
+                <input v-model="form.house_no" placeholder="เช่น 123/4" />
+              </div>
+              <div class="form-group">
+                <label>หมู่ที่</label>
+                <input v-model="form.village_no" placeholder="เช่น 5" />
               </div>
               <div class="form-group">
                 <label>ตำบล</label>
                 <input v-model="form.subdistrict_name" placeholder="เช่น ในเมือง" />
               </div>
               <div class="form-group">
+                <label>อำเภอ</label>
+                <input v-model="form.district_name" placeholder="เช่น เมืองนครราชสีมา" />
+              </div>
+              <div class="form-group">
+                <label>จังหวัด</label>
+                <input v-model="form.province_name" placeholder="เช่น นครราชสีมา" />
+              </div>
+              <div class="form-group">
+                <label>รหัสไปรษณีย์</label>
+                <input v-model="form.postal_code" placeholder="เช่น 30000" maxlength="5" />
+              </div>
+              <div class="form-group">
                 <label>ชื่อหมู่บ้าน</label>
                 <input v-model="form.village_name" placeholder="เช่น บ้านหนองแวง" />
               </div>
-              <div class="form-group">
-                <label>หมู่ที่</label>
-                <input v-model="form.village_no" placeholder="เช่น 5" />
-              </div>
             </div>
-          </details>
+          </div>
         </div>
 
         <!-- Questions by capital -->
@@ -187,11 +222,21 @@ const form = ref({
   survey_year: 2568,
   surveyed_at: '',
   surveyor_name: '',
-  province_name: '',
-  district_name: '',
-  subdistrict_name: '',
-  village_name: '',
+  // Informant personal data
+  person_title: '',
+  person_first_name: '',
+  person_last_name: '',
+  person_citizen_id: '',
+  person_birthdate: '',
+  person_phone: '',
+  // Location / address (also used for auto-creating a new household)
+  house_no: '',
   village_no: '',
+  subdistrict_name: '',
+  district_name: '',
+  province_name: '',
+  postal_code: '',
+  village_name: '',
 })
 
 // answers[questionId] = [choiceId, ...]  for multi-select (must be arrays)
@@ -287,11 +332,13 @@ async function submit() {
       // Auto-create household with the provided house_code and optional location data
       const createRes = await api.post('/households', {
         house_code:       form.value.house_code,
+        house_no:         form.value.house_no || null,
         province_name:    form.value.province_name || null,
         district_name:    form.value.district_name || null,
         subdistrict_name: form.value.subdistrict_name || null,
         village_name:     form.value.village_name || null,
         village_no:       form.value.village_no || null,
+        postal_code:      form.value.postal_code || null,
       })
       householdId = createRes.data.id
     } else {
@@ -303,9 +350,42 @@ async function submit() {
     return
   }
 
+  // Create or find person (informant) for this household if personal data is provided
+  let personId = null
+  const hasPersonData = form.value.person_first_name || form.value.person_last_name || form.value.person_citizen_id
+  if (hasPersonData) {
+    try {
+      // Check if person with same citizen_id already exists in this household
+      let existingPerson = null
+      if (form.value.person_citizen_id) {
+        const pRes = await api.get('/persons', {
+          params: { household_id: householdId, citizen_id: form.value.person_citizen_id, per_page: 5 }
+        })
+        existingPerson = pRes.data.data?.find(p => p.citizen_id === form.value.person_citizen_id)
+      }
+      if (existingPerson) {
+        personId = existingPerson.id
+      } else {
+        const pCreateRes = await api.post('/persons', {
+          household_id: householdId,
+          title:        form.value.person_title || null,
+          first_name:   form.value.person_first_name || null,
+          last_name:    form.value.person_last_name || null,
+          citizen_id:   form.value.person_citizen_id || null,
+          birthdate:    form.value.person_birthdate || null,
+          phone:        form.value.person_phone || null,
+        })
+        personId = pCreateRes.data.id
+      }
+    } catch {
+      // Person creation failure is non-fatal; continue without person_id
+    }
+  }
+
   // Build answers payload
   const payload = {
     household_id: householdId,
+    person_id: personId,
     period: form.value.period,
     survey_year: form.value.survey_year,
     surveyed_at: form.value.surveyed_at || null,
@@ -385,6 +465,17 @@ onMounted(async () => {
   user-select: none;
 }
 .location-summary:hover { color: var(--color-primary); }
+.informant-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1.5px solid var(--color-border);
+}
+.informant-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  margin-bottom: 0.75rem;
+}
 
 .page-header {
   display: flex;

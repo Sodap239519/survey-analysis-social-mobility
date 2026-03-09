@@ -12,7 +12,7 @@ class Person extends Model
 
     protected $fillable = [
         'household_id', 'title', 'first_name', 'last_name',
-        'citizen_id', 'phone', 'is_head',
+        'citizen_id', 'birthdate', 'phone', 'is_head',
     ];
 
     protected $casts = [
