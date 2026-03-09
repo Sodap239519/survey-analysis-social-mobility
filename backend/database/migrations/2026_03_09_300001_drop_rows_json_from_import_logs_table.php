@@ -8,15 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('import_logs', function (Blueprint $table) {
-            $table->json('rows_json')->nullable()->after('skipped_count');
-        });
+        if (Schema::hasColumn('import_logs', 'rows_json')) {
+            Schema::table('import_logs', function (Blueprint $table) {
+                $table->dropColumn('rows_json');
+            });
+        }
     }
 
     public function down(): void
     {
         Schema::table('import_logs', function (Blueprint $table) {
-            $table->dropColumn('rows_json');
+            $table->json('rows_json')->nullable()->after('skipped_count');
         });
     }
 };

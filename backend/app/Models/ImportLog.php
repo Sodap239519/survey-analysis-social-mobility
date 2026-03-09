@@ -13,11 +13,6 @@ class ImportLog extends Model
         'imported_count',
         'exists_count',
         'skipped_count',
-        'rows_json',
-    ];
-
-    protected $casts = [
-        'rows_json' => 'array',
     ];
 
     public function user(): BelongsTo
