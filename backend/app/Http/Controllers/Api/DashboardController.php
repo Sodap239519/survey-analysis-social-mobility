@@ -27,29 +27,11 @@ class DashboardController extends Controller
         $period      = $request->query('period', 'after');
         $surveyYear  = $request->query('survey_year') ? (int) $request->query('survey_year') : null;
 
-        // จำนวนรหัสบ้านทั้งหมด (DISTINCT house_code จากครัวเรือนที่มีการสำรวจ responses เท่านั้น)
-        $totalHouseCodesQuery = Household::whereHas('surveyResponses', function ($q) use ($period, $surveyYear) {
-            $q->where('period', $period);
-            if ($surveyYear) {
-                $q->where('survey_year', $surveyYear);
-            }
-        });
-
-        if ($district) {
-            $totalHouseCodesQuery->where(function ($q) use ($district) {
-                $q->where('district_name', 'like', "%{$district}%")
-                  ->orWhere('district_code', $district);
-            });
-        }
-
-        if ($subdistrict) {
-            $totalHouseCodesQuery->where(function ($q) use ($subdistrict) {
-                $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
-                  ->orWhere('subdistrict_code', $subdistrict);
-            });
-        }
-
-        $totalHouseCodes = $totalHouseCodesQuery->distinct('house_code')->count('house_code');
+        // จำนวนรหัสบ้านที่มีการสำรวจ (DISTINCT house_code from responses only)
+        $totalHouseCodes = SurveyResponse::query()
+            ->join('households', 'survey_responses.household_id', '=', 'households.id')
+            ->distinct('households.house_code')
+            ->count('households.house_code');
 
         // Filter survey responses
         $responseQuery = SurveyResponse::query()->where('period', $period);
@@ -401,15 +383,36 @@ class DashboardController extends Controller
             ->orderBy('district_name');
 
         if ($surveyYear) {
-            $query->where('survey_year', $surveyYear);
+            $responseQuery->where('survey_year', $surveyYear);
         }
 
         if ($district) {
-            $query->where(function ($q) use ($district) {
+            $responseQuery->whereHas('household', function ($q) use ($district) {
                 $q->where('district_name', 'like', "%{$district}%")
                   ->orWhere('district_code', $district);
             });
         }
+
+        if ($subdistrict) {
+            $responseQuery->whereHas('household', function ($q) use ($subdistrict) {
+                $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
+                  ->orWhere('subdistrict_code', $subdistrict);
+            });
+        }
+
+        $householdIds = (clone $responseQuery)->distinct()->pluck('household_id');
+
+        $query = Household::query()
+            ->whereIn('id', $householdIds)
+            ->selectRaw('
+                district_name,
+                district_code,
+                COUNT(DISTINCT subdistrict_name) AS subdistrict_count,
+                COUNT(DISTINCT village_name)     AS village_count,
+                COUNT(DISTINCT house_code)       AS household_count
+            ')
+            ->groupBy('district_name', 'district_code')
+            ->orderBy('district_name');
 
         return $query->get()->toArray();
     }
@@ -433,29 +436,33 @@ class DashboardController extends Controller
         });
 
         if ($surveyYear) {
-            $query->where('survey_year', $surveyYear);
+            $responseQuery->where('survey_year', $surveyYear);
         }
 
         if ($district) {
-            $query->where(function ($q) use ($district) {
+            $responseQuery->whereHas('household', function ($q) use ($district) {
                 $q->where('district_name', 'like', "%{$district}%")
                   ->orWhere('district_code', $district);
             });
         }
 
         if ($subdistrict) {
-            $query->where(function ($q) use ($subdistrict) {
+            $responseQuery->whereHas('household', function ($q) use ($subdistrict) {
                 $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
                   ->orWhere('subdistrict_code', $subdistrict);
             });
         }
 
-        $row = $query->selectRaw('
-            COUNT(DISTINCT district_name)   AS district_count,
-            COUNT(DISTINCT subdistrict_name) AS subdistrict_count,
-            COUNT(DISTINCT village_name)    AS village_count,
-            COUNT(DISTINCT house_code)      AS household_count
-        ')->first();
+        $householdIds = (clone $responseQuery)->distinct()->pluck('household_id');
+
+        $row = Household::query()
+            ->whereIn('id', $householdIds)
+            ->selectRaw('
+                COUNT(DISTINCT district_name)    AS district_count,
+                COUNT(DISTINCT subdistrict_name) AS subdistrict_count,
+                COUNT(DISTINCT village_name)     AS village_count,
+                COUNT(DISTINCT house_code)       AS household_count
+            ')->first();
 
         return [
             'districts'   => $row ? (int) $row->district_count : 0,
