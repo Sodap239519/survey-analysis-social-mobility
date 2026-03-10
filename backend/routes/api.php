@@ -30,6 +30,8 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
 
     // Households
     Route::apiResource('households', HouseholdController::class);
+    Route::get('/households/{household}/compare', [HouseholdController::class, 'compare'])
+        ->name('households.compare');
 
     // Persons
     Route::apiResource('persons', PersonController::class);

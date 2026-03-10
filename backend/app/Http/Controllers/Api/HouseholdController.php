@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Household;
+use App\Services\CompareHouseholdSurveyLogic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -90,5 +91,28 @@ class HouseholdController extends Controller
         $household->delete();
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    /**
+     * Compare Before (legacy import) vs After (survey response) capital scores.
+     *
+     * GET /api/v1/households/{household}/compare
+     *
+     * Query params:
+     *   survey_year  (int, optional) – filter survey responses by year
+     *   survey_round (int, optional) – filter survey responses by round
+     *
+     * Returns per-capital before/after/diff scores (0–100 normalized),
+     * summary averages, X index, and poverty level before/after/diff.
+     */
+    public function compare(Request $request, Household $household): JsonResponse
+    {
+        $surveyYear  = $request->filled('survey_year')  ? (int) $request->survey_year  : null;
+        $surveyRound = $request->filled('survey_round') ? (int) $request->survey_round : null;
+
+        $logic  = new CompareHouseholdSurveyLogic();
+        $result = $logic->compare($household, $surveyYear, $surveyRound);
+
+        return response()->json($result);
     }
 }
