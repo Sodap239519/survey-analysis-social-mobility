@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('survey_responses', function (Blueprint $table) {
             $table->id();
             $table->foreignId('household_id')->constrained()->onDelete('cascade');
-            $table->foreignId('person_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('person_id')->nullable()->constrained('persons')->onDelete('set null');
             $table->string('period', 10)->default('after')->comment('before|after');
             $table->integer('survey_year')->nullable();
             $table->integer('survey_round')->nullable();
