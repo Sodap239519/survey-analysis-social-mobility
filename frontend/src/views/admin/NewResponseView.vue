@@ -179,6 +179,13 @@
           <div v-if="stepMaxScore > 0" class="score-badge">
             <span class="score-label">คะแนน</span>
             <span class="score-value">{{ stepCurrentScore }}/{{ stepMaxScore }}</span>
+            <span
+              v-if="stepCapitalLevel"
+              class="capital-level-badge"
+              :style="{ background: stepCapitalLevel.bg, color: stepCapitalLevel.color }"
+            >
+              {{ stepCapitalScore.toFixed(2) }} — {{ stepCapitalLevel.label }}
+            </span>
           </div>
         </div>
         <p class="step-description">{{ STEPS[currentStep].description }}</p>
@@ -293,35 +300,38 @@ const route = useRoute()
 
 // ─── Wizard steps definition ────────────────────────────────────────────────
 const STEPS = [
-  { id: 0, title: 'ข้อมูลพื้นฐาน',            icon: '📋', description: 'รหัสบ้าน และ ข้อมูลผู้ให้ข้อมูล',                  capitalSlug: null },
-  { id: 1, title: 'ทุนมนุษย์',                icon: '👤', description: 'การทำงาน ทักษะ รายได้ (ข้อ 1–6)',                  capitalSlug: 'human' },
-  { id: 2, title: 'ทุนกายภาพ',                icon: '🏠', description: 'การจำหน่าย ปัญหาพื้นที่ (ข้อ 7–8)',                capitalSlug: 'physical' },
-  { id: 3, title: 'ทุนการเงิน ส่วน 1',        icon: '💰', description: 'ความรู้การเงิน รายจ่าย (ข้อ 9–10)',                capitalSlug: 'financial' },
-  { id: 4, title: 'ทุนการเงิน ส่วน 2',        icon: '💳', description: 'การออม หนี้สิน ทรัพย์สินเพื่ออาชีพ (ข้อ 11–14)', capitalSlug: 'financial' },
-  { id: 5, title: 'ทุนธรรมชาติ',              icon: '🌿', description: 'ภัยพิบัติและการรับมือ (ข้อ 15)',                    capitalSlug: 'natural' },
-  { id: 6, title: 'ทุนสังคม + ความพึงพอใจ', icon: '🤝', description: 'กลุ่ม เครือข่าย และความพึงพอใจ (ข้อ 16–18)',       capitalSlug: 'social' },
+  { id: 0, title: 'ข้อมูลพื้นฐาน',     icon: '📋', description: 'รหัสบ้าน และ ข้อมูลผู้ให้ข้อมูล',                  capitalSlug: null },
+  { id: 1, title: 'ทุนมนุษย์',          icon: '👤', description: 'การทำงาน ทักษะ รายได้ (ข้อ 1–6)',                  capitalSlug: 'human' },
+  { id: 2, title: 'ทุนกายภาพ',          icon: '🏠', description: 'การจำหน่าย ปัญหาพื้นที่ (ข้อ 7–8)',                capitalSlug: 'physical' },
+  { id: 3, title: 'ทุนการเงิน ส่วน 1', icon: '💰', description: 'ความรู้การเงิน รายจ่าย (ข้อ 9–10)',                capitalSlug: 'financial' },
+  { id: 4, title: 'ทุนการเงิน ส่วน 2', icon: '💳', description: 'การออม หนี้สิน ทรัพย์สินเพื่ออาชีพ (ข้อ 11–14)', capitalSlug: 'financial' },
+  { id: 5, title: 'ทุนธรรมชาติ',        icon: '🌿', description: 'ภัยพิบัติและการรับมือ (ข้อ 15)',                    capitalSlug: 'natural' },
+  { id: 6, title: 'ทุนสังคม',           icon: '🤝', description: 'กลุ่มกิจกรรม และภาคีเครือข่าย (ข้อ 16–17)',       capitalSlug: 'social' },
+  { id: 7, title: 'ความพึงพอใจ',        icon: '⭐', description: 'ระดับความพึงพอใจต่อโครงการ 5 ด้าน (ข้อ 18)',      capitalSlug: null },
 ]
 
 // Step → question_key whitelist (ordered as they appear on the paper form).
 // Keys correspond to the Question.question_key column seeded by QuestionnaireSeeder
 // and the 2026_03_11_000002_add_missing_survey_questions migration.
 // Paper form ↔ DB mapping:
-//   Paper Q1  = Q2  (สถานภาพการทำงาน)          Paper Q2  = Q3  (ทักษะอาชีพ)
-//   Paper Q3  = Q3.1 (การเปลี่ยนแปลงทักษะ)     Paper Q4  = Q3.2 (กิจกรรมการเงิน)
-//   Paper Q5  = Q4  (รายได้)                    Paper Q6  = Q4.1 (แหล่งรายได้)
-//   Paper Q7  = Q5  (ช่องทางจำหน่าย)            Paper Q8  = Q6  (ปัญหาพื้นที่ทำกิน)
-//   Paper Q9  = Q7  (ความรู้การเงิน)             Paper Q10 = Q8  (รายจ่ายครัวเรือน)
-//   Paper Q11 = Q9  (การออม)                    Paper Q12 = Q10 (หนี้สิน)
-//   Paper Q13 = Q10.1 (การจัดการหนี้)           Paper Q14 = Q11 (ทรัพย์สิน)
-//   Paper Q15 = Q12.1+Q12.2 (ภัยพิบัติ)        Paper Q16 = Q13 (กลุ่มกิจกรรม)
-//   Paper Q17 = Q14 (ภาคีเครือข่าย)             Paper Q18 = Q15 (ความพึงพอใจ)
+//   Paper Q1  = Q2  (สถานภาพการทำงาน)          Paper Q2.1 = Q2.1 (อาชีพปัจจุบัน conditional)
+//   Paper Q2  = Q3  (ทักษะอาชีพ)               Paper Q3  = Q3.1 (การเปลี่ยนแปลงทักษะ)
+//   Paper Q4  = Q3.2 (กิจกรรมการเงิน)          Paper Q5  = Q4  (รายได้)
+//   Paper Q6  = Q4.1 (แหล่งรายได้)             Paper Q7  = Q5  (ช่องทางจำหน่าย)
+//   Paper Q8  = Q6  (ปัญหาพื้นที่ทำกิน)        Paper Q9  = Q7  (ความรู้การเงิน)
+//   Paper Q10 = Q8  (รายจ่ายครัวเรือน)         Paper Q11 = Q9  (การออม)
+//   Paper Q12 = Q10 (หนี้สิน)                  Paper Q13 = Q10.1 (การจัดการหนี้)
+//   Paper Q14 = Q11 (ทรัพย์สิน)               Paper Q15 = Q12.1+Q12.2 (ภัยพิบัติ)
+//   Paper Q16 = Q13 (กลุ่มกิจกรรม)            Paper Q17 = Q14 (ภาคีเครือข่าย)
+//   Paper Q18 = Q15 (ความพึงพอใจ)
 const STEP_QUESTION_KEYS = {
   1: ['Q2', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
   2: ['Q5', 'Q6'],
   3: ['Q7', 'Q8'],
   4: ['Q9', 'Q10', 'Q10.1', 'Q11'],
   5: ['Q12.1', 'Q12.2'],
-  6: ['Q13', 'Q14', 'Q15'],
+  6: ['Q13', 'Q14'],
+  7: ['Q15'],
 }
 
 const CAPITAL_COLORS = {
@@ -501,6 +511,31 @@ function computeQuestionScore(q) {
   const sum = selChoices.reduce((acc, c) => acc + (c.weight || 0), 0)
   return Math.min(q.max_score || 0, sum)
 }
+
+// ─── 4-Level Capital Scoring ──────────────────────────────────────────────────
+// Converts a raw 0-100 score into the 1.00–4.00 scale used by the paper form
+function calculateCapitalScore(rawScore, maxScore) {
+  if (!maxScore || maxScore <= 0) return 1.00
+  const normalizedScore = (rawScore / maxScore) * 3 + 1
+  return Math.round(normalizedScore * 100) / 100
+}
+
+function getCapitalLevel(score) {
+  if (score >= 3.25) return { level: 4, label: 'อยู่ดี',      color: '#16a34a', bg: '#dcfce7' }
+  if (score >= 2.50) return { level: 3, label: 'อยู่พอได้',   color: '#d97706', bg: '#fef3c7' }
+  if (score >= 1.75) return { level: 2, label: 'อยู่ยาก',     color: '#ea580c', bg: '#fed7aa' }
+  return               { level: 1, label: 'อยู่ลำบาก',  color: '#dc2626', bg: '#fee2e2' }
+}
+
+const stepCapitalScore = computed(() => {
+  if (stepMaxScore.value <= 0) return null
+  return calculateCapitalScore(stepCurrentScore.value, stepMaxScore.value)
+})
+
+const stepCapitalLevel = computed(() => {
+  if (stepCapitalScore.value === null) return null
+  return getCapitalLevel(stepCapitalScore.value)
+})
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 function validateCurrentStep() {
@@ -959,6 +994,26 @@ onUnmounted(() => {
 
 /* ─── House code autocomplete ──────────────────────────────────────────────── */
 .hh-autocomplete { position: relative; }
+
+/* ─── Capital level badge ──────────────────────────────────────────────────── */
+.capital-level-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 0.375rem;
+  white-space: nowrap;
+}
+
+/* ─── Conditional question block ───────────────────────────────────────────── */
+.conditional-question-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-bottom: 0.375rem;
+}
 
 /* ─── Mobile ───────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
