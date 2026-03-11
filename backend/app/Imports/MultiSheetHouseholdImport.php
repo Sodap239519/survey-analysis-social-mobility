@@ -200,22 +200,41 @@ class BasicDataSheetImport implements ToCollection
      * they come back as formatted strings like "25-ก.พ." (for เลขที่ 25 Feb).
      * We convert "dd-<Thai_month_abbr>" to "dd/m".
      */
+    /**
+     * Pre-compiled regex patterns for Thai month abbreviations (day-month date format).
+     * Built once as a class constant to avoid repeated preg_quote calls on every row.
+     * Key: compiled regex pattern, Value: month number (1–12).
+     *
+     * @var array<string,int>|null  (populated lazily via getMonthPatterns())
+     */
+    private ?array $monthPatterns = null;
+
+    /** @return array<string, int> regex => month number */
+    private function getMonthPatterns(): array
+    {
+        if ($this->monthPatterns !== null) {
+            return $this->monthPatterns;
+        }
+        $thaiMonths = [
+            'ม.ค.'  => 1,  'ก.พ.'  => 2,  'มี.ค.' => 3,  'เม.ย.' => 4,
+            'พ.ค.'  => 5,  'มิ.ย.' => 6,  'ก.ค.'  => 7,  'ส.ค.'  => 8,
+            'ก.ย.'  => 9,  'ต.ค.'  => 10, 'พ.ย.'  => 11, 'ธ.ค.'  => 12,
+        ];
+        $this->monthPatterns = [];
+        foreach ($thaiMonths as $abbr => $month) {
+            $this->monthPatterns['/^(\d{1,2})\s*-\s*' . preg_quote($abbr, '/') . '\s*$/u'] = $month;
+        }
+        return $this->monthPatterns;
+    }
+
     private function normalizeHouseNo(mixed $value): ?string
     {
         if ($value === null || $value === '') return null;
 
         $str = trim((string) $value);
 
-        // Thai month abbreviation → month number
-        $thaiMonths = [
-            'ม.ค.'  => 1,  'ก.พ.'  => 2,  'มี.ค.' => 3,  'เม.ย.' => 4,
-            'พ.ค.'  => 5,  'มิ.ย.' => 6,  'ก.ค.'  => 7,  'ส.ค.'  => 8,
-            'ก.ย.'  => 9,  'ต.ค.'  => 10, 'พ.ย.'  => 11, 'ธ.ค.'  => 12,
-        ];
-
-        foreach ($thaiMonths as $abbr => $month) {
-            // Pattern: "<day>-<abbr>" or "<day>-<abbr>" with optional spaces
-            if (preg_match('/^(\d{1,2})\s*-\s*' . preg_quote($abbr, '/') . '\s*$/u', $str, $m)) {
+        foreach ($this->getMonthPatterns() as $pattern => $month) {
+            if (preg_match($pattern, $str, $m)) {
                 return $m[1] . '/' . $month;
             }
         }

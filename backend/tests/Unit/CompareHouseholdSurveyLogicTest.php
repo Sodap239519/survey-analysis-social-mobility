@@ -285,10 +285,11 @@ class CompareHouseholdSurveyLogicTest extends TestCase
         }
     }
 
-    public function test_get_after_scores_returns_latest_response(): void
+    public function test_get_after_scores_averages_all_responses(): void
     {
         $household = Household::create(['house_code' => '12345678904']);
 
+        // Two respondents in same household; each person has a period=after response
         SurveyResponse::create([
             'household_id'    => $household->id,
             'period'          => 'after',
@@ -314,7 +315,10 @@ class CompareHouseholdSurveyLogicTest extends TestCase
         $result = $this->logic->getAfterScores($household);
 
         $this->assertTrue($result['found']);
-        $this->assertEqualsWithDelta(75.0, $result['scores']['human'], 0.001);
+        $this->assertEquals(2, $result['respondent_count']);
+        // Average of 55 and 75 = 65
+        $this->assertEqualsWithDelta(65.0, $result['scores']['human'], 0.001);
+        $this->assertEqualsWithDelta(65.0, $result['scores']['physical'], 0.001);
     }
 
     // ─── compare (full round-trip) ────────────────────────────────────────────
@@ -354,12 +358,18 @@ class CompareHouseholdSurveyLogicTest extends TestCase
         $this->assertEqualsWithDelta(70.0, $result['capitals']['human']['after'],  0.01);
         $this->assertEqualsWithDelta(20.0, $result['capitals']['human']['diff'],   0.01);
 
+        // diff=20 > threshold=2 => trend ดีขึ้น
+        $this->assertEquals('ดีขึ้น', $result['capitals']['human']['trend']);
+
         $this->assertEqualsWithDelta(30.0, $result['capitals']['financial']['diff'], 0.01);
 
         // Summary: avg_before=50, avg_after=(70+60+80+65+75)/5=70
         $this->assertEqualsWithDelta(50.0, $result['summary']['avg_before'], 0.01);
         $this->assertEqualsWithDelta(70.0, $result['summary']['avg_after'],  0.01);
         $this->assertEqualsWithDelta(20.0, $result['summary']['avg_diff'],   0.01);
+
+        // avg_diff=20 > threshold => overall_trend ดีขึ้น
+        $this->assertEquals('ดีขึ้น', $result['summary']['overall_trend']);
 
         // x_before = 1+(50/100)*3 = 2.5; x_after = 1+(70/100)*3 = 3.1
         $this->assertEqualsWithDelta(2.5, $result['summary']['x_before'], 0.01);

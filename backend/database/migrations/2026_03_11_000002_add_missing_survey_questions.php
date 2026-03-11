@@ -32,7 +32,11 @@ return new class extends Migration
                 'type'                 => 'multi_select',
                 'max_score'            => 0,
                 'has_exclusive_option' => false,
-                'meta'                 => ['conditional_on' => 'Q2', 'conditional_value' => '2'],
+                'meta'                 => [
+                    'conditional_on'       => 'Q2',
+                    'conditional_value'    => '2',
+                    'choice_text_required' => ['9', '10'],
+                ],
                 'sort_order'           => 15,
             ]);
 

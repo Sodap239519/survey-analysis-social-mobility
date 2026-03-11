@@ -39,7 +39,10 @@ class QuestionnaireSeeder extends Seeder
         );
 
         // Q2: สถานภาพการทำงาน (20 pts) - single select
-        $q2 = $this->createQuestion($capital, 'Q2', 'สถานภาพการทำงานปัจจุบัน', 'single_select', 20, true, 1);
+        // meta.choice_text_required: ['1'] → ว่างงาน requires a "สาเหตุ" text input
+        $q2 = $this->createQuestion($capital, 'Q2', 'สถานภาพการทำงานปัจจุบัน', 'single_select', 20, true, 1,
+            ['choice_text_required' => ['1']]
+        );
         $this->createChoices($q2, [
             ['0', 'ไม่ทำงาน', 0, true],
             ['1', 'ว่างงาน (เคยทำแต่ตอนนี้ไม่ได้ทำ)', 5, false],
