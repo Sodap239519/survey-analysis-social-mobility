@@ -38,6 +38,14 @@ class ExportController extends Controller
         'district_name'    => 'อำเภอ',
     ];
 
+    /**
+     * Threshold for trend classification: ดีขึ้น / คงที่ / แย่ลง
+     * A change is considered "improved" when the difference exceeds 5% of the before score,
+     * and "worse" when it falls more than 5% below. Otherwise it is "stable".
+     * (per project comparison rules: ดีขึ้น = new > old + 5%, แย่ลง = new < old - 5%)
+     */
+    private const TREND_THRESHOLD_PCT = 0.05;
+
     // ──────────────────────────────────────────────
     // Export History
     // ──────────────────────────────────────────────
@@ -335,10 +343,10 @@ class ExportController extends Controller
                 $s = $result['summary'];
                 $c = $result['capitals'];
 
-                // Determine trend (improved/same/worse) using 5% threshold
+                // Determine trend (ดีขึ้น/คงที่/แย่ลง) using TREND_THRESHOLD_PCT
                 $trend = '—';
                 if ($s['avg_before'] !== null && $s['avg_after'] !== null) {
-                    $threshold = $s['avg_before'] * 0.05;
+                    $threshold = $s['avg_before'] * self::TREND_THRESHOLD_PCT;
                     if ($s['avg_diff'] > $threshold) {
                         $trend = 'ดีขึ้น';
                     } elseif ($s['avg_diff'] < -$threshold) {
@@ -416,8 +424,8 @@ class ExportController extends Controller
         ]);
 
         if ($format === 'excel') {
-            // Build simple Excel-compatible UTF-8 CSV with BOM (Excel reads it correctly)
-            $filename = "{$tableName}_{$ts}.xlsx.csv";
+            // Build UTF-8 CSV with BOM so Excel reads Thai characters correctly
+            $filename = "{$tableName}_{$ts}_excel.csv";
             $content  = "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
             $content .= implode(',', array_map(fn ($v) => '"' . str_replace('"', '""', $v) . '"', $headers)) . "\r\n";
             foreach ($rows as $row) {

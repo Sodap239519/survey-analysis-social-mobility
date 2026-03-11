@@ -258,6 +258,10 @@ function closeModal() {
 
 async function saveHousehold() {
   if (!form.value.house_code) { modalError.value = 'กรุณากรอกรหัสบ้าน'; return }
+  if (!editingId.value && !/^\d{11}$/.test(form.value.house_code)) {
+    modalError.value = 'รหัสบ้านต้องเป็นตัวเลข 11 หลัก'
+    return
+  }
   saving.value = true
   modalError.value = ''
   try {
