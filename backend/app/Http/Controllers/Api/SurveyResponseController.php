@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Answer;
 use App\Models\DetailedAnswer;
+use App\Models\Household;
+use App\Models\Person;
 use App\Models\Question;
 use App\Models\SurveyResponse;
 use App\Services\ScoringService;
@@ -42,27 +44,52 @@ class SurveyResponseController extends Controller
     /**
      * Create a new survey response with answers.
      *
+     * Supports two household resolution modes:
+     *  (a) Provide "household_id" directly (must exist in households table), OR
+     *  (b) Provide "house_code" + optional "household_data" fields – the household
+     *      will be looked up by house_code and created automatically if not found.
+     *
+     * Supports two person resolution modes:
+     *  (a) Provide "person_id" directly (must exist in persons table), OR
+     *  (b) Provide "person_data" object with at least "citizen_id" or name fields –
+     *      the person will be looked up by citizen_id and created if not found.
+     *
      * Expected body:
      * {
-     *   "household_id": 1,
-     *   "person_id": 1,          // optional
+     *   "house_code": "30010017415",         // preferred: auto-creates household
+     *   "household_data": { ... },           // optional extra household fields
+     *   "person_data": {                     // optional: auto-creates person
+     *     "citizen_id": "1303005244708",
+     *     "title": "นาย", "first_name": "...", "last_name": "...", ...
+     *   },
      *   "period": "after",
      *   "survey_year": 2568,
-     *   "survey_round": 1,
-     *   "surveyed_at": "2025-09-23",
-     *   "surveyor_name": "นางสาวโยษิตา",
-     *   "answers": {
-     *     "1": { "selected_choice_ids": [3, 5] },    // question_id => answer
-     *     "2": { "value_text": "some text" },
-     *     ...
-     *   }
+     *   "answers": { "1": { "selected_choice_ids": [3, 5] }, ... }
      * }
      */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'household_id'  => 'required|exists:households,id',
-            'person_id'     => 'nullable|exists:persons,id',
+            'household_id'  => 'nullable|integer',
+            'house_code'    => 'nullable|string|max:20',
+            'household_data'                     => 'nullable|array',
+            'household_data.house_no'            => 'nullable|string',
+            'household_data.village_no'          => 'nullable|string',
+            'household_data.village_name'        => 'nullable|string',
+            'household_data.subdistrict_name'    => 'nullable|string',
+            'household_data.district_name'       => 'nullable|string',
+            'household_data.province_name'       => 'nullable|string',
+            'household_data.postal_code'         => 'nullable|string',
+            'household_data.latitude'            => 'nullable|numeric',
+            'household_data.longitude'           => 'nullable|numeric',
+            'person_id'     => 'nullable|integer',
+            'person_data'                        => 'nullable|array',
+            'person_data.citizen_id'             => 'nullable|string|max:20',
+            'person_data.title'                  => 'nullable|string|max:20',
+            'person_data.first_name'             => 'nullable|string|max:100',
+            'person_data.last_name'              => 'nullable|string|max:100',
+            'person_data.birthdate'              => 'nullable|date',
+            'person_data.phone'                  => 'nullable|string|max:20',
             'period'        => 'required|in:before,after',
             'survey_year'   => 'nullable|integer',
             'survey_round'  => 'nullable|integer',
@@ -79,9 +106,53 @@ class SurveyResponseController extends Controller
             'detailed_answers.*.sub_answers'   => 'nullable|array',
         ]);
 
+        // ── Resolve household ─────────────────────────────────────────────────
+        $householdId = $validated['household_id'] ?? null;
+        $houseCode   = $validated['house_code']   ?? null;
+
+        if (! $householdId && $houseCode) {
+            $hhData    = $validated['household_data'] ?? [];
+            $household = Household::firstOrCreate(
+                ['house_code' => $houseCode],
+                $hhData
+            );
+            $householdId = $household->id;
+        }
+
+        if (! $householdId) {
+            return response()->json(['message' => 'household_id หรือ house_code จำเป็นต้องระบุ'], 422);
+        }
+
+        // ── Resolve person ────────────────────────────────────────────────────
+        $personId   = $validated['person_id'] ?? null;
+        $personData = $validated['person_data'] ?? [];
+
+        if (! $personId && ! empty($personData)) {
+            $citizenId = $personData['citizen_id'] ?? null;
+
+            if ($citizenId) {
+                $person   = Person::firstOrCreate(
+                    ['citizen_id' => $citizenId],
+                    array_merge(['household_id' => $householdId], $personData)
+                );
+                $personId = $person->id;
+            } elseif (! empty($personData['first_name']) || ! empty($personData['last_name'])) {
+                // No citizen_id: attempt to match by household + name to avoid duplicates.
+                $person = Person::firstOrCreate(
+                    [
+                        'household_id' => $householdId,
+                        'first_name'   => $personData['first_name'] ?? null,
+                        'last_name'    => $personData['last_name']  ?? null,
+                    ],
+                    $personData
+                );
+                $personId = $person->id;
+            }
+        }
+
         $response = SurveyResponse::create([
-            'household_id'  => $validated['household_id'],
-            'person_id'     => $validated['person_id'] ?? null,
+            'household_id'  => $householdId,
+            'person_id'     => $personId,
             'period'        => $validated['period'],
             'survey_year'   => $validated['survey_year'] ?? null,
             'survey_round'  => $validated['survey_round'] ?? null,
