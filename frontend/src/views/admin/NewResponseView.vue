@@ -33,8 +33,7 @@
         <span class="progress-text">ขั้นตอน {{ currentStep + 1 }} / {{ STEPS.length }} &mdash; {{ progressPercent }}%</span>
       </div>
 
-      <!-- Auto-save notice -->
-      <p v-if="lastSaved" class="autosave-notice">💾 บันทึกร่างอัตโนมัติล่าสุด: {{ lastSaved }}</p>
+
 
       <!-- ─── STEP 0: ข้อมูลพื้นฐาน ──────────────────────────────── -->
       <div v-if="currentStep === 0" class="card mb-4">
@@ -200,8 +199,8 @@
               <span v-if="q.max_score > 0" class="question-score">({{ q.max_score }} คะแนน)</span>
             </p>
 
-            <!-- Multi-select -->
-            <div v-if="q.type === 'multi_select' || q.type === 'special_q6'" class="choices-grid">
+            <!-- Multi-select (standard, excludes satisfaction questions) -->
+            <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && !(q.meta && q.meta.aspects)" class="choices-grid">
               <label
                 v-for="c in getVisibleChoices(q)"
                 :key="c.id"
@@ -224,7 +223,7 @@
               </label>
             </div>
             <!-- "อื่นๆ" free-text for multi-select -->
-            <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && hasOtherSelected(q, answers[q.id])" class="other-input-wrap">
+            <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && !(q.meta && q.meta.aspects) && hasOtherSelected(q, answers[q.id])" class="other-input-wrap">
               <label class="other-input-label">โปรดระบุรายละเอียด (อื่นๆ)</label>
               <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุรายละเอียด..." class="other-input" />
             </div>
@@ -246,6 +245,31 @@
             <div v-if="q.type === 'single_select' && hasSingleOtherSelected(q, singleAnswers[q.id])" class="other-input-wrap">
               <label class="other-input-label">โปรดระบุรายละเอียด (อื่นๆ)</label>
               <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุรายละเอียด..." class="other-input" />
+            </div>
+
+            <!-- Satisfaction (grouped radio buttons by aspect) -->
+            <div v-if="q.meta && q.meta.aspects" class="satisfaction-grid">
+              <div v-for="aspect in getSatisfactionAspects(q)" :key="aspect.key" class="satisfaction-item">
+                <span class="satisfaction-label">{{ aspect.label }}</span>
+                <div class="satisfaction-scale">
+                  <label
+                    v-for="c in aspect.choices"
+                    :key="c.id"
+                    class="choice-label"
+                    :class="{ 'choice-selected': isSatisfactionSelected(q, c) }"
+                  >
+                    <input
+                      type="radio"
+                      :name="'satisfaction_' + q.id + '_' + aspect.key"
+                      :value="c.id"
+                      :checked="isSatisfactionSelected(q, c)"
+                      @change="handleSatisfactionChange(q, c)"
+                      class="choice-checkbox"
+                    />
+                    <span class="choice-text">{{ c.levelLabel }}</span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             <!-- Numeric -->
@@ -291,7 +315,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '../../api'
 
@@ -300,14 +324,13 @@ const route = useRoute()
 
 // ─── Wizard steps definition ────────────────────────────────────────────────
 const STEPS = [
-  { id: 0, title: 'ข้อมูลพื้นฐาน',     icon: '📋', description: 'รหัสบ้าน และ ข้อมูลผู้ให้ข้อมูล',                  capitalSlug: null },
-  { id: 1, title: 'ทุนมนุษย์',          icon: '👤', description: 'การทำงาน ทักษะ รายได้ (ข้อ 1–6)',                  capitalSlug: 'human' },
-  { id: 2, title: 'ทุนกายภาพ',          icon: '🏠', description: 'การจำหน่าย ปัญหาพื้นที่ (ข้อ 7–8)',                capitalSlug: 'physical' },
-  { id: 3, title: 'ทุนการเงิน ส่วน 1', icon: '💰', description: 'ความรู้การเงิน รายจ่าย (ข้อ 9–10)',                capitalSlug: 'financial' },
-  { id: 4, title: 'ทุนการเงิน ส่วน 2', icon: '💳', description: 'การออม หนี้สิน ทรัพย์สินเพื่ออาชีพ (ข้อ 11–14)', capitalSlug: 'financial' },
-  { id: 5, title: 'ทุนธรรมชาติ',        icon: '🌿', description: 'ภัยพิบัติและการรับมือ (ข้อ 15)',                    capitalSlug: 'natural' },
-  { id: 6, title: 'ทุนสังคม',           icon: '🤝', description: 'กลุ่มกิจกรรม และภาคีเครือข่าย (ข้อ 16–17)',       capitalSlug: 'social' },
-  { id: 7, title: 'ความพึงพอใจ',        icon: '⭐', description: 'ระดับความพึงพอใจต่อโครงการ 5 ด้าน (ข้อ 18)',      capitalSlug: null },
+  { id: 0, title: 'ข้อมูลพื้นฐาน',     icon: '📋', description: 'รหัสบ้าน และ ข้อมูลผู้ให้ข้อมูล',                                    capitalSlug: null },
+  { id: 1, title: 'ทุนมนุษย์',          icon: '👤', description: 'การทำงาน ทักษะ รายได้ (ข้อ 1–6)',                                    capitalSlug: 'human' },
+  { id: 2, title: 'ทุนกายภาพ',          icon: '🏠', description: 'การจำหน่าย ปัญหาพื้นที่ (ข้อ 7–8)',                                  capitalSlug: 'physical' },
+  { id: 3, title: 'ทุนการเงิน',         icon: '💰', description: 'ความรู้การเงิน รายจ่าย การออม หนี้สิน ทรัพย์สิน (ข้อ 9–14)',        capitalSlug: 'financial' },
+  { id: 4, title: 'ทุนธรรมชาติ',        icon: '🌿', description: 'ภัยพิบัติและการรับมือ (ข้อ 15)',                                      capitalSlug: 'natural' },
+  { id: 5, title: 'ทุนสังคม',           icon: '🤝', description: 'กลุ่มกิจกรรม และภาคีเครือข่าย (ข้อ 16–17)',                         capitalSlug: 'social' },
+  { id: 6, title: 'ความพึงพอใจ',        icon: '⭐', description: 'ระดับความพึงพอใจต่อโครงการ 5 ด้าน (ข้อ 18)',                        capitalSlug: null },
 ]
 
 // Step → question_key whitelist (ordered as they appear on the paper form).
@@ -327,11 +350,10 @@ const STEPS = [
 const STEP_QUESTION_KEYS = {
   1: ['Q2', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
   2: ['Q5', 'Q6'],
-  3: ['Q7', 'Q8'],
-  4: ['Q9', 'Q10', 'Q10.1', 'Q11'],
-  5: ['Q12.1', 'Q12.2'],
-  6: ['Q13', 'Q14'],
-  7: ['Q15'],
+  3: ['Q7', 'Q8', 'Q9', 'Q10', 'Q10.1', 'Q11'],
+  4: ['Q12.1', 'Q12.2'],
+  5: ['Q13', 'Q14'],
+  6: ['Q15'],
 }
 
 const CAPITAL_COLORS = {
@@ -344,7 +366,6 @@ const currentStep      = ref(0)
 const loadingQuestions = ref(true)
 const allQuestions     = ref([])  // flat array of all questions
 const errors           = ref({})
-const lastSaved        = ref('')
 const submitting       = ref(false)
 const submitError      = ref('')
 const submitSuccess    = ref(false)
@@ -460,6 +481,42 @@ function getVisibleChoices(question) {
     if (key.includes('.')) return hasProblems  // sub-choices visible only when parent selected
     return true
   })
+}
+
+// Satisfaction question helpers (for questions with meta.aspects = true)
+// Choices have choice_key format "{aspect}_{level}", e.g. "1_5" = aspect 1, level 5
+// Text format: "กระบวนการ/กิจกรรมของโครงการ: มากที่สุด"
+function getSatisfactionAspects(question) {
+  const aspectMap = {}
+  for (const c of question.choices || []) {
+    const separatorIdx = c.text_th?.indexOf(': ')
+    const aspectLabel = separatorIdx >= 0 ? c.text_th.slice(0, separatorIdx) : (c.text_th || '')
+    const levelLabel  = separatorIdx >= 0 ? c.text_th.slice(separatorIdx + 2) : c.choice_key
+    const aspectKey   = String(c.choice_key).split('_')[0]
+    if (!aspectMap[aspectKey]) {
+      aspectMap[aspectKey] = { key: aspectKey, label: aspectLabel, choices: [] }
+    }
+    aspectMap[aspectKey].choices.push({ ...c, levelLabel })
+  }
+  return Object.values(aspectMap)
+}
+
+function handleSatisfactionChange(question, choice) {
+  if (!Array.isArray(answers.value[question.id])) {
+    answers.value[question.id] = []
+  }
+  const aspectKey = String(choice.choice_key).split('_')[0]
+  const aspectChoiceIds = (question.choices || [])
+    .filter(c => String(c.choice_key).split('_')[0] === aspectKey)
+    .map(c => c.id)
+  answers.value[question.id] = [
+    ...answers.value[question.id].filter(id => !aspectChoiceIds.includes(id)),
+    choice.id,
+  ]
+}
+
+function isSatisfactionSelected(question, choice) {
+  return (answers.value[question.id] || []).includes(choice.id)
 }
 
 // Conditional question visibility driven by question.meta.conditional_on / conditional_value
@@ -585,44 +642,6 @@ function goToStep(idx) {
   }
 }
 
-// ─── Auto-save (localStorage) ─────────────────────────────────────────────────
-function autoSaveKey() {
-  return `survey_draft_${isEditMode.value ? editingId.value : 'new'}`
-}
-
-function autoSave() {
-  try {
-    localStorage.setItem(autoSaveKey(), JSON.stringify({
-      form: form.value,
-      answers: answers.value,
-      singleAnswers: singleAnswers.value,
-      numericAnswers: numericAnswers.value,
-      otherTexts: otherTexts.value,
-    }))
-    lastSaved.value = new Date().toLocaleTimeString('th-TH')
-  } catch {
-    // Non-fatal if localStorage is full / unavailable
-  }
-}
-
-function restoreDraft() {
-  if (isEditMode.value) return  // don't overwrite loaded data in edit mode
-  try {
-    const raw = localStorage.getItem(autoSaveKey())
-    if (!raw) return
-    const saved = JSON.parse(raw)
-    if (saved.form) Object.assign(form.value, saved.form)
-    if (saved.answers) Object.assign(answers.value, saved.answers)
-    if (saved.singleAnswers) Object.assign(singleAnswers.value, saved.singleAnswers)
-    if (saved.numericAnswers) Object.assign(numericAnswers.value, saved.numericAnswers)
-    if (saved.otherTexts) Object.assign(otherTexts.value, saved.otherTexts)
-    lastSaved.value = 'ร่างที่บันทึกไว้'
-  } catch {
-    // Ignore corrupt data
-  }
-}
-
-let autoSaveTimer = null
 
 // ─── Household autocomplete ──────────────────────────────────────────────────
 async function loadHouseholdSuggestions(search = '') {
@@ -792,7 +811,6 @@ async function submit() {
       await api.post('/responses', payload)
     }
     // Clear draft after successful save
-    try { localStorage.removeItem(autoSaveKey()) } catch { /* ignore */ }
     submitSuccess.value = true
     setTimeout(() => router.push('/admin/responses'), 1500)
   } catch (e) {
@@ -825,16 +843,7 @@ onMounted(async () => {
   // Edit mode: load existing response
   if (isEditMode.value && editingId.value) {
     await loadExistingResponse(editingId.value)
-  } else {
-    restoreDraft()
   }
-
-  // Start auto-save timer
-  autoSaveTimer = setInterval(autoSave, 30000)
-})
-
-onUnmounted(() => {
-  clearInterval(autoSaveTimer)
 })
 </script>
 
@@ -1007,6 +1016,32 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+/* ─── Satisfaction grid ─────────────────────────────────────────────────────── */
+.satisfaction-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+.satisfaction-item {
+  padding: 0.875rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 8px);
+}
+.satisfaction-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+.satisfaction-scale {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 /* ─── Conditional question block ───────────────────────────────────────────── */
 .conditional-question-hint {
   font-size: 0.75rem;
@@ -1024,5 +1059,6 @@ onUnmounted(() => {
   .other-input-wrap { max-width: 100%; }
   .wizard-nav { flex-wrap: wrap; }
   .step-header { flex-direction: column; align-items: flex-start; }
+  .satisfaction-scale { flex-direction: column; }
 }
 </style>
