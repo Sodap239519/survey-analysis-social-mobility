@@ -25,10 +25,18 @@ class HouseholdController extends Controller
 
         if ($request->filled('search')) {
             $s = $request->search;
-            $query->where(function ($q) use ($s) {
-                $q->where('house_code', 'like', "%{$s}%")
-                  ->orWhere('village_name', 'like', "%{$s}%");
-            });
+            // For autocomplete purposes, only search by house_code when the search
+            // string contains only digits (house codes are numeric only).
+            // This prevents non-house-code data (e.g. survey years) from appearing
+            // in the house_code suggestion list.
+            if (ctype_digit($s)) {
+                $query->where('house_code', 'like', "%{$s}%");
+            } else {
+                $query->where(function ($q) use ($s) {
+                    $q->where('house_code', 'like', "%{$s}%")
+                      ->orWhere('village_name', 'like', "%{$s}%");
+                });
+            }
         }
 
         if ($request->filled('survey_year')) {
