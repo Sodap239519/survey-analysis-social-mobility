@@ -36,7 +36,7 @@
               <th>รหัสบ้าน</th>
               <th>ช่วงเวลา</th>
               <th>ปี พ.ศ.</th>
-              <th>ระดับความยากจน</th>
+              <th>ระดับความเป็นอยู่</th>
               <th>คะแนนรวม</th>
               <th>ทุนมนุษย์</th>
               <th>ทุนกายภาพ</th>
@@ -53,7 +53,7 @@
               <td>{{ r.survey_year || '—' }}</td>
               <td>
                 <span v-if="r.poverty_level" class="badge" :style="{background: levelColor(r.poverty_level), color: '#fff'}">
-                  ระดับ {{ r.poverty_level }}
+                  {{ levelLabel(r.poverty_level) }}
                 </span>
                 <span v-else class="text-muted">—</span>
               </td>
@@ -103,7 +103,7 @@
           <div class="detail-item"><span class="detail-label">ผู้สำรวจ</span><span class="detail-value">{{ detailResponse.surveyor_name || '—' }}</span></div>
           <div class="detail-item"><span class="detail-label">ชื่อโมเดล</span><span class="detail-value">{{ detailResponse.model_name || '—' }}</span></div>
           <div class="detail-item"><span class="detail-label">วันที่สำรวจ</span><span class="detail-value">{{ detailResponse.surveyed_at || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ระดับความยากจน</span><span class="detail-value">{{ detailResponse.poverty_level || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ระดับความเป็นอยู่</span><span class="detail-value">{{ detailResponse.poverty_level ? `ระดับ ${detailResponse.poverty_level} — ${levelLabel(detailResponse.poverty_level)}` : '—' }}</span></div>
           <div class="detail-item"><span class="detail-label">คะแนนรวม</span><span class="detail-value">{{ detailResponse.score_aggregate?.toFixed(2) || '—' }}</span></div>
           <div class="detail-item"><span class="detail-label">ทุนมนุษย์</span><span class="detail-value">{{ detailResponse.score_human?.toFixed(2) || '—' }}</span></div>
           <div class="detail-item"><span class="detail-label">ทุนกายภาพ</span><span class="detail-value">{{ detailResponse.score_physical?.toFixed(2) || '—' }}</span></div>
@@ -272,6 +272,11 @@ const exportFormat = ref('csv')
 function levelColor(level) {
   const colors = { 1: '#ef4444', 2: '#f97316', 3: '#eab308', 4: '#22c55e' }
   return colors[level] || '#94a3b8'
+}
+
+function levelLabel(level) {
+  const labels = { 1: 'อยู่ลำบาก', 2: 'อยู่ยาก', 3: 'อยู่พอได้', 4: 'อยู่ดี' }
+  return labels[level] ? `ระดับ ${level} ${labels[level]}` : `ระดับ ${level}`
 }
 
 async function load() {

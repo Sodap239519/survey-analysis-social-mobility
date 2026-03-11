@@ -51,6 +51,22 @@ class ScoringServiceTest extends TestCase
         $this->assertEquals(4, $this->service->getPovertyLevel(4.00));
     }
 
+    // ─── Poverty Level Labels ────────────────────────────────────────────────
+
+    public function test_poverty_level_labels(): void
+    {
+        $this->assertEquals('อยู่ลำบาก', $this->service->getPovertyLevelLabel(1));
+        $this->assertEquals('อยู่ยาก',   $this->service->getPovertyLevelLabel(2));
+        $this->assertEquals('อยู่พอได้',  $this->service->getPovertyLevelLabel(3));
+        $this->assertEquals('อยู่ดี',     $this->service->getPovertyLevelLabel(4));
+    }
+
+    public function test_poverty_level_label_unknown_returns_empty(): void
+    {
+        $this->assertEquals('', $this->service->getPovertyLevelLabel(0));
+        $this->assertEquals('', $this->service->getPovertyLevelLabel(5));
+    }
+
     // ─── Aggregate Score Computation ─────────────────────────────────────────
 
     public function test_aggregate_score_from_normalized(): void

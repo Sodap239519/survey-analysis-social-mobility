@@ -9,6 +9,7 @@ use App\Models\ImportLog;
 use App\Models\Person;
 use App\Models\SurveyResponse;
 use App\Services\CompareHouseholdSurveyLogic;
+use App\Services\ScoringService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -247,10 +248,12 @@ class ExportController extends Controller
             'score_natural'   => 'ทุนธรรมชาติ (คะแนน)',
             'score_social'    => 'ทุนสังคม (คะแนน)',
             'score_aggregate' => 'คะแนนรวม (X)',
-            'poverty_level'   => 'ระดับความยากจน',
+            'poverty_level'   => 'ระดับ (1-4)',
+            'poverty_label'   => 'ระดับความเป็นอยู่',
         ]);
 
-        $rows = $query->orderBy('id')->get()->map(function ($r) {
+        $scoring = new ScoringService();
+        $rows = $query->orderBy('id')->get()->map(function ($r) use ($scoring) {
             $h = $r->household;
             return [
                 'house_code'       => $h?->house_code,
@@ -272,6 +275,7 @@ class ExportController extends Controller
                 'score_social'     => $r->score_social,
                 'score_aggregate'  => $r->score_aggregate,
                 'poverty_level'    => $r->poverty_level,
+                'poverty_label'    => $r->poverty_level ? $scoring->getPovertyLevelLabel((int) $r->poverty_level) : '',
             ];
         })->toArray();
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Answer;
+use App\Models\DetailedAnswer;
 use App\Models\Question;
 use App\Models\SurveyResponse;
 use App\Services\ScoringService;
@@ -35,7 +36,7 @@ class SurveyResponseController extends Controller
 
     public function show(SurveyResponse $surveyResponse): JsonResponse
     {
-        return response()->json($surveyResponse->load(['household', 'person', 'answers.question']));
+        return response()->json($surveyResponse->load(['household', 'person', 'answers.question', 'detailedAnswers']));
     }
 
     /**
@@ -72,6 +73,10 @@ class SurveyResponseController extends Controller
             'answers.*.selected_choice_ids' => 'nullable|array',
             'answers.*.value_text'          => 'nullable|string',
             'answers.*.value_numeric'       => 'nullable|numeric',
+            'detailed_answers'              => 'nullable|array',
+            'detailed_answers.*.question_code' => 'required_with:detailed_answers.*|string|max:50',
+            'detailed_answers.*.answer_value'  => 'nullable|string',
+            'detailed_answers.*.sub_answers'   => 'nullable|array',
         ]);
 
         $response = SurveyResponse::create([
@@ -99,6 +104,16 @@ class SurveyResponseController extends Controller
             ]);
         }
 
+        // Store detailed answers (for complex question data)
+        foreach ($validated['detailed_answers'] ?? [] as $detailData) {
+            DetailedAnswer::create([
+                'survey_response_id' => $response->id,
+                'question_code'      => $detailData['question_code'],
+                'answer_value'       => $detailData['answer_value'] ?? null,
+                'sub_answers'        => $detailData['sub_answers'] ?? null,
+            ]);
+        }
+
         // Compute scores
         $response = $this->scoring->computeAndSave($response);
 
@@ -118,9 +133,13 @@ class SurveyResponseController extends Controller
             'answers.*.selected_choice_ids' => 'nullable|array',
             'answers.*.value_text'          => 'nullable|string',
             'answers.*.value_numeric'       => 'nullable|numeric',
+            'detailed_answers'              => 'nullable|array',
+            'detailed_answers.*.question_code' => 'required_with:detailed_answers.*|string|max:50',
+            'detailed_answers.*.answer_value'  => 'nullable|string',
+            'detailed_answers.*.sub_answers'   => 'nullable|array',
         ]);
 
-        $surveyResponse->update(collect($validated)->except(['answers'])->toArray());
+        $surveyResponse->update(collect($validated)->except(['answers', 'detailed_answers'])->toArray());
 
         foreach ($validated['answers'] ?? [] as $questionId => $answerData) {
             Answer::updateOrCreate(
@@ -136,9 +155,23 @@ class SurveyResponseController extends Controller
             );
         }
 
+        // Update detailed answers (upsert by question_code)
+        foreach ($validated['detailed_answers'] ?? [] as $detailData) {
+            DetailedAnswer::updateOrCreate(
+                [
+                    'survey_response_id' => $surveyResponse->id,
+                    'question_code'      => $detailData['question_code'],
+                ],
+                [
+                    'answer_value' => $detailData['answer_value'] ?? null,
+                    'sub_answers'  => $detailData['sub_answers'] ?? null,
+                ]
+            );
+        }
+
         $surveyResponse = $this->scoring->computeAndSave($surveyResponse);
 
-        return response()->json($surveyResponse->load(['answers.question']));
+        return response()->json($surveyResponse->load(['answers.question', 'detailedAnswers']));
     }
 
     public function destroy(SurveyResponse $surveyResponse): JsonResponse

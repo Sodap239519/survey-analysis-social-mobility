@@ -335,7 +335,7 @@ const { filters, load, initYears } = useDashboardFilters('after')
 const POVERTY_DESC = {
   1: 'ระดับ 1: อยู่ลำบาก',
   2: 'ระดับ 2: อยู่ยาก',
-  3: 'ระดับ 3: พออยู่ได้',
+  3: 'ระดับ 3: อยู่พอได้',
   4: 'ระดับ 4: อยู่ดี',
 }
 
