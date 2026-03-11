@@ -303,11 +303,10 @@ const STEPS = [
   { id: 0, title: 'ข้อมูลพื้นฐาน',     icon: '📋', description: 'รหัสบ้าน และ ข้อมูลผู้ให้ข้อมูล',                  capitalSlug: null },
   { id: 1, title: 'ทุนมนุษย์',          icon: '👤', description: 'การทำงาน ทักษะ รายได้ (ข้อ 1–6)',                  capitalSlug: 'human' },
   { id: 2, title: 'ทุนกายภาพ',          icon: '🏠', description: 'การจำหน่าย ปัญหาพื้นที่ (ข้อ 7–8)',                capitalSlug: 'physical' },
-  { id: 3, title: 'ทุนการเงิน ส่วน 1', icon: '💰', description: 'ความรู้การเงิน รายจ่าย (ข้อ 9–10)',                capitalSlug: 'financial' },
-  { id: 4, title: 'ทุนการเงิน ส่วน 2', icon: '💳', description: 'การออม หนี้สิน ทรัพย์สินเพื่ออาชีพ (ข้อ 11–14)', capitalSlug: 'financial' },
-  { id: 5, title: 'ทุนธรรมชาติ',        icon: '🌿', description: 'ภัยพิบัติและการรับมือ (ข้อ 15)',                    capitalSlug: 'natural' },
-  { id: 6, title: 'ทุนสังคม',           icon: '🤝', description: 'กลุ่มกิจกรรม และภาคีเครือข่าย (ข้อ 16–17)',       capitalSlug: 'social' },
-  { id: 7, title: 'ความพึงพอใจ',        icon: '⭐', description: 'ระดับความพึงพอใจต่อโครงการ 5 ด้าน (ข้อ 18)',      capitalSlug: null },
+  { id: 3, title: 'ทุนการเงิน',          icon: '💰', description: 'ความรู้การเงิน รายจ่าย การออม หนี้สิน ทรัพย์สิน (ข้อ 9–14)', capitalSlug: 'financial' },
+  { id: 4, title: 'ทุนธรรมชาติ',        icon: '🌿', description: 'ภัยพิบัติและการรับมือ (ข้อ 15)',                              capitalSlug: 'natural' },
+  { id: 5, title: 'ทุนทางสังคม',        icon: '🤝', description: 'กลุ่มกิจกรรม และภาคีเครือข่าย (ข้อ 16–17)',                 capitalSlug: 'social' },
+  { id: 6, title: 'ความพึงพอใจ',        icon: '⭐', description: 'ระดับความพึงพอใจต่อโครงการ 5 ด้าน (ข้อ 18)',                capitalSlug: null },
 ]
 
 // Step → question_key whitelist (ordered as they appear on the paper form).
@@ -327,11 +326,10 @@ const STEPS = [
 const STEP_QUESTION_KEYS = {
   1: ['Q2', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
   2: ['Q5', 'Q6'],
-  3: ['Q7', 'Q8'],
-  4: ['Q9', 'Q10', 'Q10.1', 'Q11'],
-  5: ['Q12.1', 'Q12.2'],
-  6: ['Q13', 'Q14'],
-  7: ['Q15'],
+  3: ['Q7', 'Q8', 'Q9', 'Q10', 'Q10.1', 'Q11'],
+  4: ['Q12.1', 'Q12.2'],
+  5: ['Q13', 'Q14'],
+  6: ['Q15'],
 }
 
 const CAPITAL_COLORS = {
