@@ -749,6 +749,8 @@ function mobilityTotal(slug) {
   return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)
 }
 
+// Grand total across ALL capitals (uses store.data.mobility — the overall aggregate,
+// not per-capital; distinct from mobilityTotal which operates on a single capital slug)
 const mobilityGrandTotal = computed(() => {
   const m = store.data?.mobility || { improved: 0, same: 0, decreased: 0 }
   return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)

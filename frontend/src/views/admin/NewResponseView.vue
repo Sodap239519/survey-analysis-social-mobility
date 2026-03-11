@@ -255,6 +255,7 @@ const loadingQuestions = ref(true)
 // Households with survey responses (for house_code autocomplete)
 const householdSuggestions = ref([])
 const loadingHouseholds = ref(false)
+// Non-reactive timer ID for debouncing house_code input (intentionally plain let, consistent with other debounce timers)
 let hhDebounce = null
 
 async function loadHouseholdSuggestions(search = '') {
