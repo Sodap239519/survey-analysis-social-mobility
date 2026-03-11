@@ -302,7 +302,19 @@ const STEPS = [
   { id: 6, title: 'ทุนสังคม + ความพึงพอใจ', icon: '🤝', description: 'กลุ่ม เครือข่าย และความพึงพอใจ (ข้อ 16–18)',       capitalSlug: 'social' },
 ]
 
-// Step → question_key whitelist (ordered as they appear on the paper form)
+// Step → question_key whitelist (ordered as they appear on the paper form).
+// Keys correspond to the Question.question_key column seeded by QuestionnaireSeeder
+// and the 2026_03_11_000002_add_missing_survey_questions migration.
+// Paper form ↔ DB mapping:
+//   Paper Q1  = Q2  (สถานภาพการทำงาน)          Paper Q2  = Q3  (ทักษะอาชีพ)
+//   Paper Q3  = Q3.1 (การเปลี่ยนแปลงทักษะ)     Paper Q4  = Q3.2 (กิจกรรมการเงิน)
+//   Paper Q5  = Q4  (รายได้)                    Paper Q6  = Q4.1 (แหล่งรายได้)
+//   Paper Q7  = Q5  (ช่องทางจำหน่าย)            Paper Q8  = Q6  (ปัญหาพื้นที่ทำกิน)
+//   Paper Q9  = Q7  (ความรู้การเงิน)             Paper Q10 = Q8  (รายจ่ายครัวเรือน)
+//   Paper Q11 = Q9  (การออม)                    Paper Q12 = Q10 (หนี้สิน)
+//   Paper Q13 = Q10.1 (การจัดการหนี้)           Paper Q14 = Q11 (ทรัพย์สิน)
+//   Paper Q15 = Q12.1+Q12.2 (ภัยพิบัติ)        Paper Q16 = Q13 (กลุ่มกิจกรรม)
+//   Paper Q17 = Q14 (ภาคีเครือข่าย)             Paper Q18 = Q15 (ความพึงพอใจ)
 const STEP_QUESTION_KEYS = {
   1: ['Q2', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
   2: ['Q5', 'Q6'],
