@@ -17,6 +17,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Ensure capital records exist before adding questions that depend on them.
+        // (Capitals are normally seeded via QuestionnaireSeeder, but migrations run
+        //  before seeders, so we create them here with firstOrCreate as well.)
+        $this->ensureCapitals();
+
         // Q2.1: อาชีพที่ประกอบปัจจุบัน (multi_select, conditional on Q2=2)
         $human = Capital::where('slug', 'human')->first();
         if ($human && ! Question::where('question_key', 'Q2.1')->exists()) {
@@ -191,5 +196,24 @@ return new class extends Migration
     public function down(): void
     {
         Question::whereIn('question_key', ['Q2.1', 'Q4.1', 'Q10.1', 'Q15'])->delete();
+    }
+
+    /**
+     * Ensure all five Capital records exist.
+     * This mirrors QuestionnaireSeeder so the migration is self-contained
+     * and works regardless of whether the seeder has already run.
+     */
+    private function ensureCapitals(): void
+    {
+        $capitals = [
+            ['slug' => 'human',    'name_th' => 'ทุนมนุษย์',              'name_en' => 'Human Capital',    'max_score' => 100, 'sort_order' => 1],
+            ['slug' => 'physical', 'name_th' => 'ทุนกายภาพ',              'name_en' => 'Physical Capital', 'max_score' => 100, 'sort_order' => 2],
+            ['slug' => 'financial','name_th' => 'ทุนการเงิน',              'name_en' => 'Financial Capital','max_score' => 100, 'sort_order' => 3],
+            ['slug' => 'natural',  'name_th' => 'ทุนทรัพยากรธรรมชาติ',   'name_en' => 'Natural Capital',  'max_score' => 100, 'sort_order' => 4],
+            ['slug' => 'social',   'name_th' => 'ทุนทางสังคม',            'name_en' => 'Social Capital',   'max_score' => 100, 'sort_order' => 5],
+        ];
+        foreach ($capitals as $data) {
+            Capital::firstOrCreate(['slug' => $data['slug']], $data);
+        }
     }
 };
