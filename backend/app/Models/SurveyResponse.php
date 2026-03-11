@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SurveyResponse extends Model
 {
+    /** Thai labels for poverty levels 1–4 */
+    public const POVERTY_LEVEL_LABELS = [
+        1 => 'อยู่ลำบาก',
+        2 => 'อยู่ยาก',
+        3 => 'อยู่พอได้',
+        4 => 'อยู่ดี',
+    ];
+
     protected $fillable = [
         'household_id', 'person_id', 'period', 'survey_year', 'survey_round',
         'surveyed_at', 'surveyor_name', 'model_name',
@@ -27,6 +35,12 @@ class SurveyResponse extends Model
         'score_aggregate' => 'float',
     ];
 
+    /** Returns the Thai label for this response's poverty level, or null. */
+    public function getPovertyLevelLabelAttribute(): ?string
+    {
+        return self::POVERTY_LEVEL_LABELS[$this->poverty_level] ?? null;
+    }
+
     public function household(): BelongsTo
     {
         return $this->belongsTo(Household::class);
@@ -40,5 +54,10 @@ class SurveyResponse extends Model
     public function answers(): HasMany
     {
         return $this->hasMany(Answer::class);
+    }
+
+    public function detailedAnswers(): HasMany
+    {
+        return $this->hasMany(DetailedAnswer::class);
     }
 }

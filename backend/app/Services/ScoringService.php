@@ -15,10 +15,10 @@ use Illuminate\Support\Collection;
  * Handles computation of capital scores, aggregate score, and poverty level.
  *
  * Poverty Level Mapping (X = aggregate score in [1.0, 4.0]):
- *  Level 1: 1.00 <= X < 1.75
- *  Level 2: 1.75 <= X < 2.50
- *  Level 3: 2.50 <= X < 3.25
- *  Level 4: 3.25 <= X <= 4.00
+ *  Level 1: 1.00 <= X < 1.75  (อยู่ลำบาก)
+ *  Level 2: 1.75 <= X < 2.50  (อยู่ยาก)
+ *  Level 3: 2.50 <= X < 3.25  (อยู่พอได้)
+ *  Level 4: 3.25 <= X <= 4.00 (อยู่ดี)
  *
  * Multi-select scoring rule:
  *  score_question = min(max_score, sum(weights_of_selected_choices))
@@ -141,10 +141,10 @@ class ScoringService
     /**
      * Map aggregate score X to poverty level (1-4).
      *
-     * Level 1: 1.00 <= X < 1.75
-     * Level 2: 1.75 <= X < 2.50
-     * Level 3: 2.50 <= X < 3.25
-     * Level 4: 3.25 <= X <= 4.00
+     * Level 1: 1.00 <= X < 1.75  (อยู่ลำบาก)
+     * Level 2: 1.75 <= X < 2.50  (อยู่ยาก)
+     * Level 3: 2.50 <= X < 3.25  (อยู่พอได้)
+     * Level 4: 3.25 <= X <= 4.00 (อยู่ดี)
      */
     public function getPovertyLevel(float $aggregateScore): int
     {
@@ -159,6 +159,25 @@ class ScoringService
         }
 
         return 4;
+    }
+
+    /**
+     * Return the Thai label for a poverty level (1–4).
+     *
+     * 1 → อยู่ลำบาก
+     * 2 → อยู่ยาก
+     * 3 → อยู่พอได้
+     * 4 → อยู่ดี
+     */
+    public function getPovertyLevelLabel(int $level): string
+    {
+        return match ($level) {
+            1 => 'อยู่ลำบาก',
+            2 => 'อยู่ยาก',
+            3 => 'อยู่พอได้',
+            4 => 'อยู่ดี',
+            default => '',
+        };
     }
 
     /**

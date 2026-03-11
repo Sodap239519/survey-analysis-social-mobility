@@ -24,7 +24,7 @@ return new class extends Migration
             $table->decimal('score_natural', 8, 4)->nullable();
             $table->decimal('score_social', 8, 4)->nullable();
             $table->decimal('score_aggregate', 8, 4)->nullable()->comment('X in [1.0,4.0]');
-            $table->tinyInteger('poverty_level')->nullable()->comment('1-4');
+            $table->tinyInteger('poverty_level')->nullable()->comment('1=อยู่ลำบาก 2=อยู่ยาก 3=อยู่พอได้ 4=อยู่ดี');
             $table->json('raw_data')->nullable();
             $table->timestamps();
         });

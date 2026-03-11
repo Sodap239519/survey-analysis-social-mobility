@@ -37,10 +37,10 @@ use App\Models\SurveyResponse;
  *
  * X index (poverty level 1–4):
  *   X = 1.0 + (avg_normalized / 100) * 3.0
- *   Level 1: 1.00 ≤ X < 1.75  (ยากจนมาก)
- *   Level 2: 1.75 ≤ X < 2.50  (ยากจน)
- *   Level 3: 2.50 ≤ X < 3.25  (เกือบยากจน)
- *   Level 4: 3.25 ≤ X ≤ 4.00  (พ้นจน)
+ *   Level 1: 1.00 ≤ X < 1.75  (อยู่ลำบาก)
+ *   Level 2: 1.75 ≤ X < 2.50  (อยู่ยาก)
+ *   Level 3: 2.50 ≤ X < 3.25  (อยู่พอได้)
+ *   Level 4: 3.25 ≤ X ≤ 4.00  (อยู่ดี)
  */
 class CompareHouseholdSurveyLogic
 {
