@@ -47,7 +47,7 @@
               <input
                 v-model="form.house_code"
                 list="hh-list"
-                placeholder="XXX-XXXXXX-X"
+                placeholder="เช่น 30010017415"
                 @input="onHouseCodeInput"
                 autocomplete="off"
               />
@@ -123,7 +123,7 @@
             </div>
             <div class="form-group" :class="{ 'has-error': errors.person_citizen_id }">
               <label>หมายเลขบัตรประจำตัวประชาชน (13 หลัก)</label>
-              <input v-model="form.person_citizen_id" placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" />
+              <input v-model="form.person_citizen_id" placeholder="เช่น 1303005244708" maxlength="13" />
               <span v-if="errors.person_citizen_id" class="field-error">{{ errors.person_citizen_id }}</span>
             </div>
             <div class="form-group">
@@ -132,7 +132,7 @@
             </div>
             <div class="form-group" :class="{ 'has-error': errors.person_phone }">
               <label>หมายเลขโทรศัพท์</label>
-              <input v-model="form.person_phone" placeholder="0xx-xxx-xxxx" />
+              <input v-model="form.person_phone" placeholder="เช่น 0812345678" />
               <span v-if="errors.person_phone" class="field-error">{{ errors.person_phone }}</span>
             </div>
           </div>
@@ -508,19 +508,19 @@ function validateCurrentStep() {
   if (currentStep.value === 0) {
     if (!form.value.house_code) {
       errors.value.house_code = 'กรุณากรอกรหัสบ้าน'
-    } else if (!/^\d{3}-\d{6}-\d{1}$/.test(form.value.house_code)) {
-      errors.value.house_code = 'รหัสบ้านต้องเป็นรูปแบบ XXX-XXXXXX-X (เช่น 123-456789-0)'
+    } else if (!/^\d{11}$/.test(form.value.house_code)) {
+      errors.value.house_code = 'รหัสบ้านต้องเป็นตัวเลข 11 หลัก'
     }
     if (!form.value.period) {
       errors.value.period = 'กรุณาเลือกช่วงเวลา'
     }
     if (form.value.person_citizen_id &&
-        !/^\d{1}-\d{4}-\d{5}-\d{2}-\d{1}$/.test(form.value.person_citizen_id)) {
-      errors.value.person_citizen_id = 'บัตรประชาชนต้องเป็นรูปแบบ X-XXXX-XXXXX-XX-X'
+        !/^\d{13}$/.test(form.value.person_citizen_id)) {
+      errors.value.person_citizen_id = 'บัตรประชาชนต้องเป็นตัวเลข 13 หลัก'
     }
     if (form.value.person_phone &&
-        !/^[0-9\-+\s()]{8,15}$/.test(form.value.person_phone)) {
-      errors.value.person_phone = 'หมายเลขโทรศัพท์ไม่ถูกต้อง (ต้องมี 8–15 ตัวอักษร)'
+        !/^[0-9]{8,15}$/.test(form.value.person_phone)) {
+      errors.value.person_phone = 'หมายเลขโทรศัพท์ต้องเป็นตัวเลข 8-15 หลัก'
     }
   }
   return Object.keys(errors.value).length === 0
