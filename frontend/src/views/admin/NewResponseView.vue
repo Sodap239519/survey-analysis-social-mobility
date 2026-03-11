@@ -690,63 +690,6 @@ async function submit() {
   submitError.value = ''
   submitSuccess.value = false
 
-  // Resolve / auto-create household
-  let householdId
-  try {
-    const res = await api.get('/households', { params: { search: form.value.house_code, per_page: 1 } })
-    const hh  = res.data.data?.find(h => h.house_code === form.value.house_code)
-    if (!hh) {
-      const createRes = await api.post('/households', {
-        house_code:       form.value.house_code,
-        house_no:         form.value.house_no || null,
-        province_name:    form.value.province_name || null,
-        district_name:    form.value.district_name || null,
-        subdistrict_name: form.value.subdistrict_name || null,
-        village_name:     form.value.village_name || null,
-        village_no:       form.value.village_no || null,
-        postal_code:      form.value.postal_code || null,
-      })
-      householdId = createRes.data.id
-    } else {
-      householdId = hh.id
-    }
-  } catch (e) {
-    submitError.value = e.response?.data?.message || 'ไม่สามารถค้นหา/สร้างรหัสบ้านได้'
-    submitting.value = false
-    return
-  }
-
-  // Resolve / auto-create person
-  let personId = null
-  const hasPersonData = form.value.person_first_name || form.value.person_last_name || form.value.person_citizen_id
-  if (hasPersonData) {
-    try {
-      let existingPerson = null
-      if (form.value.person_citizen_id) {
-        const pRes = await api.get('/persons', {
-          params: { household_id: householdId, citizen_id: form.value.person_citizen_id, per_page: 5 }
-        })
-        existingPerson = pRes.data.data?.find(p => p.citizen_id === form.value.person_citizen_id)
-      }
-      if (existingPerson) {
-        personId = existingPerson.id
-      } else {
-        const pCreateRes = await api.post('/persons', {
-          household_id: householdId,
-          title:        form.value.person_title || null,
-          first_name:   form.value.person_first_name || null,
-          last_name:    form.value.person_last_name || null,
-          citizen_id:   form.value.person_citizen_id || null,
-          birthdate:    form.value.person_birthdate || null,
-          phone:        form.value.person_phone || null,
-        })
-        personId = pCreateRes.data.id
-      }
-    } catch {
-      // Non-fatal
-    }
-  }
-
   // Build answers payload
   const answersPayload = {}
 
@@ -771,15 +714,40 @@ async function submit() {
     }
   }
 
+  // Build household_data (location info)
+  const householdData = {
+    house_no:         form.value.house_no         || null,
+    village_no:       form.value.village_no       || null,
+    village_name:     form.value.village_name     || null,
+    subdistrict_name: form.value.subdistrict_name || null,
+    district_name:    form.value.district_name    || null,
+    province_name:    form.value.province_name    || null,
+    postal_code:      form.value.postal_code      || null,
+  }
+
+  // Build person_data (informant info) — omit if no data entered
+  const hasPersonData = form.value.person_first_name || form.value.person_last_name || form.value.person_citizen_id
+  const personData = hasPersonData ? {
+    title:      form.value.person_title      || null,
+    first_name: form.value.person_first_name || null,
+    last_name:  form.value.person_last_name  || null,
+    citizen_id: form.value.person_citizen_id || null,
+    birthdate:  form.value.person_birthdate  || null,
+    phone:      form.value.person_phone      || null,
+  } : null
+
+  // Send house_code + person_data to the backend; the backend resolves/creates
+  // the household and person records automatically (firstOrCreate).
   const payload = {
-    household_id:  householdId,
-    person_id:     personId,
-    period:        form.value.period,
-    survey_year:   form.value.survey_year || null,
-    surveyed_at:   form.value.surveyed_at || null,
-    surveyor_name: form.value.surveyor_name || null,
-    model_name:    form.value.model_name || null,
-    answers:       answersPayload,
+    house_code:     form.value.house_code,
+    household_data: householdData,
+    person_data:    personData,
+    period:         form.value.period,
+    survey_year:    form.value.survey_year || null,
+    surveyed_at:    form.value.surveyed_at || null,
+    surveyor_name:  form.value.surveyor_name || null,
+    model_name:     form.value.model_name || null,
+    answers:        answersPayload,
   }
 
   try {
@@ -941,23 +909,23 @@ onUnmounted(() => {
 }
 .question-block:last-child { border-bottom: none; margin-bottom: 0; }
 .question-text {
-  font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem;
+  font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;
   color: var(--color-text); line-height: 1.5;
 }
 .question-key {
   display: inline-block; background: var(--color-primary-light);
   color: var(--color-primary-dark); border-radius: 4px;
-  padding: 1px 6px; font-size: 0.75rem; font-weight: 700; margin-right: 0.375rem;
+  padding: 1px 6px; font-size: 0.8rem; font-weight: 700; margin-right: 0.375rem;
 }
-.question-score { font-size: 0.75rem; font-weight: 400; color: var(--color-text-muted); margin-left: 0.25rem; }
+.question-score { font-size: 0.8rem; font-weight: 400; color: var(--color-text-muted); margin-left: 0.25rem; }
 
 /* ─── Choices ──────────────────────────────────────────────────────────────── */
-.choices-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.choices-grid { display: flex; flex-wrap: wrap; gap: 0.625rem; }
 .choice-label {
   display: flex; align-items: center; gap: 0.375rem;
-  font-size: 0.85rem; background: var(--color-surface);
+  font-size: 0.9rem; background: var(--color-surface);
   border: 1.5px solid var(--color-border); border-radius: var(--radius-sm, 8px);
-  padding: 0.5rem 0.75rem; cursor: pointer; color: var(--color-text);
+  padding: 0.5rem 0.875rem; cursor: pointer; color: var(--color-text);
   user-select: none; transition: background 0.15s, border-color 0.15s;
   min-height: 44px;
 }
