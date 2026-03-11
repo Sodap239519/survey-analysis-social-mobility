@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\HouseholdController;
 use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\PersonController;
@@ -44,4 +45,9 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/import/stats', [ImportController::class, 'stats']);
     Route::get('/import/history', [ImportController::class, 'history']);
     Route::get('/import/history/{id}', [ImportController::class, 'show']);
+
+    // Export
+    Route::get('/export/history', [ExportController::class, 'history']);
+    Route::delete('/export/history/{id}', [ExportController::class, 'deleteHistory']);
+    Route::get('/export/{table}', [ExportController::class, 'export']);
 });
