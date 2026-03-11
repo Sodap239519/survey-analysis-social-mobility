@@ -52,27 +52,46 @@ class ExportController extends Controller
 
     public function history(Request $request): JsonResponse
     {
-        $logs = ExportLog::query()
-            ->with('user:id,name')
-            ->orderByDesc('created_at')
-            ->paginate($request->integer('per_page', 20));
+        try {
+            $logs = ExportLog::query()
+                ->with('user:id,name')
+                ->orderByDesc('created_at')
+                ->paginate($request->integer('per_page', 20));
 
-        return response()->json($logs->through(fn ($log) => [
-            'id'            => $log->id,
-            'table_name'    => $log->table_name,
-            'format'        => $log->format,
-            'filename'      => $log->filename,
-            'records_count' => $log->records_count,
-            'filters'       => $log->filters,
-            'exported_by'   => $log->user?->name ?? 'ระบบ',
-            'exported_at'   => $log->created_at?->toDateTimeString(),
-        ]));
+            return response()->json($logs->through(fn ($log) => [
+                'id'            => $log->id,
+                'table_name'    => $log->table_name,
+                'format'        => $log->format,
+                'filename'      => $log->filename,
+                'records_count' => $log->records_count,
+                'filters'       => $log->filters,
+                'exported_by'   => $log->user?->name ?? 'ระบบ',
+                'exported_at'   => $log->created_at?->toDateTimeString(),
+            ]));
+        } catch (\Throwable $e) {
+            // Return empty pagination result if export_logs table does not exist yet
+            return response()->json([
+                'data'          => [],
+                'total'         => 0,
+                'per_page'      => 20,
+                'current_page'  => 1,
+                'last_page'     => 1,
+                'from'          => null,
+                'to'            => null,
+            ]);
+        }
     }
 
     public function deleteHistory(int $id): JsonResponse
     {
-        $log = ExportLog::findOrFail($id);
-        $log->delete();
+        try {
+            $log = ExportLog::findOrFail($id);
+            $log->delete();
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Not found'], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Table does not exist yet – treat as already gone
+        }
 
         return response()->json(['message' => 'Deleted']);
     }
@@ -413,15 +432,19 @@ class ExportController extends Controller
         $ts       = now()->format('Ymd_His');
         $filename = "{$tableName}_{$ts}.csv";
 
-        // Log the export
-        ExportLog::create([
-            'user_id'       => $request->user()?->id,
-            'table_name'    => $tableName,
-            'format'        => $format === 'excel' ? 'excel' : 'csv',
-            'filename'      => $filename,
-            'records_count' => $count,
-            'filters'       => $request->only(['survey_year', 'period', 'district', 'search', 'survey_round']),
-        ]);
+        // Log the export (non-fatal: ignore if export_logs table does not exist yet)
+        try {
+            ExportLog::create([
+                'user_id'       => $request->user()?->id,
+                'table_name'    => $tableName,
+                'format'        => $format === 'excel' ? 'excel' : 'csv',
+                'filename'      => $filename,
+                'records_count' => $count,
+                'filters'       => $request->only(['survey_year', 'period', 'district', 'search', 'survey_round']),
+            ]);
+        } catch (\Throwable $e) {
+            // Table may not exist yet – skip logging but do not abort the export
+        }
 
         if ($format === 'excel') {
             // Build UTF-8 CSV with BOM so Excel reads Thai characters correctly

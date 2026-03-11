@@ -5,8 +5,16 @@
       <button class="btn btn-secondary" @click="showExportModal = true">📥 Export</button>
     </div>
 
-    <div class="flex gap-4 mb-4" style="max-width:500px">
-      <input v-model="search" placeholder="ค้นหาชื่อ / หมายเลขบัตร..." @input="debouncedLoad" />
+    <div class="flex gap-4 mb-4" style="max-width:700px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <input v-model="search" placeholder="ค้นหาชื่อ / หมายเลขบัตร..." @input="debouncedLoad" />
+      </div>
+      <div class="form-group" style="min-width:200px;display:flex;align-items:flex-end;gap:0.5rem">
+        <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;margin:0">
+          <input type="checkbox" v-model="onlySurveyed" @change="load" style="width:16px;height:16px" />
+          <span>แสดงเฉพาะผู้ตอบแบบสอบถาม</span>
+        </label>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">กำลังโหลด...</div>
@@ -101,6 +109,7 @@ const search = ref('')
 const loading = ref(false)
 const error = ref('')
 const page = ref(1)
+const onlySurveyed = ref(true)
 
 const showDeleteConfirm = ref(false)
 const deletingPerson = ref(null)
@@ -117,6 +126,7 @@ async function load() {
   try {
     const params = { page: page.value }
     if (search.value) params.search = search.value
+    if (onlySurveyed.value) params.has_responses = 1
     const res = await api.get('/persons', { params })
     persons.value = res.data
   } catch (e) {

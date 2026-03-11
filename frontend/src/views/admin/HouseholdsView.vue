@@ -19,6 +19,12 @@
           <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
         </select>
       </div>
+      <div class="form-group" style="min-width:200px;display:flex;align-items:flex-end;gap:0.5rem">
+        <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;margin:0">
+          <input type="checkbox" v-model="onlySurveyed" @change="load" style="width:16px;height:16px" />
+          <span>แสดงเฉพาะที่มีการสำรวจ</span>
+        </label>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">กำลังโหลด...</div>
@@ -248,6 +254,7 @@ const { availableYears, selectedYear: filterYear, loadYears } = useAvailableYear
 const loading = ref(false)
 const error = ref('')
 const page = ref(1)
+const onlySurveyed = ref(true)
 
 // CRUD modal state
 const showModal = ref(false)
@@ -291,6 +298,7 @@ async function load() {
     const params = { page: page.value }
     if (search.value) params.search = search.value
     if (filterYear.value) params.survey_year = filterYear.value
+    if (onlySurveyed.value) params.has_responses = 1
     const res = await api.get('/households', { params })
     households.value = res.data
   } catch (e) {

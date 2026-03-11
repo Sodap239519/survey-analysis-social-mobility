@@ -64,7 +64,11 @@
               <td>{{ r.score_natural?.toFixed(1) || '—' }}</td>
               <td>{{ r.score_social?.toFixed(1) || '—' }}</td>
               <td>
-                <button class="btn btn-danger btn-sm" @click="confirmDelete(r)" title="ลบ">🗑️</button>
+                <div class="flex gap-1">
+                  <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️ ดู</button>
+                  <button class="btn btn-secondary btn-sm" @click="openEditModal(r)" title="แก้ไข">✏️</button>
+                  <button class="btn btn-danger btn-sm" @click="confirmDelete(r)" title="ลบ">🗑️</button>
+                </div>
               </td>
             </tr>
             <tr v-if="!responses.data?.length">
@@ -79,6 +83,83 @@
           <button class="btn btn-secondary" :disabled="page <= 1" @click="prevPage">‹ ก่อนหน้า</button>
           <span>หน้า {{ page }} / {{ responses.last_page }}</span>
           <button class="btn btn-secondary" :disabled="page >= responses.last_page" @click="nextPage">ถัดไป ›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div v-if="showDetailModal" class="modal-backdrop" @click.self="showDetailModal = false">
+      <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+          <h3 style="font-size:1.1rem;font-weight:700">👁️ รายละเอียดการสำรวจ</h3>
+          <button class="btn btn-secondary btn-sm" @click="showDetailModal = false">✕ ปิด</button>
+        </div>
+        <div v-if="detailResponse" class="detail-grid">
+          <div class="detail-item"><span class="detail-label">ID</span><span class="detail-value"><code>{{ detailResponse.id }}</code></span></div>
+          <div class="detail-item"><span class="detail-label">รหัสบ้าน</span><span class="detail-value"><code>{{ detailResponse.household?.house_code || '—' }}</code></span></div>
+          <div class="detail-item"><span class="detail-label">ช่วงเวลา</span><span class="detail-value">{{ detailResponse.period }}</span></div>
+          <div class="detail-item"><span class="detail-label">ปี พ.ศ.</span><span class="detail-value">{{ detailResponse.survey_year || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">รอบสำรวจ</span><span class="detail-value">{{ detailResponse.survey_round || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ผู้สำรวจ</span><span class="detail-value">{{ detailResponse.surveyor_name || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ชื่อโมเดล</span><span class="detail-value">{{ detailResponse.model_name || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">วันที่สำรวจ</span><span class="detail-value">{{ detailResponse.surveyed_at || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ระดับความยากจน</span><span class="detail-value">{{ detailResponse.poverty_level || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">คะแนนรวม</span><span class="detail-value">{{ detailResponse.score_aggregate?.toFixed(2) || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ทุนมนุษย์</span><span class="detail-value">{{ detailResponse.score_human?.toFixed(2) || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ทุนกายภาพ</span><span class="detail-value">{{ detailResponse.score_physical?.toFixed(2) || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ทุนการเงิน</span><span class="detail-value">{{ detailResponse.score_financial?.toFixed(2) || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ทุนธรรมชาติ</span><span class="detail-value">{{ detailResponse.score_natural?.toFixed(2) || '—' }}</span></div>
+          <div class="detail-item"><span class="detail-label">ทุนสังคม</span><span class="detail-value">{{ detailResponse.score_social?.toFixed(2) || '—' }}</span></div>
+          <div v-if="detailResponse.household" class="detail-item detail-item-full">
+            <span class="detail-label">ที่อยู่</span>
+            <span class="detail-value">{{ [detailResponse.household.house_no, 'หมู่', detailResponse.household.village_no, detailResponse.household.village_name, detailResponse.household.subdistrict_name, detailResponse.household.district_name].filter(Boolean).join(' ') || '—' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div v-if="showEditModal" class="modal-backdrop" @click.self="showEditModal = false">
+      <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+          <h3 style="font-size:1.1rem;font-weight:700">✏️ แก้ไขการสำรวจ</h3>
+          <button class="btn btn-secondary btn-sm" @click="showEditModal = false">✕ ปิด</button>
+        </div>
+        <div v-if="editingResponse" class="form-grid">
+          <div class="form-group">
+            <label>ช่วงเวลา</label>
+            <select v-model="editForm.period">
+              <option value="before">ก่อนโครงการ</option>
+              <option value="after">หลังโครงการ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ปี พ.ศ.</label>
+            <input type="number" v-model="editForm.survey_year" placeholder="เช่น 2568" />
+          </div>
+          <div class="form-group">
+            <label>รอบสำรวจ</label>
+            <input type="number" v-model="editForm.survey_round" placeholder="เช่น 1" />
+          </div>
+          <div class="form-group">
+            <label>ผู้สำรวจ</label>
+            <input type="text" v-model="editForm.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
+          </div>
+          <div class="form-group">
+            <label>ชื่อโมเดล</label>
+            <input type="text" v-model="editForm.model_name" placeholder="ชื่อโมเดล" />
+          </div>
+          <div class="form-group">
+            <label>วันที่สำรวจ</label>
+            <input type="date" v-model="editForm.surveyed_at" />
+          </div>
+        </div>
+        <div v-if="editError" class="error mt-2">{{ editError }}</div>
+        <div class="flex gap-2 justify-end mt-4">
+          <button class="btn btn-secondary" @click="showEditModal = false">ยกเลิก</button>
+          <button class="btn btn-primary" :disabled="saving" @click="saveEdit">
+            {{ saving ? 'กำลังบันทึก...' : '💾 บันทึก' }}
+          </button>
         </div>
       </div>
     </div>
@@ -137,6 +218,52 @@ const { availableYears, selectedYear: filterYear, loadYears } = useAvailableYear
 const showDeleteConfirm = ref(false)
 const deletingResponse = ref(null)
 const deleting = ref(false)
+
+// Detail modal state
+const showDetailModal = ref(false)
+const detailResponse = ref(null)
+
+// Edit modal state
+const showEditModal = ref(false)
+const editingResponse = ref(null)
+const editForm = ref({})
+const editError = ref('')
+const saving = ref(false)
+
+function openDetailModal(r) {
+  detailResponse.value = r
+  showDetailModal.value = true
+}
+
+function openEditModal(r) {
+  editingResponse.value = r
+  editForm.value = {
+    period: r.period,
+    survey_year: r.survey_year || '',
+    survey_round: r.survey_round || '',
+    surveyor_name: r.surveyor_name || '',
+    model_name: r.model_name || '',
+    surveyed_at: r.surveyed_at || '',
+  }
+  editError.value = ''
+  showEditModal.value = true
+}
+
+async function saveEdit() {
+  if (!editingResponse.value) return
+  saving.value = true
+  editError.value = ''
+  try {
+    await api.put(`/responses/${editingResponse.value.id}`, editForm.value)
+    showEditModal.value = false
+    editingResponse.value = null
+    load()
+  } catch (e) {
+    editError.value = e.response?.data?.message || 'ไม่สามารถบันทึกได้'
+  } finally {
+    saving.value = false
+  }
+}
 
 // Export state
 const showExportModal = ref(false)
@@ -214,6 +341,12 @@ onMounted(async () => {
 
 <style scoped>
 .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; min-height: unset; }
+.btn-info {
+  background: #0ea5e9; color: #fff; border: none; border-radius: 8px;
+  padding: 0.5rem 1rem; font-size: 0.875rem; cursor: pointer;
+  font-family: 'Prompt', sans-serif; min-height: 40px;
+}
+.btn-info:hover { background: #0284c7; }
 .btn-danger {
   background: #ef4444; color: #fff; border: none; border-radius: 8px;
   padding: 0.5rem 1rem; font-size: 0.875rem; cursor: pointer;
@@ -231,5 +364,16 @@ onMounted(async () => {
   width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,0.25);
 }
+.detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+}
+.detail-item {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  background: #f8fafc; border-radius: 8px; padding: 0.6rem 0.75rem;
+}
+.detail-item-full { grid-column: 1 / -1; }
+.detail-label { font-size: 0.75rem; color: #64748b; font-weight: 600; }
+.detail-value { font-size: 0.9rem; color: #1e293b; word-break: break-all; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .mb-3 { margin-bottom: 0.75rem; }
 </style>
