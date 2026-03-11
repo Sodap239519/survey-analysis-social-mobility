@@ -197,7 +197,9 @@
               <span class="question-key">{{ q.question_key }}</span>
               {{ q.text_th }}
               <span v-if="q.max_score > 0" class="question-score">({{ q.max_score }} คะแนน)</span>
+              <span v-if="q.meta?.required_when_visible" class="required"> *</span>
             </p>
+            <p v-if="errors[`q_${q.id}`]" class="field-error mb-2">{{ errors[`q_${q.id}`] }}</p>
 
             <!-- Multi-select (standard, excludes satisfaction questions) -->
             <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && !(q.meta && q.meta.aspects)" class="choices-grid">
@@ -207,7 +209,8 @@
                 class="choice-label"
                 :class="{
                   'choice-selected': answers[q.id]?.includes(c.id),
-                  'choice-disabled': isChoiceDisabled(q, c)
+                  'choice-disabled': isChoiceDisabled(q, c),
+                  'choice-sub': isSubChoice(c)
                 }"
               >
                 <input
@@ -222,10 +225,70 @@
                 <span v-if="c.weight > 0" class="choice-weight">({{ c.weight }}pt)</span>
               </label>
             </div>
-            <!-- "อื่นๆ" free-text for multi-select -->
+            <!-- "อื่นๆ" free-text for multi-select (choice text contains อื่นๆ).
+                 Also handles Q2.0 "อื่นๆ" (choice_key=5) with required validation. -->
             <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && !(q.meta && q.meta.aspects) && hasOtherSelected(q, answers[q.id])" class="other-input-wrap">
-              <label class="other-input-label">โปรดระบุรายละเอียด (อื่นๆ)</label>
-              <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุรายละเอียด..." class="other-input" />
+              <label class="other-input-label">
+                โปรดระบุรายละเอียด (อื่นๆ)
+                <span v-if="q.question_key === 'Q2.0'" class="required"> *</span>
+              </label>
+              <input
+                type="text"
+                v-model="otherTexts[q.id]"
+                placeholder="ระบุรายละเอียด..."
+                class="other-input"
+                :class="{ 'input-error': errors[`q_${q.id}_other`] }"
+              />
+              <p v-if="errors[`q_${q.id}_other`]" class="field-error">{{ errors[`q_${q.id}_other`] }}</p>
+            </div>
+
+            <!-- special_q12: Q12.1 disaster type (parent radio + sub-checkboxes) -->
+            <div v-else-if="q.type === 'special_q12'" class="choices-grid">
+              <!-- Parent choices: 0=ไม่ประสบ (radio), 1=ประสบ (radio) -->
+              <template v-for="c in getQ12ParentChoices(q)" :key="c.id">
+                <label
+                  class="choice-label"
+                  :class="{ 'choice-selected': answers[q.id]?.includes(c.id) }"
+                >
+                  <input
+                    type="radio"
+                    :name="'q12_' + q.id"
+                    :value="c.id"
+                    :checked="answers[q.id]?.includes(c.id)"
+                    @change="handleQ12ParentChange(q, c)"
+                    class="choice-checkbox"
+                  />
+                  <span class="choice-text">{{ c.choice_key }}) {{ c.text_th }}</span>
+                  <span v-if="c.weight > 0" class="choice-weight">({{ c.weight }}pt)</span>
+                </label>
+                <!-- Sub-disaster type checkboxes, shown only when ประสบ (1) is selected -->
+                <template v-if="String(c.choice_key) === '1' && answers[q.id]?.includes(c.id)">
+                  <div class="sub-choices-wrap">
+                    <span class="sub-choices-label">ระบุประเภท:</span>
+                    <div class="sub-choices-grid">
+                      <label
+                        v-for="sc in getQ12SubChoices(q)"
+                        :key="sc.id"
+                        class="choice-label choice-sub"
+                        :class="{ 'choice-selected': answers[q.id]?.includes(sc.id) }"
+                      >
+                        <input
+                          type="checkbox"
+                          :value="sc.id"
+                          v-model="answers[q.id]"
+                          class="choice-checkbox"
+                        />
+                        <span class="choice-text">{{ sc.text_th }}</span>
+                      </label>
+                    </div>
+                    <!-- "อื่นๆ" text -->
+                    <div v-if="hasQ12OtherSelected(q)" class="other-input-wrap mt-1">
+                      <label class="other-input-label">โปรดระบุประเภทภัยพิบัติ (อื่นๆ)</label>
+                      <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุ..." class="other-input" />
+                    </div>
+                  </div>
+                </template>
+              </template>
             </div>
 
             <!-- Single-select -->
@@ -241,11 +304,101 @@
                 <span v-if="c.weight > 0" class="choice-weight">({{ c.weight }}pt)</span>
               </label>
             </div>
-            <!-- "อื่นๆ" free-text for single-select -->
+            <!-- "อื่นๆ" free-text for single-select (choice text contains อื่นๆ) -->
             <div v-if="q.type === 'single_select' && hasSingleOtherSelected(q, singleAnswers[q.id])" class="other-input-wrap">
               <label class="other-input-label">โปรดระบุรายละเอียด (อื่นๆ)</label>
               <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุรายละเอียด..." class="other-input" />
             </div>
+            <!-- Generic "ระบุ" text field for any single-select choice in meta.choice_text_required
+                 (e.g. Q2 choice_key=1 / ว่างงาน → "สาเหตุ..." required) -->
+            <template v-if="q.type === 'single_select' && q.meta?.choice_text_required">
+              <template v-for="c in q.choices" :key="'ct_' + c.id">
+                <div
+                  v-if="singleAnswers[q.id] === c.id && q.meta.choice_text_required.includes(String(c.choice_key))"
+                  class="other-input-wrap"
+                >
+                  <label class="other-input-label required-star">
+                    {{ getChoiceTextLabel(q, c) }}
+                    <span class="required"> *</span>
+                  </label>
+                  <input
+                    type="text"
+                    v-model="choiceTexts[`${q.id}_${c.choice_key}`]"
+                    :placeholder="getChoiceTextPlaceholder(q, c)"
+                    class="other-input"
+                    :class="{ 'input-error': errors[`ct_${q.id}_${c.choice_key}`] }"
+                  />
+                  <p v-if="errors[`ct_${q.id}_${c.choice_key}`]" class="field-error">
+                    {{ errors[`ct_${q.id}_${c.choice_key}`] }}
+                  </p>
+                </div>
+              </template>
+            </template>
+
+            <!-- special_q41: Q4.1 income source table -->
+            <div v-else-if="q.type === 'special_q41'" class="income-table-wrap">
+              <div class="income-table-scroll">
+                <table class="income-table">
+                  <thead>
+                    <tr>
+                      <th class="income-th-source">แหล่งรายได้</th>
+                      <th class="income-th-range">0–1,000 บาท</th>
+                      <th class="income-th-range">1,000–3,000 บาท</th>
+                      <th class="income-th-range">&gt;3,000 บาท</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="src in getQ41Sources(q)" :key="src.id" class="income-tr">
+                      <td class="income-td-source">{{ src.label }}</td>
+                      <td v-for="rng in [1,2,3]" :key="rng" class="income-td-range">
+                        <label class="income-radio-label">
+                          <input
+                            type="radio"
+                            :name="'q41_row_' + q.id + '_' + src.id"
+                            :value="src.choices[rng - 1]?.id"
+                            :checked="answers[q.id]?.includes(src.choices[rng - 1]?.id)"
+                            @change="handleQ41RadioChange(q, src, rng - 1)"
+                            class="choice-checkbox"
+                          />
+                        </label>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- "อื่นๆ" text when source 6 row is selected -->
+              <div v-if="hasQ41OtherSelected(q)" class="other-input-wrap mt-2">
+                <label class="other-input-label">โปรดระบุแหล่งรายได้อื่นๆ</label>
+                <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุ..." class="other-input" />
+              </div>
+            </div>
+
+            <!-- Generic per-choice "ระบุ" text inputs for multi_select with meta.choice_text_required.
+                 Shown BELOW the choices-grid when a matching choice is selected.
+                 e.g. Q2.1 choice 9 (ธุรกิจส่วนตัว → โปรดระบุ) and choice 10 (อื่นๆ → ระบุ) -->
+            <template v-if="(q.type === 'multi_select' || q.type === 'special_q6') && q.meta?.choice_text_required">
+              <template v-for="c in q.choices" :key="'mct_' + c.id">
+                <div
+                  v-if="answers[q.id]?.includes(c.id) && q.meta.choice_text_required.includes(String(c.choice_key))"
+                  class="other-input-wrap mt-1"
+                >
+                  <label class="other-input-label required-star">
+                    {{ getChoiceTextLabel(q, c) }}
+                    <span class="required"> *</span>
+                  </label>
+                  <input
+                    type="text"
+                    v-model="choiceTexts[`${q.id}_${c.choice_key}`]"
+                    :placeholder="getChoiceTextPlaceholder(q, c)"
+                    class="other-input"
+                    :class="{ 'input-error': errors[`ct_${q.id}_${c.choice_key}`] }"
+                  />
+                  <p v-if="errors[`ct_${q.id}_${c.choice_key}`]" class="field-error">
+                    {{ errors[`ct_${q.id}_${c.choice_key}`] }}
+                  </p>
+                </div>
+              </template>
+            </template>
 
             <!-- Satisfaction (grouped radio buttons by aspect) -->
             <div v-if="q.meta && q.meta.aspects" class="satisfaction-grid">
@@ -337,18 +490,18 @@ const STEPS = [
 // Keys correspond to the Question.question_key column seeded by QuestionnaireSeeder
 // and the 2026_03_11_000002_add_missing_survey_questions migration.
 // Paper form ↔ DB mapping:
-//   Paper Q1  = Q2  (สถานภาพการทำงาน)          Paper Q2.1 = Q2.1 (อาชีพปัจจุบัน conditional)
-//   Paper Q2  = Q3  (ทักษะอาชีพ)               Paper Q3  = Q3.1 (การเปลี่ยนแปลงทักษะ)
-//   Paper Q4  = Q3.2 (กิจกรรมการเงิน)          Paper Q5  = Q4  (รายได้)
-//   Paper Q6  = Q4.1 (แหล่งรายได้)             Paper Q7  = Q5  (ช่องทางจำหน่าย)
-//   Paper Q8  = Q6  (ปัญหาพื้นที่ทำกิน)        Paper Q9  = Q7  (ความรู้การเงิน)
-//   Paper Q10 = Q8  (รายจ่ายครัวเรือน)         Paper Q11 = Q9  (การออม)
-//   Paper Q12 = Q10 (หนี้สิน)                  Paper Q13 = Q10.1 (การจัดการหนี้)
-//   Paper Q14 = Q11 (ทรัพย์สิน)               Paper Q15 = Q12.1+Q12.2 (ภัยพิบัติ)
-//   Paper Q16 = Q13 (กลุ่มกิจกรรม)            Paper Q17 = Q14 (ภาคีเครือข่าย)
-//   Paper Q18 = Q15 (ความพึงพอใจ)
+//   Paper Q1  = Q2  (สถานภาพการทำงาน)          Paper Q1.sub = Q2.0 (สาเหตุที่ไม่ทำงาน, conditional)
+//   Paper Q2.1 = Q2.1 (อาชีพปัจจุบัน conditional) Paper Q2  = Q3  (ทักษะอาชีพ)
+//   Paper Q3  = Q3.1 (การเปลี่ยนแปลงทักษะ)      Paper Q4  = Q3.2 (กิจกรรมการเงิน)
+//   Paper Q5  = Q4  (รายได้)                    Paper Q6  = Q4.1 (แหล่งรายได้)
+//   Paper Q7  = Q5  (ช่องทางจำหน่าย)            Paper Q8  = Q6  (ปัญหาพื้นที่ทำกิน)
+//   Paper Q9  = Q7  (ความรู้การเงิน)             Paper Q10 = Q8  (รายจ่ายครัวเรือน)
+//   Paper Q11 = Q9  (การออม)                    Paper Q12 = Q10 (หนี้สิน)
+//   Paper Q13 = Q10.1 (การจัดการหนี้)           Paper Q14 = Q11 (ทรัพย์สิน)
+//   Paper Q15 = Q12.1+Q12.2 (ภัยพิบัติ)         Paper Q16 = Q13 (กลุ่มกิจกรรม)
+//   Paper Q17 = Q14 (ภาคีเครือข่าย)             Paper Q18 = Q15 (ความพึงพอใจ)
 const STEP_QUESTION_KEYS = {
-  1: ['Q2', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
+  1: ['Q2', 'Q2.0', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
   2: ['Q5', 'Q6'],
   3: ['Q7', 'Q8', 'Q9', 'Q10', 'Q10.1', 'Q11'],
   4: ['Q12.1', 'Q12.2'],
@@ -390,6 +543,8 @@ const answers        = ref({})   // multi-select: { qId: [choiceId, ...] }
 const singleAnswers  = ref({})   // single-select / radio: { qId: choiceId }
 const numericAnswers = ref({})   // numeric: { qId: number }
 const otherTexts     = ref({})   // free-text "อื่นๆ": { qId: string }
+const choiceTexts    = ref({})   // per-choice required text: { [qId_choiceKey]: string }
+                                  // e.g. Q2 ว่างงาน: choiceTexts[q2Id_1], Q2.1 ธุรกิจ: choiceTexts[q21Id_9]
 
 // ─── Edit mode ───────────────────────────────────────────────────────────────
 const isEditMode = computed(() => !!route.params.id)
@@ -483,6 +638,137 @@ function getVisibleChoices(question) {
   })
 }
 
+// Helpers for special_q12 (Q12.1 disaster question)
+// Parent choices: '0' = ไม่ประสบ, '1' = ประสบ
+function getQ12ParentChoices(question) {
+  return (question.choices || []).filter(c => {
+    const key = String(c.choice_key)
+    return key === '0' || key === '1'
+  })
+}
+// Sub-disaster type choices: '1.อุทกภัย', '1.วาตภัย', etc.
+function getQ12SubChoices(question) {
+  return (question.choices || []).filter(c => String(c.choice_key).startsWith('1.'))
+}
+// Check if any disaster sub-type "อื่นๆ" is selected
+function hasQ12OtherSelected(question) {
+  const selected = answers.value[question.id] || []
+  return (question.choices || []).some(c => String(c.choice_key) === '1.อื่นๆ' && selected.includes(c.id))
+}
+// Handle Q12.1 parent radio change: clear all choices then set selected
+function handleQ12ParentChange(question, choice) {
+  if (!answers.value[question.id]) answers.value[question.id] = []
+  // Clear all parent and sub-choices first (radio-like for parent)
+  const parentIds = getQ12ParentChoices(question).map(c => c.id)
+  const subIds    = getQ12SubChoices(question).map(c => c.id)
+  answers.value[question.id] = answers.value[question.id].filter(
+    id => !parentIds.includes(id) && !subIds.includes(id)
+  )
+  answers.value[question.id].push(choice.id)
+}
+
+// Helper to detect sub-choices (e.g., choice_key contains '.')
+function isSubChoice(choice) {
+  return String(choice.choice_key).includes('.')
+}
+
+// ─── Generic "choice_text_required" helpers ───────────────────────────────────
+/**
+ * Build the choiceTexts reactive ref key from a question ID and choice key.
+ * Format: "<qId>_<choiceKey>". Using a helper ensures consistency across
+ * template bindings, validation, submit serialization, and load restoration.
+ */
+function choiceTextKey(qId, choiceKey) {
+  return `${qId}_${choiceKey}`
+}
+
+/**
+ * Parse a composite choiceTexts key back into { qId, choiceKey }.
+ * Splits on the first underscore only so multi-digit qIds are handled correctly.
+ */
+function parseChoiceTextKey(compositeKey) {
+  const idx = compositeKey.indexOf('_')
+  return idx < 0
+    ? { qId: compositeKey, choiceKey: '' }
+    : { qId: compositeKey.slice(0, idx), choiceKey: compositeKey.slice(idx + 1) }
+}
+
+/**
+ * Returns the label for the inline text input of a choice requiring "ระบุ".
+ * Customize per question_key / choice_key for paper-form accuracy.
+ */
+function getChoiceTextLabel(question, choice) {
+  const qk = question.question_key
+  const ck = String(choice.choice_key)
+  if (qk === 'Q2'   && ck === '1')  return 'สาเหตุที่ว่างงาน (ระบุ)'
+  if (qk === 'Q2.1' && ck === '9')  return `${choice.text_th} — โปรดระบุ`
+  if (qk === 'Q2.1' && ck === '10') return 'อื่นๆ — ระบุ'
+  return `${choice.text_th} — ระบุ`
+}
+
+/**
+ * Returns the placeholder text for the inline choice text input.
+ */
+function getChoiceTextPlaceholder(question, choice) {
+  const qk = question.question_key
+  const ck = String(choice.choice_key)
+  if (qk === 'Q2' && ck === '1') return 'ระบุสาเหตุที่ว่างงาน...'
+  if (qk === 'Q2.1' && ck === '9') return 'ระบุประเภทธุรกิจ/บริการ...'
+  return 'ระบุรายละเอียด...'
+}
+
+// ─── Q4.1 Income Table helpers ────────────────────────────────────────────────
+/**
+ * Group Q4.1 choices into rows by source ID (the part before '_').
+ * Returns: [{ id: sourceId, label: sourceName, choices: [c1, c2, c3] }, ...]
+ */
+function getQ41Sources(question) {
+  const sources = {}
+  for (const c of question.choices || []) {
+    const [srcId] = String(c.choice_key).split('_')
+    if (!sources[srcId]) {
+      // Extract source label from "Source — Range" text
+      const dash = c.text_th?.indexOf(' — ')
+      sources[srcId] = {
+        id:      srcId,
+        label:   dash >= 0 ? c.text_th.slice(0, dash) : `แหล่งที่ ${srcId}`,
+        choices: [],
+      }
+    }
+    sources[srcId].choices.push(c)
+  }
+  // Sort choices within each row by range ID
+  return Object.values(sources).map(s => ({
+    ...s,
+    choices: s.choices.sort((a, b) => {
+      const ra = parseInt(String(a.choice_key).split('_')[1] || '0')
+      const rb = parseInt(String(b.choice_key).split('_')[1] || '0')
+      return ra - rb
+    }),
+  }))
+}
+
+/** True when at least one choice in source 6 (อื่นๆ) row is selected */
+function hasQ41OtherSelected(question) {
+  const selected = answers.value[question.id] || []
+  return (question.choices || []).some(
+    c => String(c.choice_key).startsWith('6_') && selected.includes(c.id)
+  )
+}
+
+/**
+ * Radio-like handler for Q4.1 table: selecting one range for a source clears
+ * all other ranges for that source.
+ */
+function handleQ41RadioChange(question, src, rangeIdx) {
+  if (!answers.value[question.id]) answers.value[question.id] = []
+  const choiceIds    = src.choices.map(c => c.id)
+  const selectedId   = src.choices[rangeIdx]?.id
+  // Remove all choices from this source row, then add the selected one
+  answers.value[question.id] = answers.value[question.id].filter(id => !choiceIds.includes(id))
+  if (selectedId) answers.value[question.id].push(selectedId)
+}
+
 // Satisfaction question helpers (for questions with meta.aspects = true)
 // Choices have choice_key format "{aspect}_{level}", e.g. "1_5" = aspect 1, level 5
 // Text format: "กระบวนการ/กิจกรรมของโครงการ: มากที่สุด"
@@ -549,7 +835,7 @@ function computeQuestionScore(q) {
   if (q.type === 'single_select') {
     const id = singleAnswers.value[q.id]
     if (id) selIds = [id]
-  } else if (q.type === 'multi_select' || q.type === 'special_q6') {
+  } else if (q.type === 'multi_select' || q.type === 'special_q6' || q.type === 'special_q12' || q.type === 'special_q41') {
     selIds = answers.value[q.id] || []
   } else {
     return 0
@@ -557,6 +843,14 @@ function computeQuestionScore(q) {
   if (!selIds.length) return 0
 
   const selChoices = q.choices.filter(c => selIds.includes(c.id))
+
+  // special_q12: score = ไม่ประสบ (exclusive) => full, or "1"=ประสบ => weight
+  if (q.type === 'special_q12') {
+    if (selChoices.some(c => c.is_exclusive)) return q.max_score || 0
+    const parent1 = selChoices.find(c => String(c.choice_key) === '1')
+    return parent1 ? (parent1.weight || 0) : 0
+  }
+
   if (selChoices.some(c => c.is_exclusive)) {
     return q.type === 'special_q6' ? (q.max_score || 0) : 0
   }
@@ -613,6 +907,55 @@ function validateCurrentStep() {
     if (form.value.person_phone &&
         !/^[0-9]{8,15}$/.test(form.value.person_phone)) {
       errors.value.person_phone = 'หมายเลขโทรศัพท์ต้องเป็นตัวเลข 8-15 หลัก'
+    }
+  } else {
+    for (const q of stepQuestions.value) {
+      if (!isQuestionVisible(q)) continue
+
+      // required_when_visible — multi-select must have ≥1 selected
+      if (q.meta?.required_when_visible) {
+        const selected = answers.value[q.id] || []
+        if (selected.length === 0) {
+          errors.value[`q_${q.id}`] = `กรุณาเลือกอย่างน้อย 1 คำตอบสำหรับ "${q.text_th}"`
+        }
+      }
+
+      // choice_text_required — require inline text for each selected choice in the list
+      if (q.meta?.choice_text_required) {
+        if (q.type === 'single_select') {
+          // single-select: check selected choice_key against the required list
+          const selId     = singleAnswers.value[q.id]
+          const selChoice = selId ? q.choices?.find(c => c.id === selId) : null
+          if (selChoice && q.meta.choice_text_required.includes(String(selChoice.choice_key))) {
+            const ctKey = choiceTextKey(q.id, selChoice.choice_key)
+            if (!choiceTexts.value[ctKey]?.trim()) {
+              errors.value[`ct_${q.id}_${selChoice.choice_key}`] =
+                `กรุณา${getChoiceTextLabel(q, selChoice)}`
+            }
+          }
+        } else {
+          // multi-select: check each selected choice
+          const selIds = answers.value[q.id] || []
+          for (const c of q.choices || []) {
+            if (selIds.includes(c.id) && q.meta.choice_text_required.includes(String(c.choice_key))) {
+              const ctKey = choiceTextKey(q.id, c.choice_key)
+              if (!choiceTexts.value[ctKey]?.trim()) {
+                errors.value[`ct_${q.id}_${c.choice_key}`] =
+                  `กรุณา${getChoiceTextLabel(q, c)}`
+              }
+            }
+          }
+        }
+      }
+
+      // Q2.0 "อื่นๆ" (choice_key=5): require text when selected
+      if (q.question_key === 'Q2.0') {
+        const selIds   = answers.value[q.id] || []
+        const otherCh  = q.choices?.find(c => String(c.choice_key) === '5')
+        if (otherCh && selIds.includes(otherCh.id) && !otherTexts.value[q.id]?.trim()) {
+          errors.value[`q_${q.id}_other`] = 'กรุณาระบุสาเหตุ (อื่นๆ)'
+        }
+      }
     }
   }
   return Object.keys(errors.value).length === 0
@@ -723,7 +1066,7 @@ async function loadExistingResponse(id) {
       const q   = allQuestions.value.find(x => x.id === qId)
       if (!q) continue
 
-      if (q.type === 'multi_select' || q.type === 'special_q6') {
+      if (q.type === 'multi_select' || q.type === 'special_q6' || q.type === 'special_q12' || q.type === 'special_q41') {
         answers.value[qId] = answer.selected_choice_ids || []
       } else if (q.type === 'single_select') {
         if (answer.selected_choice_ids?.length) {
@@ -739,7 +1082,25 @@ async function loadExistingResponse(id) {
       }
 
       if (answer.value_text) {
-        otherTexts.value[qId] = answer.value_text
+        // Restore choiceTexts: value_text for questions with choice_text_required is stored
+        // as JSON {"choiceKey": "text"}, e.g. Q2: {"1": "สาเหตุ"}, Q2.1: {"9": "text", "10": "text"}
+        if (q.meta?.choice_text_required) {
+          try {
+            const parsed = JSON.parse(answer.value_text)
+            if (typeof parsed === 'object' && parsed !== null) {
+              for (const [ck, txt] of Object.entries(parsed)) {
+                choiceTexts.value[choiceTextKey(qId, ck)] = txt
+              }
+            } else {
+              otherTexts.value[qId] = answer.value_text
+            }
+          } catch {
+            // Legacy plain-string format: store in otherTexts as fallback
+            otherTexts.value[qId] = answer.value_text
+          }
+        } else {
+          otherTexts.value[qId] = answer.value_text
+        }
       }
     }
   } catch (e) {
@@ -777,6 +1138,23 @@ async function submit() {
       answersPayload[qId] = answersPayload[qId] || {}
       answersPayload[qId].value_numeric = val
     }
+  }
+
+  // Serialize choiceTexts: group by qId and store as JSON in value_text.
+  // Uses parseChoiceTextKey() to split the composite key consistently.
+  // e.g. Q2 with choice_key=1 selected → { value_text: '{"1":"สาเหตุ..."}' }
+  // e.g. Q2.1 with choice_keys 9+10 → { value_text: '{"9":"ธุรกิจ...","10":"อื่นๆ..."}' }
+  const choiceTextsByQ = {}
+  for (const [compositeKey, text] of Object.entries(choiceTexts.value)) {
+    if (!text?.trim()) continue
+    const { qId, choiceKey } = parseChoiceTextKey(compositeKey)
+    if (!qId || !choiceKey) continue
+    if (!choiceTextsByQ[qId]) choiceTextsByQ[qId] = {}
+    choiceTextsByQ[qId][choiceKey] = text.trim()
+  }
+  for (const [qId, ctMap] of Object.entries(choiceTextsByQ)) {
+    if (!answersPayload[qId]) answersPayload[qId] = {}
+    answersPayload[qId].value_text = JSON.stringify(ctMap)
   }
 
   // Build household_data (location info)
@@ -841,7 +1219,7 @@ onMounted(async () => {
     )
     // Initialize multi-select answer arrays
     for (const q of allQuestions.value) {
-      if ((q.type === 'multi_select' || q.type === 'special_q6') && !answers.value[q.id]) {
+      if ((q.type === 'multi_select' || q.type === 'special_q6' || q.type === 'special_q12' || q.type === 'special_q41') && !answers.value[q.id]) {
         answers.value[q.id] = []
       }
     }
@@ -941,8 +1319,10 @@ onMounted(async () => {
 
 /* ─── Validation errors ────────────────────────────────────────────────────── */
 .required { color: #ef4444; }
+.required-star { display: flex; align-items: center; gap: 0.15rem; }
 .has-error input, .has-error select { border-color: #ef4444 !important; }
 .field-error { font-size: 0.75rem; color: #ef4444; margin-top: 0.25rem; display: block; }
+.input-error { border-color: #ef4444 !important; background: #fff5f5; }
 
 /* ─── Card section title ───────────────────────────────────────────────────── */
 .card-section-title {
@@ -987,6 +1367,45 @@ onMounted(async () => {
 .choice-checkbox { width: 18px !important; height: 18px; flex-shrink: 0; accent-color: var(--color-primary); cursor: pointer; }
 .choice-text { flex: 1; line-height: 1.3; }
 .choice-weight { font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap; flex-shrink: 0; }
+/* Sub-choice: slightly indented, smaller */
+.choice-sub {
+  margin-left: 0.5rem; font-size: 0.85rem; border-style: dashed;
+  background: var(--color-bg, #f8fafc);
+}
+.choice-sub.choice-selected { background: var(--color-primary-light); border-style: solid; }
+
+/* ─── Q12 sub-choices wrapper ────────────────────────────────────────────── */
+.sub-choices-wrap {
+  width: 100%; margin-top: 0.5rem; margin-left: 1.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg, #f8fafc);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 var(--radius-sm, 8px) var(--radius-sm, 8px) 0;
+}
+.sub-choices-label {
+  display: block; font-size: 0.8rem; font-weight: 600; color: var(--color-primary-dark);
+  margin-bottom: 0.5rem;
+}
+.sub-choices-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* ─── Q4.1 income source table ─────────────────────────────────────────────── */
+.income-table-wrap { width: 100%; }
+.income-table-scroll { overflow-x: auto; border-radius: var(--radius-sm, 8px); border: 1.5px solid var(--color-border); }
+.income-table {
+  width: 100%; border-collapse: collapse; font-size: 0.875rem;
+  font-family: 'Prompt', sans-serif;
+}
+.income-table th, .income-table td {
+  padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--color-border);
+  text-align: center;
+}
+.income-th-source { text-align: left; background: var(--color-surface); font-weight: 600; min-width: 160px; }
+.income-th-range  { background: var(--color-surface); font-weight: 600; min-width: 110px; }
+.income-td-source { text-align: left; background: var(--color-bg, #f8fafc); }
+.income-td-range  { background: #fff; }
+.income-tr:hover td { background: var(--color-primary-light); }
+.income-radio-label { display: flex; align-items: center; justify-content: center; cursor: pointer; min-height: 36px; }
+.income-radio-label input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-primary); cursor: pointer; }
 
 /* ─── "อื่นๆ" input ────────────────────────────────────────────────────────── */
 .other-input-wrap { margin-top: 0.625rem; display: flex; flex-direction: column; gap: 0.25rem; max-width: 480px; }

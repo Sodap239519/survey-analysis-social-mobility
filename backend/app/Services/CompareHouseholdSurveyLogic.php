@@ -8,34 +8,39 @@ use App\Models\SurveyResponse;
 /**
  * CompareHouseholdSurveyLogic
  *
- * Compares Before (legacy CSV import) vs After (new survey response) capital scores
- * for a given household, matched by house_code (11-digit รหัสบ้าน).
+ * Compares Before (legacy XLSX/CSV import) vs After (new survey responses) capital
+ * scores for a given household, matched by house_code (11-digit รหัสบ้าน).
  *
- * Before scores are read from two sources (in priority order):
- *  1. A SurveyResponse record with period='before' (score_* columns, 0–100 scale).
- *  2. Fallback: Household.raw_data columns from the legacy CSV import (X scale 1–4),
- *     converted to 0–100 using: normalized = (x – 1.0) / 3.0 * 100.
+ * ─── Before scores ──────────────────────────────────────────────────────────
+ * Priority order:
+ *  1. Household.baseline_score_* columns (set by MultiSheetHouseholdImport from
+ *     the "ข้อมูลพื้นฐาน" sheet baseline columns; X scale 1–4).
+ *  2. SurveyResponse with period='before' (score_* columns, 0–100 scale).
+ *  3. Fallback: Household.raw_data array (legacy CSV index-based, X scale 1–4).
  *
- * After scores are read from the most recent SurveyResponse with period='after'
- * (score_* columns, 0–100 scale).
+ * ─── After scores ───────────────────────────────────────────────────────────
+ * All SurveyResponse records with period='after' for the household are collected.
+ * Each represents one respondent (person) in the household.
+ * Scores are AVERAGED across all respondents to produce household-level scores.
+ * This reflects requirement B3: "คำนวณระดับรายคน แล้วรวม/เฉลี่ยเป็นรายครัวเรือน".
  *
- * Capital slug → legacy CSV column mapping (0-based index in raw_data array):
+ * ─── Comparison criteria (ดีขึ้น / คงที่ / แย่ลง) ──────────────────────────
+ * Applied per capital (diff = after_score − before_score, both on 0–100 scale):
+ *   ดีขึ้น  (improved):  diff >  +2.0 points
+ *   คงที่   (unchanged): |diff| ≤ 2.0 points
+ *   แย่ลง   (decreased): diff < -2.0 points
+ *
+ * The ±2-point threshold (2% of 100-point scale) avoids flagging minor rounding
+ * differences as real changes.  This constant is COMPARISON_THRESHOLD below.
+ *
+ * ─── Capital slug → legacy CSV column mapping (raw_data fallback) ───────────
  *   human     => 44  (ทุนมนุษย์)
  *   physical  => 55  (ทุนกายภาพ)
- *   financial => 69  (ทุนการเงิน)   NOTE: column name 'ทุนการเงิน' — pending mapping manual
+ *   financial => 69  (ทุนการเงิน)
  *   natural   => 78  (ทุนธรรมชาติ)
  *   social    => 87  (ทุนทางสังคม)
  *
- * After-survey question grouping → capital slug mapping is handled by ScoringService
- * and stored in SurveyResponse.score_* columns.  The field-level question-to-capital
- * assignment for the "After" questionnaire (แบบกำกับติดตาม_After) is:
- *   human     => Q2, Q3, Q3.1, Q3.2, Q4      (max 20 pts each)
- *   physical  => Q5, Q6                        (70 + 30 pts)
- *   financial => Q7, Q8, Q9, Q10, Q11         (20 pts each)
- *   natural   => Q12–Q16 (ตอนที่ 4)            — pending mapping manual (exact questions TBC)
- *   social    => Q17–Q26 (ตอนที่ 5)            — pending mapping manual (exact questions TBC)
- *
- * X index (poverty level 1–4):
+ * ─── X index (poverty level 1–4) ────────────────────────────────────────────
  *   X = 1.0 + (avg_normalized / 100) * 3.0
  *   Level 1: 1.00 ≤ X < 1.75  (อยู่ลำบาก)
  *   Level 2: 1.75 ≤ X < 2.50  (อยู่ยาก)
@@ -44,6 +49,14 @@ use App\Models\SurveyResponse;
  */
 class CompareHouseholdSurveyLogic
 {
+    /**
+     * Threshold (in 0–100 scale points) for ดีขึ้น / คงที่ / แย่ลง comparison.
+     * diff > THRESHOLD  => ดีขึ้น
+     * |diff| <= THRESHOLD => คงที่
+     * diff < -THRESHOLD => แย่ลง
+     */
+    public const COMPARISON_THRESHOLD = 2.0;
+
     /**
      * Capital metadata: slug => [label (Thai), raw_data column index, score field]
      *
@@ -61,19 +74,13 @@ class CompareHouseholdSurveyLogic
     /**
      * Run Before–After comparison for one household.
      *
-     * @param  Household   $household
-     * @param  int|null    $surveyYear   Filter survey_year on SurveyResponse (optional)
-     * @param  int|null    $surveyRound  Filter survey_round on SurveyResponse (optional)
-     * @return array{
-     *   household_id: int,
-     *   house_code: string,
-     *   before_source: string,
-     *   after_found: bool,
-     *   capitals: array<string, array{label: string, before: float|null, after: float|null, diff: float|null}>,
-     *   summary: array{avg_before: float|null, avg_after: float|null, avg_diff: float|null,
-     *                  x_before: float|null,   x_after: float|null,   x_diff: float|null,
-     *                  poverty_level_before: int|null, poverty_level_after: int|null, poverty_level_diff: int|null}
-     * }
+     * After scores are averaged across all respondents (persons) with the same
+     * house_code who have a period='after' SurveyResponse record.
+     *
+     * Per-capital change label (see COMPARISON_THRESHOLD):
+     *   diff >  THRESHOLD  => 'ดีขึ้น'
+     *   |diff| ≤ THRESHOLD => 'คงที่'
+     *   diff < -THRESHOLD  => 'แย่ลง'
      */
     public function compare(Household $household, ?int $surveyYear = null, ?int $surveyRound = null): array
     {
@@ -87,23 +94,36 @@ class CompareHouseholdSurveyLogic
             $after  = $afterScores['scores'][$slug] ?? null;
             $diff   = ($before !== null && $after !== null) ? round($after - $before, 4) : null;
 
+            $trend = null;
+            if ($diff !== null) {
+                if ($diff > self::COMPARISON_THRESHOLD) {
+                    $trend = 'ดีขึ้น';
+                } elseif ($diff < -self::COMPARISON_THRESHOLD) {
+                    $trend = 'แย่ลง';
+                } else {
+                    $trend = 'คงที่';
+                }
+            }
+
             $capitals[$slug] = [
                 'label'  => $label,
                 'before' => $before,
                 'after'  => $after,
                 'diff'   => $diff,
+                'trend'  => $trend,
             ];
         }
 
         $summary = $this->buildSummary($capitals);
 
         return [
-            'household_id'  => $household->id,
-            'house_code'    => $household->house_code,
-            'before_source' => $beforeScores['source'],
-            'after_found'   => $afterScores['found'],
-            'capitals'      => $capitals,
-            'summary'       => $summary,
+            'household_id'      => $household->id,
+            'house_code'        => $household->house_code,
+            'before_source'     => $beforeScores['source'],
+            'after_found'       => $afterScores['found'],
+            'respondent_count'  => $afterScores['respondent_count'] ?? 0,
+            'capitals'          => $capitals,
+            'summary'           => $summary,
         ];
     }
 
@@ -146,10 +166,13 @@ class CompareHouseholdSurveyLogic
     }
 
     /**
-     * Retrieve After capital scores (0–100 normalized) from the most recent
-     * SurveyResponse with period='after'.
+     * Retrieve After capital scores (0–100 normalized) by averaging ALL
+     * SurveyResponse records with period='after' for the household.
      *
-     * @return array{found: bool, scores: array<string, float|null>}
+     * Averaging reflects requirement B3: "คำนวณระดับรายคน แล้วรวม/เฉลี่ยเป็นรายครัวเรือน
+     * โดยเอาคนที่ house_code เดียวกัน".
+     *
+     * @return array{found: bool, scores: array<string, float|null>, respondent_count: int}
      */
     public function getAfterScores(Household $household, ?int $surveyYear = null, ?int $surveyRound = null): array
     {
@@ -163,15 +186,41 @@ class CompareHouseholdSurveyLogic
             $query->where('survey_round', $surveyRound);
         }
 
-        $response = $query->latest('surveyed_at')->first();
+        $responses = $query->get();
 
-        if (!$response) {
-            return ['found' => false, 'scores' => array_fill_keys(array_keys(self::CAPITALS), null)];
+        if ($responses->isEmpty()) {
+            return [
+                'found'            => false,
+                'scores'           => array_fill_keys(array_keys(self::CAPITALS), null),
+                'respondent_count' => 0,
+            ];
+        }
+
+        // Average per-capital scores across all respondents in this household
+        $totals  = array_fill_keys(array_keys(self::CAPITALS), 0.0);
+        $counts  = array_fill_keys(array_keys(self::CAPITALS), 0);
+
+        foreach ($responses as $response) {
+            foreach (self::CAPITALS as $slug => $meta) {
+                $value = $response->{$meta['score_field']};
+                if ($value !== null) {
+                    $totals[$slug] += (float) $value;
+                    $counts[$slug]++;
+                }
+            }
+        }
+
+        $scores = [];
+        foreach (array_keys(self::CAPITALS) as $slug) {
+            $scores[$slug] = $counts[$slug] > 0
+                ? round($totals[$slug] / $counts[$slug], 4)
+                : null;
         }
 
         return [
-            'found'  => true,
-            'scores' => $this->scoresFromResponse($response),
+            'found'            => true,
+            'scores'           => $scores,
+            'respondent_count' => $responses->count(),
         ];
     }
 
@@ -192,40 +241,67 @@ class CompareHouseholdSurveyLogic
     }
 
     /**
-     * Extract per-capital scores from Household.raw_data (legacy CSV import).
+     * Extract per-capital scores from Household baseline_score_* fields (new XLSX import).
      *
-     * CSV capital columns store values on the X scale [1.0, 4.0].
+     * Baseline scores from the XLSX file use the X scale [1.0, 4.0].
      * Conversion to 0–100: normalized = (x – 1.0) / 3.0 * 100
      *
-     * If a column is missing or empty, returns null for that capital with a
-     * // PENDING MAPPING MANUAL comment below.
+     * Falls back to the legacy raw_data array if baseline_score_* fields are not set.
      *
      * @return array<string, float|null>
      */
     public function scoresFromRawData(Household $household): array
     {
+        $scores = [];
+
+        // First try the dedicated baseline_score_* columns (set by MultiSheetHouseholdImport)
+        $hasBaseline = $household->baseline_score_human !== null
+            || $household->baseline_score_physical !== null
+            || $household->baseline_score_financial !== null
+            || $household->baseline_score_natural !== null
+            || $household->baseline_score_social !== null;
+
+        if ($hasBaseline) {
+            $fieldMap = [
+                'human'     => 'baseline_score_human',
+                'physical'  => 'baseline_score_physical',
+                'financial' => 'baseline_score_financial',
+                'natural'   => 'baseline_score_natural',
+                'social'    => 'baseline_score_social',
+            ];
+
+            foreach ($fieldMap as $slug => $field) {
+                $value = $household->{$field};
+                if ($value === null) {
+                    $scores[$slug] = null;
+                    continue;
+                }
+                $x = (float) $value;
+                $x = max(1.0, min(4.0, $x));
+                $scores[$slug] = round(($x - 1.0) / 3.0 * 100, 4);
+            }
+
+            return $scores;
+        }
+
+        // Legacy fallback: raw_data array (index-based, from original CSV import)
         $raw = $household->raw_data;
 
         if (empty($raw) || !is_array($raw)) {
             return array_fill_keys(array_keys(self::CAPITALS), null);
         }
 
-        $scores = [];
         foreach (self::CAPITALS as $slug => $meta) {
             $col   = $meta['raw_data_col'];
             $value = $raw[$col] ?? null;
 
             if ($value === null || $value === '') {
-                // PENDING MAPPING MANUAL: column index may be incorrect for this row's layout
                 $scores[$slug] = null;
                 continue;
             }
 
             $x = (float) $value;
-
-            // Clamp to valid X range before normalizing
             $x = max(1.0, min(4.0, $x));
-
             $scores[$slug] = round(($x - 1.0) / 3.0 * 100, 4);
         }
 
@@ -257,10 +333,23 @@ class CompareHouseholdSurveyLogic
         $levelAfter  = $xAfter  !== null ? $this->povertyLevel($xAfter)  : null;
         $levelDiff   = ($levelBefore !== null && $levelAfter !== null) ? ($levelAfter - $levelBefore) : null;
 
+        // Overall household trend based on avg_diff and COMPARISON_THRESHOLD
+        $overallTrend = null;
+        if ($avgDiff !== null) {
+            if ($avgDiff > self::COMPARISON_THRESHOLD) {
+                $overallTrend = 'ดีขึ้น';
+            } elseif ($avgDiff < -self::COMPARISON_THRESHOLD) {
+                $overallTrend = 'แย่ลง';
+            } else {
+                $overallTrend = 'คงที่';
+            }
+        }
+
         return [
             'avg_before'           => $avgBefore,
             'avg_after'            => $avgAfter,
             'avg_diff'             => $avgDiff,
+            'overall_trend'        => $overallTrend,
             'x_before'             => $xBefore,
             'x_after'              => $xAfter,
             'x_diff'               => $xDiff,

@@ -39,11 +39,27 @@ class QuestionnaireSeeder extends Seeder
         );
 
         // Q2: สถานภาพการทำงาน (20 pts) - single select
-        $q2 = $this->createQuestion($capital, 'Q2', 'สถานภาพการทำงานปัจจุบัน', 'single_select', 20, true, 1);
+        // meta.choice_text_required: ['1'] → ว่างงาน requires a "สาเหตุ" text input
+        $q2 = $this->createQuestion($capital, 'Q2', 'สถานภาพการทำงานปัจจุบัน', 'single_select', 20, true, 1,
+            ['choice_text_required' => ['1']]
+        );
         $this->createChoices($q2, [
             ['0', 'ไม่ทำงาน', 0, true],
             ['1', 'ว่างงาน (เคยทำแต่ตอนนี้ไม่ได้ทำ)', 5, false],
             ['2', 'ทำงาน', 20, false],
+        ]);
+
+        // Q2.0: สาเหตุที่ไม่ทำงาน (conditional on Q2=0, not scored)
+        $q20 = $this->createQuestion(
+            $capital, 'Q2.0', 'สาเหตุที่ไม่ทำงาน (เลือกได้มากกว่า 1)', 'multi_select', 0, false, 10,
+            ['conditional_on' => 'Q2', 'conditional_value' => '0', 'required_when_visible' => true]
+        );
+        $this->createChoices($q20, [
+            ['1', 'ชรา',              0, false],
+            ['2', 'พิการ',            0, false],
+            ['3', 'เจ็บป่วย',         0, false],
+            ['4', 'เด็กเล็ก/นักเรียน', 0, false],
+            ['5', 'อื่นๆ',            0, false],
         ]);
 
         // Q3: ทักษะอาชีพ (20 pts) - multi select
@@ -211,16 +227,17 @@ class QuestionnaireSeeder extends Seeder
             ['name_th' => 'ทุนทรัพยากรธรรมชาติ', 'name_en' => 'Natural Capital', 'max_score' => 100, 'sort_order' => 4]
         );
 
-        // Q12.1: ครัวเรือนประสบภัยพิบัติหรือไม่ (40 pts)
-        $q121 = $this->createQuestion($capital, 'Q12.1', 'ครัวเรือนของท่านประสบภัยพิบัติหรือไม่ หลังจากเข้าร่วมโครงการ', 'single_select', 40, false, 1);
+        // Q12.1: ครัวเรือนประสบภัยพิบัติหรือไม่ (40 pts) - special_q12 (parent + sub disaster types)
+        $q121 = $this->createQuestion($capital, 'Q12.1', 'ครัวเรือนของท่านประสบภัยพิบัติหรือไม่ หลังจากเข้าร่วมโครงการ', 'special_q12', 40, false, 1);
         $this->createChoices($q121, [
-            ['0', 'ไม่ประสบ', 40, false],
-            ['1', 'ประสบ - อุทกภัย', 20, false],
-            ['2', 'ประสบ - วาตภัย', 20, false],
-            ['3', 'ประสบ - ภัยแล้ง', 20, false],
-            ['4', 'ประสบ - อัคคีภัย', 20, false],
-            ['5', 'ประสบ - โรคระบาด', 20, false],
-            ['6', 'ประสบ - อื่นๆ', 20, false],
+            ['0',         'ไม่ประสบ',   40, true],   // exclusive => full score
+            ['1',         'ประสบ',      20, false],  // parent choice
+            ['1.อุทกภัย', 'อุทกภัย',    0,  false],  // sub-type
+            ['1.วาตภัย',  'วาตภัย',     0,  false],
+            ['1.ภัยแล้ง', 'ภัยแล้ง',    0,  false],
+            ['1.อัคคีภัย','อัคคีภัย',   0,  false],
+            ['1.โรคระบาด','โรคระบาด',   0,  false],
+            ['1.อื่นๆ',   'อื่นๆ',      0,  false],
         ]);
 
         // Q12.2: การรับมือกับภัยพิบัติ (60 pts)

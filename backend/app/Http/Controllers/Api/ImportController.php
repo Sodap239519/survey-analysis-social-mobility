@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Imports\HouseholdImport;
+use App\Imports\MultiSheetHouseholdImport;
 use App\Models\Household;
 use App\Models\ImportLog;
 use App\Models\SurveyResponse;
@@ -19,19 +20,27 @@ class ImportController extends Controller
             'file' => 'required|file|mimes:xlsx,csv,xls',
         ]);
 
-        $import = new HouseholdImport();
+        $filename  = $request->file('file')->getClientOriginalName();
+        $extension = strtolower($request->file('file')->getClientOriginalExtension());
+
+        // Use the multi-sheet importer for XLSX files; fall back to the legacy
+        // single-sheet CSV importer for .csv files.
+        $import = ($extension === 'xlsx' || $extension === 'xls')
+            ? new MultiSheetHouseholdImport()
+            : new HouseholdImport();
 
         try {
             Excel::import($import, $request->file('file'));
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Import failed', [
-                'file'  => $request->file('file')->getClientOriginalName(),
+                'file'  => $filename,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'message' => 'ไม่สามารถนำเข้าไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์และลองอีกครั้ง',
+                'detail'  => $e->getMessage(),
             ], 422);
         }
 
