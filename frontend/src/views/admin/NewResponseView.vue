@@ -197,7 +197,9 @@
               <span class="question-key">{{ q.question_key }}</span>
               {{ q.text_th }}
               <span v-if="q.max_score > 0" class="question-score">({{ q.max_score }} คะแนน)</span>
+              <span v-if="q.meta?.required_when_visible" class="required"> *</span>
             </p>
+            <p v-if="errors[`q_${q.id}`]" class="field-error mb-2">{{ errors[`q_${q.id}`] }}</p>
 
             <!-- Multi-select (standard, excludes satisfaction questions) -->
             <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && !(q.meta && q.meta.aspects)" class="choices-grid">
@@ -207,7 +209,8 @@
                 class="choice-label"
                 :class="{
                   'choice-selected': answers[q.id]?.includes(c.id),
-                  'choice-disabled': isChoiceDisabled(q, c)
+                  'choice-disabled': isChoiceDisabled(q, c),
+                  'choice-sub': isSubChoice(c)
                 }"
               >
                 <input
@@ -226,6 +229,55 @@
             <div v-if="(q.type === 'multi_select' || q.type === 'special_q6') && !(q.meta && q.meta.aspects) && hasOtherSelected(q, answers[q.id])" class="other-input-wrap">
               <label class="other-input-label">โปรดระบุรายละเอียด (อื่นๆ)</label>
               <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุรายละเอียด..." class="other-input" />
+            </div>
+
+            <!-- special_q12: Q12.1 disaster type (parent radio + sub-checkboxes) -->
+            <div v-else-if="q.type === 'special_q12'" class="choices-grid">
+              <!-- Parent choices: 0=ไม่ประสบ (radio), 1=ประสบ (radio) -->
+              <template v-for="c in getQ12ParentChoices(q)" :key="c.id">
+                <label
+                  class="choice-label"
+                  :class="{ 'choice-selected': answers[q.id]?.includes(c.id) }"
+                >
+                  <input
+                    type="radio"
+                    :name="'q12_' + q.id"
+                    :value="c.id"
+                    :checked="answers[q.id]?.includes(c.id)"
+                    @change="handleQ12ParentChange(q, c)"
+                    class="choice-checkbox"
+                  />
+                  <span class="choice-text">{{ c.choice_key }}) {{ c.text_th }}</span>
+                  <span v-if="c.weight > 0" class="choice-weight">({{ c.weight }}pt)</span>
+                </label>
+                <!-- Sub-disaster type checkboxes, shown only when ประสบ (1) is selected -->
+                <template v-if="String(c.choice_key) === '1' && answers[q.id]?.includes(c.id)">
+                  <div class="sub-choices-wrap">
+                    <span class="sub-choices-label">ระบุประเภท:</span>
+                    <div class="sub-choices-grid">
+                      <label
+                        v-for="sc in getQ12SubChoices(q)"
+                        :key="sc.id"
+                        class="choice-label choice-sub"
+                        :class="{ 'choice-selected': answers[q.id]?.includes(sc.id) }"
+                      >
+                        <input
+                          type="checkbox"
+                          :value="sc.id"
+                          v-model="answers[q.id]"
+                          class="choice-checkbox"
+                        />
+                        <span class="choice-text">{{ sc.text_th }}</span>
+                      </label>
+                    </div>
+                    <!-- "อื่นๆ" text -->
+                    <div v-if="hasQ12OtherSelected(q)" class="other-input-wrap mt-1">
+                      <label class="other-input-label">โปรดระบุประเภทภัยพิบัติ (อื่นๆ)</label>
+                      <input type="text" v-model="otherTexts[q.id]" placeholder="ระบุ..." class="other-input" />
+                    </div>
+                  </div>
+                </template>
+              </template>
             </div>
 
             <!-- Single-select -->
@@ -337,18 +389,18 @@ const STEPS = [
 // Keys correspond to the Question.question_key column seeded by QuestionnaireSeeder
 // and the 2026_03_11_000002_add_missing_survey_questions migration.
 // Paper form ↔ DB mapping:
-//   Paper Q1  = Q2  (สถานภาพการทำงาน)          Paper Q2.1 = Q2.1 (อาชีพปัจจุบัน conditional)
-//   Paper Q2  = Q3  (ทักษะอาชีพ)               Paper Q3  = Q3.1 (การเปลี่ยนแปลงทักษะ)
-//   Paper Q4  = Q3.2 (กิจกรรมการเงิน)          Paper Q5  = Q4  (รายได้)
-//   Paper Q6  = Q4.1 (แหล่งรายได้)             Paper Q7  = Q5  (ช่องทางจำหน่าย)
-//   Paper Q8  = Q6  (ปัญหาพื้นที่ทำกิน)        Paper Q9  = Q7  (ความรู้การเงิน)
-//   Paper Q10 = Q8  (รายจ่ายครัวเรือน)         Paper Q11 = Q9  (การออม)
-//   Paper Q12 = Q10 (หนี้สิน)                  Paper Q13 = Q10.1 (การจัดการหนี้)
-//   Paper Q14 = Q11 (ทรัพย์สิน)               Paper Q15 = Q12.1+Q12.2 (ภัยพิบัติ)
-//   Paper Q16 = Q13 (กลุ่มกิจกรรม)            Paper Q17 = Q14 (ภาคีเครือข่าย)
-//   Paper Q18 = Q15 (ความพึงพอใจ)
+//   Paper Q1  = Q2  (สถานภาพการทำงาน)          Paper Q1.sub = Q2.0 (สาเหตุที่ไม่ทำงาน, conditional)
+//   Paper Q2.1 = Q2.1 (อาชีพปัจจุบัน conditional) Paper Q2  = Q3  (ทักษะอาชีพ)
+//   Paper Q3  = Q3.1 (การเปลี่ยนแปลงทักษะ)      Paper Q4  = Q3.2 (กิจกรรมการเงิน)
+//   Paper Q5  = Q4  (รายได้)                    Paper Q6  = Q4.1 (แหล่งรายได้)
+//   Paper Q7  = Q5  (ช่องทางจำหน่าย)            Paper Q8  = Q6  (ปัญหาพื้นที่ทำกิน)
+//   Paper Q9  = Q7  (ความรู้การเงิน)             Paper Q10 = Q8  (รายจ่ายครัวเรือน)
+//   Paper Q11 = Q9  (การออม)                    Paper Q12 = Q10 (หนี้สิน)
+//   Paper Q13 = Q10.1 (การจัดการหนี้)           Paper Q14 = Q11 (ทรัพย์สิน)
+//   Paper Q15 = Q12.1+Q12.2 (ภัยพิบัติ)         Paper Q16 = Q13 (กลุ่มกิจกรรม)
+//   Paper Q17 = Q14 (ภาคีเครือข่าย)             Paper Q18 = Q15 (ความพึงพอใจ)
 const STEP_QUESTION_KEYS = {
-  1: ['Q2', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
+  1: ['Q2', 'Q2.0', 'Q2.1', 'Q3', 'Q3.1', 'Q3.2', 'Q4', 'Q4.1'],
   2: ['Q5', 'Q6'],
   3: ['Q7', 'Q8', 'Q9', 'Q10', 'Q10.1', 'Q11'],
   4: ['Q12.1', 'Q12.2'],
@@ -483,6 +535,40 @@ function getVisibleChoices(question) {
   })
 }
 
+// Helpers for special_q12 (Q12.1 disaster question)
+// Parent choices: '0' = ไม่ประสบ, '1' = ประสบ
+function getQ12ParentChoices(question) {
+  return (question.choices || []).filter(c => {
+    const key = String(c.choice_key)
+    return key === '0' || key === '1'
+  })
+}
+// Sub-disaster type choices: '1.อุทกภัย', '1.วาตภัย', etc.
+function getQ12SubChoices(question) {
+  return (question.choices || []).filter(c => String(c.choice_key).startsWith('1.'))
+}
+// Check if any disaster sub-type "อื่นๆ" is selected
+function hasQ12OtherSelected(question) {
+  const selected = answers.value[question.id] || []
+  return (question.choices || []).some(c => String(c.choice_key) === '1.อื่นๆ' && selected.includes(c.id))
+}
+// Handle Q12.1 parent radio change: clear all choices then set selected
+function handleQ12ParentChange(question, choice) {
+  if (!answers.value[question.id]) answers.value[question.id] = []
+  // Clear all parent and sub-choices first (radio-like for parent)
+  const parentIds = getQ12ParentChoices(question).map(c => c.id)
+  const subIds    = getQ12SubChoices(question).map(c => c.id)
+  answers.value[question.id] = answers.value[question.id].filter(
+    id => !parentIds.includes(id) && !subIds.includes(id)
+  )
+  answers.value[question.id].push(choice.id)
+}
+
+// Helper to detect sub-choices (e.g., choice_key contains '.')
+function isSubChoice(choice) {
+  return String(choice.choice_key).includes('.')
+}
+
 // Satisfaction question helpers (for questions with meta.aspects = true)
 // Choices have choice_key format "{aspect}_{level}", e.g. "1_5" = aspect 1, level 5
 // Text format: "กระบวนการ/กิจกรรมของโครงการ: มากที่สุด"
@@ -549,7 +635,7 @@ function computeQuestionScore(q) {
   if (q.type === 'single_select') {
     const id = singleAnswers.value[q.id]
     if (id) selIds = [id]
-  } else if (q.type === 'multi_select' || q.type === 'special_q6') {
+  } else if (q.type === 'multi_select' || q.type === 'special_q6' || q.type === 'special_q12') {
     selIds = answers.value[q.id] || []
   } else {
     return 0
@@ -557,6 +643,14 @@ function computeQuestionScore(q) {
   if (!selIds.length) return 0
 
   const selChoices = q.choices.filter(c => selIds.includes(c.id))
+
+  // special_q12: score = ไม่ประสบ (exclusive) => full, or "1"=ประสบ => weight
+  if (q.type === 'special_q12') {
+    if (selChoices.some(c => c.is_exclusive)) return q.max_score || 0
+    const parent1 = selChoices.find(c => String(c.choice_key) === '1')
+    return parent1 ? (parent1.weight || 0) : 0
+  }
+
   if (selChoices.some(c => c.is_exclusive)) {
     return q.type === 'special_q6' ? (q.max_score || 0) : 0
   }
@@ -613,6 +707,17 @@ function validateCurrentStep() {
     if (form.value.person_phone &&
         !/^[0-9]{8,15}$/.test(form.value.person_phone)) {
       errors.value.person_phone = 'หมายเลขโทรศัพท์ต้องเป็นตัวเลข 8-15 หลัก'
+    }
+  } else {
+    // Validate required conditional questions
+    for (const q of stepQuestions.value) {
+      if (!isQuestionVisible(q)) continue
+      if (q.meta?.required_when_visible) {
+        const selected = answers.value[q.id] || []
+        if (selected.length === 0) {
+          errors.value[`q_${q.id}`] = `กรุณาเลือกอย่างน้อย 1 คำตอบสำหรับ "${q.text_th}"`
+        }
+      }
     }
   }
   return Object.keys(errors.value).length === 0
@@ -723,7 +828,7 @@ async function loadExistingResponse(id) {
       const q   = allQuestions.value.find(x => x.id === qId)
       if (!q) continue
 
-      if (q.type === 'multi_select' || q.type === 'special_q6') {
+      if (q.type === 'multi_select' || q.type === 'special_q6' || q.type === 'special_q12') {
         answers.value[qId] = answer.selected_choice_ids || []
       } else if (q.type === 'single_select') {
         if (answer.selected_choice_ids?.length) {
@@ -841,7 +946,7 @@ onMounted(async () => {
     )
     // Initialize multi-select answer arrays
     for (const q of allQuestions.value) {
-      if ((q.type === 'multi_select' || q.type === 'special_q6') && !answers.value[q.id]) {
+      if ((q.type === 'multi_select' || q.type === 'special_q6' || q.type === 'special_q12') && !answers.value[q.id]) {
         answers.value[q.id] = []
       }
     }
@@ -987,6 +1092,26 @@ onMounted(async () => {
 .choice-checkbox { width: 18px !important; height: 18px; flex-shrink: 0; accent-color: var(--color-primary); cursor: pointer; }
 .choice-text { flex: 1; line-height: 1.3; }
 .choice-weight { font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap; flex-shrink: 0; }
+/* Sub-choice: slightly indented, smaller */
+.choice-sub {
+  margin-left: 0.5rem; font-size: 0.85rem; border-style: dashed;
+  background: var(--color-bg, #f8fafc);
+}
+.choice-sub.choice-selected { background: var(--color-primary-light); border-style: solid; }
+
+/* ─── Q12 sub-choices wrapper ────────────────────────────────────────────── */
+.sub-choices-wrap {
+  width: 100%; margin-top: 0.5rem; margin-left: 1.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg, #f8fafc);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 var(--radius-sm, 8px) var(--radius-sm, 8px) 0;
+}
+.sub-choices-label {
+  display: block; font-size: 0.8rem; font-weight: 600; color: var(--color-primary-dark);
+  margin-bottom: 0.5rem;
+}
+.sub-choices-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
 /* ─── "อื่นๆ" input ────────────────────────────────────────────────────────── */
 .other-input-wrap { margin-top: 0.625rem; display: flex; flex-direction: column; gap: 0.25rem; max-width: 480px; }

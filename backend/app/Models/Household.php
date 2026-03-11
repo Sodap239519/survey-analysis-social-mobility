@@ -12,6 +12,8 @@ class Household extends Model
         'subdistrict_name', 'district_code', 'district_name', 'province_code',
         'province_name', 'postal_code', 'house_no', 'road', 'alley',
         'latitude', 'longitude', 'survey_year', 'survey_round', 'raw_data',
+        'baseline_score_human', 'baseline_score_physical', 'baseline_score_financial',
+        'baseline_score_natural', 'baseline_score_social',
     ];
 
     protected $casts = [

@@ -192,40 +192,67 @@ class CompareHouseholdSurveyLogic
     }
 
     /**
-     * Extract per-capital scores from Household.raw_data (legacy CSV import).
+     * Extract per-capital scores from Household baseline_score_* fields (new XLSX import).
      *
-     * CSV capital columns store values on the X scale [1.0, 4.0].
+     * Baseline scores from the XLSX file use the X scale [1.0, 4.0].
      * Conversion to 0–100: normalized = (x – 1.0) / 3.0 * 100
      *
-     * If a column is missing or empty, returns null for that capital with a
-     * // PENDING MAPPING MANUAL comment below.
+     * Falls back to the legacy raw_data array if baseline_score_* fields are not set.
      *
      * @return array<string, float|null>
      */
     public function scoresFromRawData(Household $household): array
     {
+        $scores = [];
+
+        // First try the dedicated baseline_score_* columns (set by MultiSheetHouseholdImport)
+        $hasBaseline = $household->baseline_score_human !== null
+            || $household->baseline_score_physical !== null
+            || $household->baseline_score_financial !== null
+            || $household->baseline_score_natural !== null
+            || $household->baseline_score_social !== null;
+
+        if ($hasBaseline) {
+            $fieldMap = [
+                'human'     => 'baseline_score_human',
+                'physical'  => 'baseline_score_physical',
+                'financial' => 'baseline_score_financial',
+                'natural'   => 'baseline_score_natural',
+                'social'    => 'baseline_score_social',
+            ];
+
+            foreach ($fieldMap as $slug => $field) {
+                $value = $household->{$field};
+                if ($value === null) {
+                    $scores[$slug] = null;
+                    continue;
+                }
+                $x = (float) $value;
+                $x = max(1.0, min(4.0, $x));
+                $scores[$slug] = round(($x - 1.0) / 3.0 * 100, 4);
+            }
+
+            return $scores;
+        }
+
+        // Legacy fallback: raw_data array (index-based, from original CSV import)
         $raw = $household->raw_data;
 
         if (empty($raw) || !is_array($raw)) {
             return array_fill_keys(array_keys(self::CAPITALS), null);
         }
 
-        $scores = [];
         foreach (self::CAPITALS as $slug => $meta) {
             $col   = $meta['raw_data_col'];
             $value = $raw[$col] ?? null;
 
             if ($value === null || $value === '') {
-                // PENDING MAPPING MANUAL: column index may be incorrect for this row's layout
                 $scores[$slug] = null;
                 continue;
             }
 
             $x = (float) $value;
-
-            // Clamp to valid X range before normalizing
             $x = max(1.0, min(4.0, $x));
-
             $scores[$slug] = round(($x - 1.0) / 3.0 * 100, 4);
         }
 

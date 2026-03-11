@@ -50,6 +50,11 @@ class ScoringService
             return $this->scoreQ6($question, $selectedChoiceIds);
         }
 
+        // Special rule for Q12.1 (Natural capital disaster question)
+        if ($question->type === 'special_q12') {
+            return $this->scoreQ12($question, $selectedChoiceIds);
+        }
+
         $choices = $question->choices()->whereIn('id', $selectedChoiceIds)->get();
 
         // If any exclusive choice is selected, score is 0
@@ -92,6 +97,34 @@ class ScoringService
         $score = max(0.0, $maxScore - $penaltyPerProblem * $count);
 
         return $score;
+    }
+
+    /**
+     * Special scoring for Q12.1: ครัวเรือนประสบภัยพิบัติหรือไม่
+     *
+     * Choice key "0" means "ไม่ประสบ" (is_exclusive) => full 40 pts
+     * Choice key "1" means "ประสบ" (parent) => 20 pts
+     * Choice keys "1.อุทกภัย" etc. are sub-type informational choices => 0 pts each
+     *
+     * Score = weight of the "0" or "1" parent choice selected.
+     */
+    public function scoreQ12(Question $question, array $selectedChoiceIds): float
+    {
+        $maxScore = (float) $question->max_score;
+        $choices  = $question->choices()->whereIn('id', $selectedChoiceIds)->get();
+
+        // "ไม่ประสบ" (is_exclusive) selected => full score
+        if ($choices->where('is_exclusive', true)->isNotEmpty()) {
+            return $maxScore;
+        }
+
+        // Look for parent "ประสบ" choice (choice_key = "1")
+        $parentChoice = $choices->first(fn ($c) => (string) $c->choice_key === '1');
+        if ($parentChoice) {
+            return (float) $parentChoice->weight;
+        }
+
+        return 0.0;
     }
 
     /**
