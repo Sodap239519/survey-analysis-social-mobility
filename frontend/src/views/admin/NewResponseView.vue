@@ -13,8 +13,39 @@
           <h3 class="card-section-title">ข้อมูลพื้นฐาน</h3>
           <div class="form-grid">
             <div class="form-group">
-              <label>รหัสบ้าน</label>
-              <input v-model="form.house_code" placeholder="เช่น 30010001662" required />
+              <label>รหัสบ้าน (11 หลัก) <span style="color:#ef4444">*</span></label>
+              <div class="hh-autocomplete">
+                <input
+                  v-model="form.house_code"
+                  list="hh-list"
+                  placeholder="พิมพ์เพื่อค้นหารหัสบ้าน..."
+                  required
+                  @input="onHouseCodeInput"
+                  autocomplete="off"
+                />
+                <datalist id="hh-list">
+                  <option v-for="hh in householdSuggestions" :key="hh.id" :value="hh.house_code">
+                    {{ hh.house_code }} — {{ hh.village_name || hh.subdistrict_name || '' }}
+                  </option>
+                </datalist>
+                <p v-if="loadingHouseholds" class="text-muted text-sm mt-1">กำลังโหลดรายการรหัสบ้าน...</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>ชื่อรุ่น (Model Name)</label>
+              <input v-model="form.model_name" placeholder="เช่น รุ่นที่ 1 / Model A" />
+            </div>
+            <div class="form-group">
+              <label>พื้นที่/ตำบล</label>
+              <input v-model="form.subdistrict_name" placeholder="เช่น ในเมือง" />
+            </div>
+            <div class="form-group">
+              <label>อำเภอ</label>
+              <input v-model="form.district_name" placeholder="เช่น เมืองนครราชสีมา" />
+            </div>
+            <div class="form-group">
+              <label>จังหวัด</label>
+              <input v-model="form.province_name" placeholder="เช่น นครราชสีมา" />
             </div>
             <div class="form-group">
               <label>ช่วงเวลา</label>
@@ -35,10 +66,6 @@
               <label>ชื่อผู้สำรวจ</label>
               <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
             </div>
-            <div class="form-group">
-              <label>ชื่อรุ่น (Model Name)</label>
-              <input v-model="form.model_name" placeholder="เช่น รุ่นที่ 1 / Model A" />
-            </div>
           </div>
 
           <!-- Informant data -->
@@ -47,7 +74,12 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>คำนำหน้า</label>
-                <input v-model="form.person_title" placeholder="เช่น นาย / นาง / นางสาว" />
+                <select v-model="form.person_title">
+                  <option value="">-- เลือก --</option>
+                  <option value="นาย">นาย</option>
+                  <option value="นาง">นาง</option>
+                  <option value="นางสาว">นางสาว</option>
+                </select>
               </div>
               <div class="form-group">
                 <label>ชื่อ</label>
@@ -58,7 +90,7 @@
                 <input v-model="form.person_last_name" placeholder="นามสกุล" />
               </div>
               <div class="form-group">
-                <label>เลขบัตรประชาชน</label>
+                <label>หมายเลขบัตรประจำตัวประชาชน (13 หลัก)</label>
                 <input v-model="form.person_citizen_id" placeholder="x-xxxx-xxxxx-xx-x" maxlength="17" />
               </div>
               <div class="form-group">
@@ -71,6 +103,10 @@
               </div>
             </div>
             <div class="form-grid mt-3">
+              <div class="form-group">
+                <label>ชื่อหมู่บ้าน</label>
+                <input v-model="form.village_name" placeholder="เช่น บ้านหนองแวง" />
+              </div>
               <div class="form-group">
                 <label>บ้านเลขที่</label>
                 <input v-model="form.house_no" placeholder="เช่น 123/4" />
@@ -94,10 +130,6 @@
               <div class="form-group">
                 <label>รหัสไปรษณีย์</label>
                 <input v-model="form.postal_code" placeholder="เช่น 30000" maxlength="5" />
-              </div>
-              <div class="form-group">
-                <label>ชื่อหมู่บ้าน</label>
-                <input v-model="form.village_name" placeholder="เช่น บ้านหนองแวง" />
               </div>
             </div>
           </div>
@@ -219,6 +251,44 @@ import api from '../../api'
 const router = useRouter()
 const questions = ref([])
 const loadingQuestions = ref(true)
+
+// Households with survey responses (for house_code autocomplete)
+const householdSuggestions = ref([])
+const loadingHouseholds = ref(false)
+// Non-reactive timer ID for debouncing house_code input (intentionally plain let, consistent with other debounce timers)
+let hhDebounce = null
+
+async function loadHouseholdSuggestions(search = '') {
+  loadingHouseholds.value = true
+  try {
+    const params = { has_responses: 1, per_page: 50 }
+    if (search) params.search = search
+    const res = await api.get('/households', { params })
+    householdSuggestions.value = res.data.data || []
+  } catch {
+    // Non-fatal — user can still type house_code manually
+  } finally {
+    loadingHouseholds.value = false
+  }
+}
+
+function onHouseCodeInput() {
+  clearTimeout(hhDebounce)
+  hhDebounce = setTimeout(() => {
+    loadHouseholdSuggestions(form.value.house_code)
+    // Auto-fill address fields when an exact match is selected
+    const match = householdSuggestions.value.find(h => h.house_code === form.value.house_code)
+    if (match) {
+      if (!form.value.village_name && match.village_name) form.value.village_name = match.village_name
+      if (!form.value.house_no && match.house_no) form.value.house_no = match.house_no
+      if (!form.value.village_no && match.village_no) form.value.village_no = match.village_no
+      if (!form.value.subdistrict_name && match.subdistrict_name) form.value.subdistrict_name = match.subdistrict_name
+      if (!form.value.district_name && match.district_name) form.value.district_name = match.district_name
+      if (!form.value.province_name && match.province_name) form.value.province_name = match.province_name
+      if (!form.value.postal_code && match.postal_code) form.value.postal_code = match.postal_code
+    }
+  }, 300)
+}
 
 const form = ref({
   house_code: '',
@@ -439,6 +509,9 @@ async function submit() {
 }
 
 onMounted(async () => {
+  // Load household suggestions (with survey responses) for autocomplete
+  loadHouseholdSuggestions()
+
   try {
     const res = await api.get('/questions')
     questions.value = res.data
@@ -471,6 +544,9 @@ onMounted(async () => {
   user-select: none;
 }
 .location-summary:hover { color: var(--color-primary); }
+
+/* House code autocomplete */
+.hh-autocomplete { position: relative; }
 .informant-section {
   margin-top: 1.25rem;
   padding-top: 1rem;
