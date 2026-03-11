@@ -898,9 +898,6 @@ onMounted(async () => {
 }
 .progress-text { font-size: 0.75rem; color: var(--color-text-muted); white-space: nowrap; }
 
-/* ─── Auto-save ────────────────────────────────────────────────────────────── */
-.autosave-notice { font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 0.75rem; }
-
 /* ─── Step header with score badge ────────────────────────────────────────── */
 .step-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.25rem; }
 .step-description { font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 1rem; }

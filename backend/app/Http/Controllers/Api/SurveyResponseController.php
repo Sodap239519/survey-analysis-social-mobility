@@ -194,6 +194,21 @@ class SurveyResponseController extends Controller
     public function update(Request $request, SurveyResponse $surveyResponse): JsonResponse
     {
         $validated = $request->validate([
+            'household_data'                     => 'nullable|array',
+            'household_data.house_no'            => 'nullable|string',
+            'household_data.village_no'          => 'nullable|string',
+            'household_data.village_name'        => 'nullable|string',
+            'household_data.subdistrict_name'    => 'nullable|string',
+            'household_data.district_name'       => 'nullable|string',
+            'household_data.province_name'       => 'nullable|string',
+            'household_data.postal_code'         => 'nullable|string',
+            'person_data'                        => 'nullable|array',
+            'person_data.citizen_id'             => 'nullable|string|max:20',
+            'person_data.title'                  => 'nullable|string|max:20',
+            'person_data.first_name'             => 'nullable|string|max:100',
+            'person_data.last_name'              => 'nullable|string|max:100',
+            'person_data.birthdate'              => 'nullable|date',
+            'person_data.phone'                  => 'nullable|string|max:20',
             'period'        => 'sometimes|in:before,after',
             'survey_year'   => 'nullable|integer',
             'survey_round'  => 'nullable|integer',
@@ -210,7 +225,19 @@ class SurveyResponseController extends Controller
             'detailed_answers.*.sub_answers'   => 'nullable|array',
         ]);
 
-        $surveyResponse->update(collect($validated)->except(['answers', 'detailed_answers'])->toArray());
+        // ── Update household data if provided ─────────────────────────────────
+        $householdData = $validated['household_data'] ?? [];
+        if (! empty($householdData) && $surveyResponse->household) {
+            $surveyResponse->household->update(array_filter($householdData, fn ($v) => $v !== null));
+        }
+
+        // ── Update person data if provided ────────────────────────────────────
+        $personData = $validated['person_data'] ?? [];
+        if (! empty($personData) && $surveyResponse->person) {
+            $surveyResponse->person->update(array_filter($personData, fn ($v) => $v !== null));
+        }
+
+        $surveyResponse->update(collect($validated)->except(['household_data', 'person_data', 'answers', 'detailed_answers'])->toArray());
 
         foreach ($validated['answers'] ?? [] as $questionId => $answerData) {
             Answer::updateOrCreate(
