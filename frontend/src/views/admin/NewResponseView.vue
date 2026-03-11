@@ -644,13 +644,22 @@ function goToStep(idx) {
 
 
 // ─── Household autocomplete ──────────────────────────────────────────────────
-async function loadHouseholdSuggestions(search = '') {
+// Only digits are valid house_code characters
+const HOUSE_CODE_PATTERN = /^\d+$/
+
+async function loadHouseholdSuggestions(search) {
+  // Only search when user has typed something that looks like a house code (digits only, ≥3 chars)
+  if (!search || search.length < 3 || !HOUSE_CODE_PATTERN.test(search)) {
+    householdSuggestions.value = []
+    return
+  }
   loadingHouseholds.value = true
   try {
-    const params = { per_page: 50 }
-    if (search) params.search = search
-    const res = await api.get('/households', { params })
-    householdSuggestions.value = res.data.data || []
+    const res = await api.get('/households', { params: { search, per_page: 20 } })
+    // Filter client-side to only keep valid house codes (digits only)
+    householdSuggestions.value = (res.data.data || []).filter(
+      hh => hh.house_code && HOUSE_CODE_PATTERN.test(hh.house_code)
+    )
   } catch {
     // Non-fatal
   } finally {
@@ -658,11 +667,13 @@ async function loadHouseholdSuggestions(search = '') {
   }
 }
 
-function onHouseCodeInput() {
+async function onHouseCodeInput() {
   clearTimeout(hhDebounce)
-  hhDebounce = setTimeout(() => {
-    loadHouseholdSuggestions(form.value.house_code)
-    const match = householdSuggestions.value.find(h => h.house_code === form.value.house_code)
+  hhDebounce = setTimeout(async () => {
+    const code = form.value.house_code
+    await loadHouseholdSuggestions(code)
+    // Autofill address fields when there is an exact match
+    const match = householdSuggestions.value.find(h => h.house_code === code)
     if (match) {
       if (!form.value.village_name && match.village_name)     form.value.village_name = match.village_name
       if (!form.value.house_no && match.house_no)             form.value.house_no = match.house_no
@@ -822,8 +833,6 @@ async function submit() {
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  loadHouseholdSuggestions()
-
   try {
     const res = await api.get('/questions')
     // Flatten grouped questions into a single array and attach capital slug
