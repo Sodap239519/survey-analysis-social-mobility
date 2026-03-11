@@ -144,9 +144,10 @@ class BasicDataSheetImport implements ToCollection
                 ]
             );
 
-            $this->parent->imported++;
             $status = $household->wasRecentlyCreated ? 'created' : 'exists';
-            if ($status === 'exists') {
+            if ($status === 'created') {
+                $this->parent->imported++;
+            } else {
                 $this->parent->exists++;
             }
 

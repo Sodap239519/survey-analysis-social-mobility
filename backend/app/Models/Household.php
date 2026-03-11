@@ -17,9 +17,14 @@ class Household extends Model
     ];
 
     protected $casts = [
-        'raw_data' => 'array',
-        'latitude' => 'float',
-        'longitude' => 'float',
+        'raw_data'                 => 'array',
+        'latitude'                 => 'float',
+        'longitude'                => 'float',
+        'baseline_score_human'     => 'float',
+        'baseline_score_physical'  => 'float',
+        'baseline_score_financial' => 'float',
+        'baseline_score_natural'   => 'float',
+        'baseline_score_social'    => 'float',
     ];
 
     public function persons(): HasMany

@@ -18,11 +18,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('households', function (Blueprint $table) {
-            $table->decimal('baseline_score_human',    8, 6)->nullable()->comment('ทุนมนุษย์ (X scale 1–4)');
-            $table->decimal('baseline_score_physical', 8, 6)->nullable()->comment('ทุนกายภาพ (X scale 1–4)');
-            $table->decimal('baseline_score_financial',8, 6)->nullable()->comment('ทุนการเงิน (X scale 1–4)');
-            $table->decimal('baseline_score_natural',  8, 6)->nullable()->comment('ทุนธรรมชาติ (X scale 1–4)');
-            $table->decimal('baseline_score_social',   8, 6)->nullable()->comment('ทุนทางสังคม (X scale 1–4)');
+            $table->decimal('baseline_score_human',    5, 4)->nullable()->comment('ทุนมนุษย์ (X scale 1.0000–4.0000)');
+            $table->decimal('baseline_score_physical', 5, 4)->nullable()->comment('ทุนกายภาพ (X scale 1.0000–4.0000)');
+            $table->decimal('baseline_score_financial',5, 4)->nullable()->comment('ทุนการเงิน (X scale 1.0000–4.0000)');
+            $table->decimal('baseline_score_natural',  5, 4)->nullable()->comment('ทุนธรรมชาติ (X scale 1.0000–4.0000)');
+            $table->decimal('baseline_score_social',   5, 4)->nullable()->comment('ทุนทางสังคม (X scale 1.0000–4.0000)');
         });
     }
 
