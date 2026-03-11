@@ -57,6 +57,10 @@
           <i class="fi fi-rr-plus nav-icon"></i>
           <span class="nav-text">เพิ่มการสำรวจ</span>
         </RouterLink>
+        <RouterLink to="/admin/export" active-class="active" @click="closeSidebar" :title="sidebarCollapsed ? 'Export ข้อมูล' : undefined">
+          <i class="fi fi-rr-download nav-icon"></i>
+          <span class="nav-text">Export ข้อมูล</span>
+        </RouterLink>
       </nav>
 
       <div class="sidebar-footer">

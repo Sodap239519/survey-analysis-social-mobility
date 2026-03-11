@@ -52,6 +52,11 @@ const routes = [
         name: 'admin-response-new',
         component: () => import('../views/admin/NewResponseView.vue'),
       },
+      {
+        path: 'export',
+        name: 'admin-export',
+        component: () => import('../views/admin/ExportView.vue'),
+      },
     ],
   },
 ]
