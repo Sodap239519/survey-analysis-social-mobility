@@ -51,6 +51,7 @@
               <td>{{ h.survey_year || '—' }}</td>
               <td>
                 <div class="flex gap-1">
+                  <button class="btn btn-info btn-sm" @click="openDetailModal(h)" title="ดูรายละเอียด">👁️ ดู</button>
                   <button class="btn btn-secondary btn-sm" @click="openEditModal(h)" title="แก้ไข">✏️</button>
                   <button class="btn btn-danger btn-sm" @click="confirmDelete(h)" title="ลบ">🗑️</button>
                 </div>
@@ -68,6 +69,74 @@
           <button class="btn btn-secondary" :disabled="page <= 1" @click="prevPage">‹ ก่อนหน้า</button>
           <span>หน้า {{ page }} / {{ households.last_page }}</span>
           <button class="btn btn-secondary" :disabled="page >= households.last_page" @click="nextPage">ถัดไป ›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div v-if="showDetailModal" class="modal-backdrop" @click.self="showDetailModal = false">
+      <div class="modal-box">
+        <div class="detail-modal-header">
+          <h3 style="font-size:1.1rem;font-weight:700">🏠 รายละเอียดครัวเรือน</h3>
+          <button class="btn btn-secondary btn-sm" @click="showDetailModal = false">✕ ปิด</button>
+        </div>
+        <div v-if="detailHousehold" class="detail-grid mt-3">
+          <div class="detail-item detail-item-full">
+            <span class="detail-label">ID (ระบบ)</span>
+            <span class="detail-value"><code class="detail-id">{{ detailHousehold.id }}</code></span>
+          </div>
+          <div class="detail-item detail-item-full">
+            <span class="detail-label">รหัสบ้าน</span>
+            <span class="detail-value"><code class="detail-code">{{ detailHousehold.house_code }}</code></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">บ้านเลขที่</span>
+            <span class="detail-value">{{ detailHousehold.house_no || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">หมู่ที่</span>
+            <span class="detail-value">{{ detailHousehold.village_no || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">ชื่อหมู่บ้าน</span>
+            <span class="detail-value">{{ detailHousehold.village_name || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">ตำบล</span>
+            <span class="detail-value">{{ detailHousehold.subdistrict_name || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">อำเภอ</span>
+            <span class="detail-value">{{ detailHousehold.district_name || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">จังหวัด</span>
+            <span class="detail-value">{{ detailHousehold.province_name || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">รหัสไปรษณีย์</span>
+            <span class="detail-value">{{ detailHousehold.postal_code || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">ปีสำรวจ</span>
+            <span class="detail-value">{{ detailHousehold.survey_year || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">รอบสำรวจ</span>
+            <span class="detail-value">{{ detailHousehold.survey_round || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">สร้างเมื่อ</span>
+            <span class="detail-value">{{ detailHousehold.created_at ? new Date(detailHousehold.created_at).toLocaleDateString('th-TH') : '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">แก้ไขล่าสุด</span>
+            <span class="detail-value">{{ detailHousehold.updated_at ? new Date(detailHousehold.updated_at).toLocaleDateString('th-TH') : '—' }}</span>
+          </div>
+        </div>
+        <div class="flex gap-2 justify-end mt-4">
+          <button class="btn btn-secondary btn-sm" @click="openEditModal(detailHousehold); showDetailModal = false">✏️ แก้ไข</button>
+          <button class="btn btn-secondary" @click="showDetailModal = false">ปิด</button>
         </div>
       </div>
     </div>
@@ -191,6 +260,15 @@ const form = ref(defaultForm())
 const showDeleteConfirm = ref(false)
 const deletingHousehold = ref(null)
 const deleting = ref(false)
+
+// Detail modal state
+const showDetailModal = ref(false)
+const detailHousehold = ref(null)
+
+function openDetailModal(h) {
+  detailHousehold.value = h
+  showDetailModal.value = true
+}
 
 // Export state
 const showExportModal = ref(false)
@@ -323,6 +401,12 @@ onMounted(async () => { await loadYears(); load() })
 
 <style scoped>
 .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; min-height: unset; }
+.btn-info {
+  background: #0ea5e9; color: #fff; border: none; border-radius: 8px;
+  padding: 0.5rem 1rem; font-size: 0.875rem; cursor: pointer;
+  font-family: 'Prompt', sans-serif; min-height: 40px;
+}
+.btn-info:hover { background: #0284c7; }
 .btn-danger {
   background: #ef4444; color: #fff; border: none; border-radius: 8px;
   padding: 0.5rem 1rem; font-size: 0.875rem; cursor: pointer;
@@ -342,4 +426,31 @@ onMounted(async () => { await loadYears(); load() })
 }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
 .mb-3 { margin-bottom: 0.75rem; }
+
+/* Detail modal */
+.detail-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.detail-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;
+}
+.detail-item-full { grid-column: 1 / -1; }
+.detail-item {
+  background: var(--color-surface, #f8fafc); border-radius: 8px;
+  padding: 0.6rem 0.875rem; border: 1px solid var(--color-border, #e2e8f0);
+}
+.detail-label {
+  display: block; font-size: 0.7rem; font-weight: 600;
+  color: var(--color-text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+.detail-value { font-size: 0.9rem; font-weight: 500; color: var(--color-text, #0f172a); }
+.detail-id {
+  background: #ede9fe; color: #7c3aed; padding: 2px 8px;
+  border-radius: 6px; font-size: 0.85rem; font-weight: 700;
+}
+.detail-code {
+  background: #e0f2fe; color: #0369a1; padding: 2px 8px;
+  border-radius: 6px; font-size: 0.9rem; font-weight: 700;
+}
 </style>

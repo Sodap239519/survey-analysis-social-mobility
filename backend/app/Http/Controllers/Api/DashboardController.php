@@ -84,6 +84,9 @@ class DashboardController extends Controller
         // Average scores per capital (for Radar Chart)
         $capitalAverages = $this->getCapitalAverages(clone $responseQuery);
 
+        // Before/After comparison summary (for paired households)
+        $comparisonSummary = $this->getComparisonSummary($district, $subdistrict, $surveyYear);
+
         return response()->json([
             'total_house_codes'    => $totalHouseCodes,
             'total_respondents'    => $totalRespondents,
@@ -98,6 +101,7 @@ class DashboardController extends Controller
             'mobility'             => $mobility,
             'mobility_by_capital'          => $mobilityByCapital,
             'mobility_by_capital_by_level' => $mobilityByCapitalByLevel,
+            'comparison_summary'           => $comparisonSummary,
             'by_district'                  => $byDistrict,
         ]);
     }
@@ -474,6 +478,85 @@ class DashboardController extends Controller
             'financial' => $row ? round((float) $row->avg_financial, 1) : 0,
             'natural'   => $row ? round((float) $row->avg_natural, 1) : 0,
             'social'    => $row ? round((float) $row->avg_social, 1) : 0,
+        ];
+    }
+
+    /**
+     * Get before/after comparison summary for paired households.
+     * Returns average scores for both periods and the diff.
+     */
+    private function getComparisonSummary(?string $district, ?string $subdistrict, ?int $surveyYear): array
+    {
+        $capitals = [
+            'human'     => 'score_human',
+            'physical'  => 'score_physical',
+            'financial' => 'score_financial',
+            'natural'   => 'score_natural',
+            'social'    => 'score_social',
+        ];
+
+        $beforeQuery = SurveyResponse::query()->where('period', 'before')->whereNotNull('score_aggregate');
+        $afterQuery  = SurveyResponse::query()->where('period', 'after')->whereNotNull('score_aggregate');
+
+        if ($surveyYear) {
+            $beforeQuery->where('survey_year', $surveyYear);
+            $afterQuery->where('survey_year', $surveyYear);
+        }
+
+        if ($district) {
+            foreach ([$beforeQuery, $afterQuery] as $q) {
+                $q->whereHas('household', function ($hq) use ($district) {
+                    $hq->where('district_name', 'like', "%{$district}%");
+                });
+            }
+        }
+
+        if ($subdistrict) {
+            foreach ([$beforeQuery, $afterQuery] as $q) {
+                $q->whereHas('household', function ($hq) use ($subdistrict) {
+                    $hq->where('subdistrict_name', 'like', "%{$subdistrict}%");
+                });
+            }
+        }
+
+        // Collect paired scores for both periods
+        $beforeRows = $beforeQuery->select(['household_id', 'score_aggregate', 'score_human', 'score_physical', 'score_financial', 'score_natural', 'score_social'])->get()->keyBy('household_id');
+        $afterRows  = $afterQuery->select(['household_id', 'score_aggregate', 'score_human', 'score_physical', 'score_financial', 'score_natural', 'score_social'])->get()->keyBy('household_id');
+
+        $pairedIds = array_intersect(array_keys($beforeRows->toArray()), array_keys($afterRows->toArray()));
+        $pairedCount = count($pairedIds);
+
+        // Compute averages over paired households only
+        $beforeAvg = ['aggregate' => 0, 'human' => 0, 'physical' => 0, 'financial' => 0, 'natural' => 0, 'social' => 0];
+        $afterAvg  = ['aggregate' => 0, 'human' => 0, 'physical' => 0, 'financial' => 0, 'natural' => 0, 'social' => 0];
+
+        if ($pairedCount > 0) {
+            foreach ($pairedIds as $id) {
+                $b = $beforeRows[$id];
+                $a = $afterRows[$id];
+                $beforeAvg['aggregate'] += (float) $b->score_aggregate;
+                $afterAvg['aggregate']  += (float) $a->score_aggregate;
+                foreach ($capitals as $slug => $col) {
+                    $beforeAvg[$slug] += (float) ($b->{$col} ?? 0);
+                    $afterAvg[$slug]  += (float) ($a->{$col} ?? 0);
+                }
+            }
+            foreach (array_keys($beforeAvg) as $key) {
+                $beforeAvg[$key] = round($beforeAvg[$key] / $pairedCount, 1);
+                $afterAvg[$key]  = round($afterAvg[$key]  / $pairedCount, 1);
+            }
+        }
+
+        $diff = [];
+        foreach (array_keys($beforeAvg) as $key) {
+            $diff[$key] = round($afterAvg[$key] - $beforeAvg[$key], 1);
+        }
+
+        return [
+            'paired_count' => $pairedCount,
+            'before_avg'   => $beforeAvg,
+            'after_avg'    => $afterAvg,
+            'diff'         => $diff,
         ];
     }
 }

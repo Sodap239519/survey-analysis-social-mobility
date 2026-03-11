@@ -229,19 +229,91 @@
               <i class="fi fi-rr-arrow-trend-up mobility-icon"></i>
               <div class="mobility-count">{{ store.data.mobility.improved }}</div>
               <div class="mobility-label">ดีขึ้น</div>
+              <div class="mobility-pct" v-if="mobilityGrandTotal > 0">{{ mobilityPct(store.data.mobility.improved, mobilityGrandTotal) }}%</div>
             </div>
             <div class="mobility-pill same">
               <i class="fi fi-rr-arrow-right mobility-icon"></i>
               <div class="mobility-count">{{ store.data.mobility.same }}</div>
               <div class="mobility-label">คงที่</div>
+              <div class="mobility-pct" v-if="mobilityGrandTotal > 0">{{ mobilityPct(store.data.mobility.same, mobilityGrandTotal) }}%</div>
             </div>
             <div class="mobility-pill decreased">
               <i class="fi fi-rr-arrow-trend-down mobility-icon"></i>
               <div class="mobility-count">{{ store.data.mobility.decreased }}</div>
               <div class="mobility-label">แย่ลง</div>
+              <div class="mobility-pct" v-if="mobilityGrandTotal > 0">{{ mobilityPct(store.data.mobility.decreased, mobilityGrandTotal) }}%</div>
             </div>
           </div>
-          <p class="text-muted text-sm mt-2">เปรียบเทียบ score รวมก่อนและหลังเข้าร่วมโครงการ</p>
+          <p class="text-muted text-sm mt-2">
+            เปรียบเทียบ score รวมก่อนและหลังเข้าร่วมโครงการ
+            <span v-if="comparisonSummary.paired_count > 0" style="margin-left:0.5rem;">
+              (ครัวเรือนที่มีข้อมูลทั้งก่อนและหลัง: <strong>{{ comparisonSummary.paired_count }}</strong> ครัวเรือน)
+            </span>
+          </p>
+        </div>
+
+        <!-- Before/After Comparison Summary Table -->
+        <div class="bento-comparison card" v-if="comparisonSummary.paired_count > 0">
+          <h3 class="card-title"><i class="fi fi-rr-chart-line-up"></i> สรุปเปรียบเทียบคะแนน Before / After ({{ comparisonSummary.paired_count }} ครัวเรือน)</h3>
+          <div class="table-wrap">
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>ด้านทุน</th>
+                  <th class="th-before">ก่อนโครงการ (Before)</th>
+                  <th class="th-after">หลังโครงการ (After)</th>
+                  <th>ผลต่าง</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="cap in capitals" :key="cap.slug">
+                  <td>
+                    <span :style="{ color: cap.color }">
+                      <i class="fi" :class="cap.icon"></i> {{ cap.nameTh }}
+                    </span>
+                  </td>
+                  <td class="td-score td-before">{{ comparisonSummary.before_avg?.[cap.slug] ?? '—' }}</td>
+                  <td class="td-score td-after">{{ comparisonSummary.after_avg?.[cap.slug] ?? '—' }}</td>
+                  <td class="td-diff" :class="diffClass(comparisonSummary.diff?.[cap.slug])">
+                    <span v-if="comparisonSummary.diff?.[cap.slug] != null">
+                      {{ comparisonSummary.diff[cap.slug] > 0 ? '+' : '' }}{{ comparisonSummary.diff[cap.slug] }}
+                    </span>
+                    <span v-else>—</span>
+                  </td>
+                  <td>
+                    <span class="diff-badge" :class="diffClass(comparisonSummary.diff?.[cap.slug])">
+                      <template v-if="(comparisonSummary.diff?.[cap.slug] ?? 0) > 0.05">⬆ ดีขึ้น</template>
+                      <template v-else-if="(comparisonSummary.diff?.[cap.slug] ?? 0) < -0.05">⬇ แย่ลง</template>
+                      <template v-else>→ คงที่</template>
+                    </span>
+                  </td>
+                </tr>
+                <!-- Aggregate row -->
+                <tr class="comparison-aggregate-row">
+                  <td><strong>📊 คะแนนรวม (Aggregate)</strong></td>
+                  <td class="td-score td-before"><strong>{{ comparisonSummary.before_avg?.aggregate ?? '—' }}</strong></td>
+                  <td class="td-score td-after"><strong>{{ comparisonSummary.after_avg?.aggregate ?? '—' }}</strong></td>
+                  <td class="td-diff" :class="diffClass(comparisonSummary.diff?.aggregate)">
+                    <strong>
+                      <span v-if="comparisonSummary.diff?.aggregate != null">
+                        {{ comparisonSummary.diff.aggregate > 0 ? '+' : '' }}{{ comparisonSummary.diff.aggregate }}
+                      </span>
+                      <span v-else>—</span>
+                    </strong>
+                  </td>
+                  <td>
+                    <span class="diff-badge" :class="diffClass(comparisonSummary.diff?.aggregate)" style="font-size:0.85rem;padding:0.3rem 0.75rem">
+                      <template v-if="(comparisonSummary.diff?.aggregate ?? 0) > 0.05">⬆ ดีขึ้น</template>
+                      <template v-else-if="(comparisonSummary.diff?.aggregate ?? 0) < -0.05">⬇ แย่ลง</template>
+                      <template v-else>→ คงที่</template>
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-muted text-sm mt-2">คะแนนเฉลี่ย (0–100) ของครัวเรือนที่มีข้อมูลทั้งก่อนและหลังเข้าร่วมโครงการ</p>
         </div>
 
         <!-- Capital cards overview -->
@@ -677,6 +749,21 @@ function mobilityTotal(slug) {
   return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)
 }
 
+const mobilityGrandTotal = computed(() => {
+  const m = store.data?.mobility || { improved: 0, same: 0, decreased: 0 }
+  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)
+})
+
+// Before/After comparison summary
+const comparisonSummary = computed(() => store.data?.comparison_summary || { paired_count: 0, before_avg: {}, after_avg: {}, diff: {} })
+
+function diffClass(val) {
+  const v = Number(val) || 0
+  if (v > 0.05) return 'diff-improved'
+  if (v < -0.05) return 'diff-decreased'
+  return 'diff-same'
+}
+
 function mobilityPct(count, total) {
   const c = Number(count) || 0
   const t = Number(total) || 0
@@ -942,6 +1029,36 @@ watch(() => route.fullPath, async () => {
 .bento-district { grid-column: span 3; }
 .bento-cap-mobility { grid-column: span 3; }
 .bento-summary { grid-column: span 3; }
+.bento-comparison { grid-column: span 3; }
+
+/* Mobility percentage label */
+.mobility-pct {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* Before/After Comparison Table */
+.comparison-table th, .comparison-table td { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+.comparison-table th { font-weight: 700; color: var(--color-text-muted); font-size: 0.75rem; text-transform: uppercase; }
+.th-before { color: #64748b !important; background: #f1f5f9; }
+.th-after  { color: #0369a1 !important; background: #e0f2fe; }
+.td-score { font-weight: 700; font-size: 0.9rem; text-align: center; }
+.td-before { background: #f8fafc; color: #475569; }
+.td-after  { background: #f0f9ff; color: #0369a1; }
+.td-diff   { font-weight: 700; text-align: center; }
+.diff-improved { color: #16a34a; }
+.diff-decreased { color: #dc2626; }
+.diff-same { color: #64748b; }
+.diff-badge {
+  display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 700;
+}
+.diff-badge.diff-improved  { background: #dcfce7; color: #15803d; }
+.diff-badge.diff-decreased { background: #fee2e2; color: #b91c1c; }
+.diff-badge.diff-same      { background: #f1f5f9; color: #64748b; }
+.comparison-aggregate-row { background: var(--color-surface-alt, #f8fafc); border-top: 2px solid var(--color-border); }
 
 .card-title {
   font-size: 0.9rem;
@@ -1098,7 +1215,7 @@ watch(() => route.fullPath, async () => {
 @media (max-width: 900px) {
   .stats-bar { grid-template-columns: repeat(2, 1fr); }
   .bento-grid { grid-template-columns: 1fr 1fr; }
-  .bento-poverty, .bento-district, .bento-cap-mobility, .bento-summary { grid-column: span 2; }
+  .bento-poverty, .bento-district, .bento-cap-mobility, .bento-summary, .bento-comparison { grid-column: span 2; }
   .bento-radar { grid-column: span 1; }
   .bento-mobility { grid-column: span 2; }
   .cap-stats-row { grid-template-columns: 1fr 1fr; }
@@ -1109,7 +1226,7 @@ watch(() => route.fullPath, async () => {
   .admin-dashboard { padding: 0; }
   .stats-bar { grid-template-columns: 1fr 1fr; }
   .bento-grid { grid-template-columns: 1fr; }
-  .bento-poverty, .bento-radar, .bento-district, .bento-mobility, .bento-cap-mobility, .bento-summary { grid-column: span 1; }
+  .bento-poverty, .bento-radar, .bento-district, .bento-mobility, .bento-cap-mobility, .bento-summary, .bento-comparison { grid-column: span 1; }
   .dash-filters { flex-direction: column; }
   .capital-tabs { gap: 0.25rem; }
   .capital-tab { font-size: 0.76rem; padding: 0.4rem 0.625rem; }
