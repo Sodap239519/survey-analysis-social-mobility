@@ -239,7 +239,7 @@
                 </span>
               </div>
               <div v-if="detailResponse.comparison?.[slug]?.before != null" class="capital-card-baseline">
-                Baseline: {{ detailResponse.comparison[slug].before.toFixed(1) }}
+                Baseline (X): {{ detailResponse.comparison[slug].before.toFixed(2) }}
               </div>
             </div>
           </div>
@@ -411,7 +411,7 @@ function diffStyle(comp) {
 function diffLabel(comp) {
   if (!comp || comp.diff === null) return ''
   const sign = comp.diff > 0 ? '+' : ''
-  return `${sign}${comp.diff.toFixed(1)}`
+  return `${sign}${comp.diff.toFixed(2)}`
 }
 
 /**
