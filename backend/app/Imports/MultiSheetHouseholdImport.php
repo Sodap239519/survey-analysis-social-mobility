@@ -45,6 +45,16 @@ class MultiSheetHouseholdImport implements WithMultipleSheets
     public int   $skipped  = 0;
     public array $rows     = [];
 
+    // Per-sheet tracking
+    public int $basicDataRows       = 0;
+    public int $humanCapitalRows    = 0;
+    public int $householdsImported  = 0;
+    public int $householdsExists    = 0;
+    public int $householdsSkipped   = 0;
+    public int $personsImported     = 0;
+    public int $personsExists       = 0;
+    public int $personsSkipped      = 0;
+
     public function sheets(): array
     {
         return [
@@ -73,11 +83,13 @@ class BasicDataSheetImport implements ToCollection
 
         foreach ($rows->skip(1) as $row) {
             $data = $row->toArray();
+            $this->parent->basicDataRows++;
 
             $houseCode = $this->cleanString($this->col($data, $headerMap, 'รหัสบ้าน'));
 
             if (empty($houseCode)) {
                 $this->parent->skipped++;
+                $this->parent->householdsSkipped++;
                 $this->parent->rows[] = [
                     'house_code'       => null,
                     'village_name'     => null,
@@ -98,6 +110,7 @@ class BasicDataSheetImport implements ToCollection
 
             if ($this->isNumericOnly($subdistrictName) || $this->isNumericOnly($districtName) || $this->isNumericOnly($provinceName)) {
                 $this->parent->skipped++;
+                $this->parent->householdsSkipped++;
                 $this->parent->rows[] = [
                     'house_code'       => $houseCode,
                     'village_name'     => null,
@@ -165,8 +178,10 @@ class BasicDataSheetImport implements ToCollection
             $status = $household->wasRecentlyCreated ? 'created' : 'exists';
             if ($status === 'created') {
                 $this->parent->imported++;
+                $this->parent->householdsImported++;
             } else {
                 $this->parent->exists++;
+                $this->parent->householdsExists++;
             }
 
             $this->parent->rows[] = [
@@ -307,19 +322,29 @@ class HumanCapitalSheetImport implements ToCollection
 
         foreach ($rows->skip(1) as $row) {
             $data = $row->toArray();
+            $this->parent->humanCapitalRows++;
 
             $houseCode = $this->cleanString($this->col($data, $headerMap, 'รหัสบ้าน'));
-            if (empty($houseCode)) continue;
+            if (empty($houseCode)) {
+                $this->parent->personsSkipped++;
+                continue;
+            }
 
             $household = Household::where('house_code', $houseCode)->first();
-            if (!$household) continue;
+            if (!$household) {
+                $this->parent->personsSkipped++;
+                continue;
+            }
 
             $citizenId = $this->parseCitizenId($this->col($data, $headerMap, 'หมายเลขประจำตัวประชาชน'));
             $firstName = $this->cleanString($this->col($data, $headerMap, 'ชื่อ'));
             $lastName  = $this->cleanString($this->col($data, $headerMap, 'สกุล'));
             $title     = $this->cleanString($this->col($data, $headerMap, 'คำนำหน้าชื่อ'));
 
-            if (empty($firstName) && empty($citizenId)) continue;
+            if (empty($firstName) && empty($citizenId)) {
+                $this->parent->personsSkipped++;
+                continue;
+            }
 
             $order = $this->toInt($this->col($data, $headerMap, 'ลำดับในบ้าน')) ?? 1;
             $isHead = ($order === 1);
@@ -333,7 +358,7 @@ class HumanCapitalSheetImport implements ToCollection
                 $searchKeys['is_head']    = $isHead;
             }
 
-            Person::firstOrCreate(
+            $person = Person::firstOrCreate(
                 $searchKeys,
                 [
                     'title'      => $title,
@@ -343,6 +368,12 @@ class HumanCapitalSheetImport implements ToCollection
                     'is_head'    => $isHead,
                 ]
             );
+
+            if ($person->wasRecentlyCreated) {
+                $this->parent->personsImported++;
+            } else {
+                $this->parent->personsExists++;
+            }
         }
     }
 

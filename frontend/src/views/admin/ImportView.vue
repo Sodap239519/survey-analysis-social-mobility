@@ -108,18 +108,11 @@
         <div v-if="historyLoading" class="text-muted text-sm">กำลังโหลด...</div>
         <div v-else-if="!history.length" class="text-muted text-sm">ยังไม่มีประวัติการนำเข้า</div>
         <div v-else class="history-list">
-          <div
+          <ImportHistoryItem
             v-for="log in history"
             :key="log.id"
-            class="history-item"
-          >
-            <span class="history-filename">{{ log.filename || '—' }}</span>
-            <span class="history-date text-muted">{{ formatDateTime(log.imported_at) }}</span>
-            <span class="badge badge-new">+{{ log.imported_count }} ใหม่</span>
-            <span class="badge badge-exists">{{ log.exists_count }} ซ้ำ</span>
-            <span class="badge badge-skipped">{{ log.skipped_count }} ข้าม</span>
-            <span class="history-by text-muted">{{ log.imported_by }}</span>
-          </div>
+            :item="log"
+          />
         </div>
       </div>
 
@@ -174,6 +167,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '../../api'
+import ImportHistoryItem from '../../components/ImportHistoryItem.vue'
 
 const file = ref(null)
 const loading = ref(false)
@@ -421,50 +415,8 @@ onMounted(() => {
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
-.history-item {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.875rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--color-border, #e5e7eb);
-  background: var(--color-bg, #fff);
-  flex-wrap: wrap;
-}
-.history-filename {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--color-text, #111827);
-  flex: 1;
-  min-width: 120px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.history-date {
-  font-size: 0.82rem;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.history-by {
-  font-size: 0.82rem;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.badge-new    { background: #dbeafe; color: #1d4ed8; }
-.badge-exists { background: #f3f4f6; color: #6b7280; }
-.badge-skipped { background: #fee2e2; color: #dc2626; }
 
 /* ── Persistent stats ── */
 .stats-bar {
