@@ -9,17 +9,23 @@ use App\Models\Household;
 use App\Models\Person;
 use App\Models\Question;
 use App\Models\SurveyResponse;
+use App\Services\CompareHouseholdSurveyLogic;
 use App\Services\ScoringService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SurveyResponseController extends Controller
 {
-    public function __construct(private readonly ScoringService $scoring) {}
+    public function __construct(
+        private readonly ScoringService $scoring,
+        private readonly CompareHouseholdSurveyLogic $compare,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $query = SurveyResponse::with('household', 'person');
+        $query = SurveyResponse::with(['household', 'person'])
+            ->latest('surveyed_at')
+            ->latest('id');
 
         if ($request->filled('household_id')) {
             $query->where('household_id', $request->household_id);
@@ -33,7 +39,81 @@ class SurveyResponseController extends Controller
             $query->where('survey_year', (int) $request->survey_year);
         }
 
-        return response()->json($query->paginate($request->integer('per_page', 20)));
+        if ($request->filled('search')) {
+            $search = mb_substr(trim($request->string('search')), 0, 100);
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('household', fn ($hq) => $hq->where('house_code', 'like', "%{$search}%"))
+                  ->orWhereHas('person', fn ($pq) => $pq->where('first_name', 'like', "%{$search}%")
+                      ->orWhere('last_name', 'like', "%{$search}%"));
+            });
+        }
+
+        $paginated = $query->paginate($request->integer('per_page', 20));
+
+        // Append comparison data (household is already eager-loaded; no N+1)
+        $paginated->getCollection()->transform(function (SurveyResponse $response) {
+            $this->appendComparison($response);
+            return $response;
+        });
+
+        return response()->json($paginated);
+    }
+
+    /**
+     * Compute and attach baseline-comparison metadata to a SurveyResponse instance.
+     *
+     * Uses household.baseline_score_* (X scale 1-4) as "before" and score_* (0-100)
+     * as "after".  Falls back to Household.raw_data legacy columns when baseline_score_*
+     * are not set (matching CompareHouseholdSurveyLogic::scoresFromRawData logic).
+     */
+    private function appendComparison(SurveyResponse $response): void
+    {
+        if (! $response->household) {
+            return;
+        }
+
+        $beforeScores = $this->compare->scoresFromRawData($response->household);
+        $afterScores  = $this->compare->scoresFromResponse($response);
+
+        $comparison = [];
+        $diffs      = [];
+
+        foreach (['human', 'physical', 'financial', 'natural', 'social'] as $capital) {
+            $before = $beforeScores[$capital] ?? null;
+            $after  = $afterScores[$capital]  ?? null;
+            $diff   = ($before !== null && $after !== null) ? round($after - $before, 2) : null;
+            $diffs[] = $diff;
+
+            $trend = null;
+            if ($diff !== null) {
+                if ($diff > CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+                    $trend = 'ดีขึ้น';
+                } elseif ($diff < -CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+                    $trend = 'แย่ลง';
+                } else {
+                    $trend = 'คงที่';
+                }
+            }
+
+            $comparison[$capital] = ['before' => $before, 'diff' => $diff, 'trend' => $trend];
+        }
+
+        $validDiffs = array_filter($diffs, fn ($d) => $d !== null);
+        $avgDiff    = count($validDiffs) > 0 ? array_sum($validDiffs) / count($validDiffs) : null;
+
+        $overallStatus = null;
+        if ($avgDiff !== null) {
+            if ($avgDiff > CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+                $overallStatus = 'ดีขึ้น';
+            } elseif ($avgDiff < -CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+                $overallStatus = 'แย่ลง';
+            } else {
+                $overallStatus = 'คงที่';
+            }
+        }
+
+        $response->comparison     = $comparison;
+        $response->overall_status = $overallStatus;
     }
 
     public function show(SurveyResponse $surveyResponse): JsonResponse
