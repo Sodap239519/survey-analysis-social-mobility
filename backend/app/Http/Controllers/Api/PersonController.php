@@ -36,6 +36,11 @@ class PersonController extends Controller
             $query->where('citizen_id', $request->citizen_id);
         }
 
+        if ($request->filled('house_code')) {
+            $query->whereHas('household', fn($q) => $q->where('house_code', $request->house_code));
+            $query->orderByDesc('is_head');
+        }
+
         return response()->json($query->paginate($request->integer('per_page', 20)));
     }
 
