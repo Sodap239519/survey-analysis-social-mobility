@@ -57,7 +57,7 @@
             <span class="house-code-badge">🏠 {{ group.house_code }}</span>
             <span class="text-muted" style="font-size:0.85rem">{{ group.responses.length }} คน</span>
             <span v-if="group.overallStatus" class="badge ml-2" :style="statusStyle(group.overallStatus)">
-              {{ statusIcon(group.overallStatus) }} {{ group.overallStatus }}
+              <i :class="statusIconClass(group.overallStatus)"></i> {{ group.overallStatus }}
             </span>
           </div>
           <div class="table-wrap">
@@ -67,16 +67,11 @@
                   <th>ชื่อผู้ตอบ</th>
                   <th>ช่วงเวลา</th>
                   <th>ปี/รอบ</th>
-                  <th>ทุนมนุษย์ (เฉลี่ย)</th>
-                  <th>สถานะ</th>
-                  <th>ทุนกายภาพ (เฉลี่ย)</th>
-                  <th>สถานะ</th>
-                  <th>ทุนการเงิน (เฉลี่ย)</th>
-                  <th>สถานะ</th>
-                  <th>ทุนธรรมชาติ (เฉลี่ย)</th>
-                  <th>สถานะ</th>
-                  <th>ทุนสังคม (เฉลี่ย)</th>
-                  <th>สถานะ</th>
+                  <th><i class="fi fi-rr-user"></i> ทุนมนุษย์</th>
+                  <th><i class="fi fi-rr-home"></i> ทุนกายภาพ</th>
+                  <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
+                  <th><i class="fi fi-rr-leaf"></i> ทุนธรรมชาติ</th>
+                  <th><i class="fi fi-rr-users"></i> ทุนสังคม</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
@@ -86,15 +81,10 @@
                   <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
                   <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
                   <td><span v-html="capitalCell(r, 'human')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
                   <td><span v-html="capitalCell(r, 'physical')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
                   <td><span v-html="capitalCell(r, 'financial')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
                   <td><span v-html="capitalCell(r, 'natural')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
                   <td><span v-html="capitalCell(r, 'social')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
                   <td>
                     <div class="flex gap-1">
                       <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
@@ -107,15 +97,11 @@
                 <tr class="avg-row">
                   <td colspan="3"><strong>เฉลี่ยบ้าน</strong></td>
                   <td>{{ fmtAvg(group.averages.human) }}</td>
-                  <td></td>
                   <td>{{ fmtAvg(group.averages.physical) }}</td>
-                  <td></td>
                   <td>{{ fmtAvg(group.averages.financial) }}</td>
-                  <td></td>
                   <td>{{ fmtAvg(group.averages.natural) }}</td>
-                  <td></td>
                   <td>{{ fmtAvg(group.averages.social) }}</td>
-                  <td colspan="2"></td>
+                  <td></td>
                 </tr>
               </tbody>
             </table>
@@ -137,16 +123,11 @@
                 <th>ชื่อผู้ตอบ</th>
                 <th>ช่วงเวลา</th>
                 <th>ปี/รอบ</th>
-                <th>ทุนมนุษย์ (เฉลี่ย)</th>
-                <th>สถานะ</th>
-                <th>ทุนกายภาพ (เฉลี่ย)</th>
-                <th>สถานะ</th>
-                <th>ทุนการเงิน (เฉลี่ย)</th>
-                <th>สถานะ</th>
-                <th>ทุนธรรมชาติ (เฉลี่ย)</th>
-                <th>สถานะ</th>
-                <th>ทุนสังคม (เฉลี่ย)</th>
-                <th>สถานะ</th>
+                <th><i class="fi fi-rr-user"></i> ทุนมนุษย์</th>
+                <th><i class="fi fi-rr-home"></i> ทุนกายภาพ</th>
+                <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
+                <th><i class="fi fi-rr-leaf"></i> ทุนธรรมชาติ</th>
+                <th><i class="fi fi-rr-users"></i> ทุนสังคม</th>
                 <th>จัดการ</th>
               </tr>
             </thead>
@@ -157,15 +138,10 @@
                 <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
                 <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
                 <td><span v-html="capitalCell(r, 'human')"></span></td>
-                <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
                 <td><span v-html="capitalCell(r, 'physical')"></span></td>
-                <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
                 <td><span v-html="capitalCell(r, 'financial')"></span></td>
-                <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
                 <td><span v-html="capitalCell(r, 'natural')"></span></td>
-                <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
                 <td><span v-html="capitalCell(r, 'social')"></span></td>
-                <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
                 <td>
                   <div class="flex gap-1">
                     <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
@@ -175,7 +151,7 @@
                 </td>
               </tr>
               <tr v-if="!filteredRows.length">
-                <td colspan="15" class="text-muted text-center">ไม่มีข้อมูล</td>
+                <td colspan="10" class="text-muted text-center">ไม่มีข้อมูล</td>
               </tr>
             </tbody>
           </table>
@@ -226,22 +202,45 @@
 
           <!-- Capital scores with comparison -->
           <h4 class="section-title mt-4">📊 คะแนนทุนและการเปลี่ยนแปลง</h4>
-          <div class="capital-compare-grid">
-            <div v-for="(cap, slug) in capitalMeta" :key="slug" class="capital-card">
-              <div class="capital-card-title">{{ cap.icon }} {{ cap.label }}</div>
-              <div class="capital-card-score">{{ detailResponse[`score_${slug}`]?.toFixed(1) || '—' }}</div>
-              <div v-if="detailResponse.comparison?.[slug]" class="capital-card-diff" :style="diffStyle(detailResponse.comparison[slug])">
-                <span>{{ diffLabel(detailResponse.comparison[slug]) }}</span>
-              </div>
-              <div v-if="detailResponse.comparison?.[slug]?.trend" class="capital-card-trend">
-                <span class="badge" :style="statusStyle(detailResponse.comparison[slug].trend)">
-                  {{ statusIcon(detailResponse.comparison[slug].trend) }} {{ detailResponse.comparison[slug].trend }}
-                </span>
-              </div>
-              <div v-if="detailResponse.comparison?.[slug]?.before != null" class="capital-card-baseline">
-                Baseline (X): {{ detailResponse.comparison[slug].before.toFixed(2) }}
-              </div>
-            </div>
+          <div class="comparison-table-wrap">
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>ทุน</th>
+                  <th>Baseline (X)</th>
+                  <th>→ Survey (X)</th>
+                  <th>= ผลต่าง</th>
+                  <th>เปลี่ยนแปลง</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(cap, slug) in capitalMeta" :key="slug">
+                  <td class="capital-name-cell">
+                    <i :class="cap.iconClass" class="capital-icon"></i> {{ cap.label }}
+                  </td>
+                  <td class="text-center">
+                    {{ detailResponse.comparison?.[slug]?.before != null ? detailResponse.comparison[slug].before.toFixed(2) : '—' }}
+                  </td>
+                  <td class="text-center">
+                    {{ detailResponse.comparison?.[slug]?.after != null ? detailResponse.comparison[slug].after.toFixed(2) : '—' }}
+                  </td>
+                  <td class="text-center" :class="getDiffClass(detailResponse.comparison?.[slug])">
+                    {{ diffLabel(detailResponse.comparison?.[slug]) || '—' }}
+                  </td>
+                  <td class="text-center" :class="getDiffClass(detailResponse.comparison?.[slug])">
+                    {{ pctLabel(detailResponse.comparison?.[slug]) || '—' }}
+                  </td>
+                  <td class="text-center">
+                    <span v-if="detailResponse.comparison?.[slug]?.trend" class="badge" :style="statusStyle(detailResponse.comparison[slug].trend)">
+                      <i :class="statusIconClass(detailResponse.comparison[slug].trend)"></i>
+                      {{ detailResponse.comparison[slug].trend }}
+                    </span>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <!-- Answers -->
@@ -357,11 +356,11 @@ const exportFormat = ref('csv')
 
 // Capital metadata for display
 const capitalMeta = {
-  human:    { label: 'ทุนมนุษย์',    icon: '👤' },
-  physical: { label: 'ทุนกายภาพ',   icon: '🏠' },
-  financial:{ label: 'ทุนการเงิน',   icon: '💰' },
-  natural:  { label: 'ทุนธรรมชาติ',  icon: '🌿' },
-  social:   { label: 'ทุนสังคม',     icon: '🤝' },
+  human:    { label: 'ทุนมนุษย์',   iconClass: 'fi fi-rr-user' },
+  physical: { label: 'ทุนกายภาพ',  iconClass: 'fi fi-rr-home' },
+  financial:{ label: 'ทุนการเงิน',  iconClass: 'fi fi-rr-coins' },
+  natural:  { label: 'ทุนธรรมชาติ', iconClass: 'fi fi-rr-leaf' },
+  social:   { label: 'ทุนสังคม',    iconClass: 'fi fi-rr-users' },
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -395,6 +394,15 @@ function statusStyle(status) {
   return styles[status] || { background: '#94a3b8', color: '#fff' }
 }
 
+function statusIconClass(status) {
+  const classes = {
+    'ดีขึ้น': 'fi fi-rr-arrow-trend-up',
+    'คงที่':  'fi fi-rr-minus',
+    'แย่ลง': 'fi fi-rr-arrow-trend-down',
+  }
+  return classes[status] || 'fi fi-rr-circle'
+}
+
 function statusIcon(status) {
   const icons = { 'ดีขึ้น': '🟢', 'คงที่': '🟡', 'แย่ลง': '🔴' }
   return icons[status] || ''
@@ -414,9 +422,19 @@ function diffLabel(comp) {
   return `${sign}${comp.diff.toFixed(2)}`
 }
 
+function pctLabel(comp) {
+  if (!comp || comp.percentage === null || comp.percentage === undefined) return ''
+  const sign = comp.percentage >= 0 ? '+' : ''
+  return `(${sign}${comp.percentage.toFixed(1)}%)`
+}
+
+function getDiffClass(comp) {
+  if (!comp || !comp.trend) return ''
+  return comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
+}
+
 /**
- * Render a capital score cell with diff percentage.
- * Format: "49.0 (-8.0%)" or just "49.0" when no comparison.
+ * Render a compact capital cell: "[Flaticon icon] score (change%)" with color.
  * Returns safe HTML string.
  */
 function capitalCell(r, capital) {
@@ -432,19 +450,10 @@ function capitalCell(r, capital) {
   }
   const sign = pct >= 0 ? '+' : ''
   const cls  = comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
-  return `<span>${score.toFixed(1)}</span> <span class="${cls}">(${sign}${pct.toFixed(1)}%)</span>`
-}
-
-/**
- * Render a per-capital status badge cell.
- * Returns safe HTML string with the trend badge or em dash.
- */
-function capitalStatusCell(r, capital) {
-  const comp = r.comparison?.[capital]
-  if (!comp || !comp.trend) return '<span class="text-muted">—</span>'
-  const icon = comp.trend === 'ดีขึ้น' ? '🟢' : comp.trend === 'แย่ลง' ? '🔴' : '🟡'
-  const cls  = comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
-  return `<span class="trend-badge ${cls}">${icon} ${comp.trend}</span>`
+  const iconCls = comp.trend === 'ดีขึ้น' ? 'fi fi-rr-arrow-trend-up'
+                : comp.trend === 'แย่ลง' ? 'fi fi-rr-arrow-trend-down'
+                : 'fi fi-rr-minus'
+  return `<span class="capital-cell-compact ${cls}"><i class="${iconCls}"></i> ${score.toFixed(1)} (${sign}${pct.toFixed(1)}%)</span>`
 }
 
 function fmtAvg(val) {
@@ -610,14 +619,15 @@ onMounted(async () => {
 .diff-down { color: #dc2626; font-size: 0.78rem; font-weight: 600; }
 .diff-same { color: #92400e; font-size: 0.78rem; }
 
-/* Per-capital trend badge in table cells */
-.trend-badge {
-  display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.3rem;
-  border-radius: 4px; vertical-align: middle; margin-left: 0.15rem; white-space: nowrap;
+/* Compact merged capital cell: icon + score + (change%) */
+.capital-cell-compact {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.82rem; font-weight: 600; white-space: nowrap;
 }
-.trend-badge.diff-up   { background: #dcfce7; color: #15803d; }
-.trend-badge.diff-down { background: #fee2e2; color: #b91c1c; }
-.trend-badge.diff-same { background: #fef9c3; color: #92400e; }
+.capital-cell-compact i { font-size: 0.8rem; }
+.capital-cell-compact.diff-up   { color: #16a34a; }
+.capital-cell-compact.diff-down { color: #dc2626; }
+.capital-cell-compact.diff-same { color: #92400e; }
 
 .house-code { font-size: 0.8rem; }
 
@@ -677,23 +687,31 @@ onMounted(async () => {
 .detail-label { font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
 .detail-value { font-size: 0.875rem; color: #1e293b; word-break: break-all; }
 
-/* Capital cards in detail modal */
-.capital-compare-grid {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;
+/* Capital comparison table in detail modal */
+.comparison-table-wrap { overflow-x: auto; }
+.comparison-table {
+  width: 100%; border-collapse: collapse; font-size: 0.875rem;
 }
+.comparison-table th {
+  background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; padding: 0.5rem 0.75rem; text-align: center;
+  border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+}
+.comparison-table th:first-child { text-align: left; }
+.comparison-table td {
+  padding: 0.5rem 0.75rem; border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.comparison-table tbody tr:hover { background: #f8fafc; }
+.capital-name-cell { font-weight: 600; white-space: nowrap; }
+.capital-icon { margin-right: 0.35rem; color: #64748b; }
+.text-center { text-align: center; }
+
 @media (max-width: 600px) {
-  .capital-compare-grid { grid-template-columns: repeat(2, 1fr); }
+  .comparison-table { font-size: 0.78rem; }
+  .comparison-table th, .comparison-table td { padding: 0.35rem 0.5rem; }
   .detail-grid { grid-template-columns: 1fr; }
 }
-.capital-card {
-  background: #f8fafc; border-radius: 10px; padding: 0.75rem;
-  text-align: center; border: 1px solid #e2e8f0;
-}
-.capital-card-title { font-size: 0.72rem; color: #64748b; font-weight: 600; margin-bottom: 0.25rem; }
-.capital-card-score { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
-.capital-card-diff { font-size: 0.85rem; font-weight: 600; margin-top: 0.2rem; }
-.capital-card-trend { margin-top: 0.25rem; }
-.capital-card-baseline { font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; }
 
 /* Answers list */
 .answers-list { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -710,7 +728,6 @@ onMounted(async () => {
 .ml-2 { margin-left: 0.5rem; }
 .text-muted { color: #94a3b8; }
 .text-sm { font-size: 0.875rem; }
-.text-center { text-align: center; }
 .mb-2 { margin-bottom: 0.5rem; }
 .mb-4 { margin-bottom: 1rem; }
 </style>
