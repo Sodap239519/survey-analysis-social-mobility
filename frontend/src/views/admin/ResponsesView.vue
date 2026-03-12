@@ -8,7 +8,12 @@
       </div>
     </div>
 
-    <div class="flex gap-4 mb-4" style="flex-wrap:wrap">
+    <!-- Filters row -->
+    <div class="filter-bar">
+      <div class="form-group" style="min-width:200px;flex:1">
+        <label>ค้นหา</label>
+        <input v-model="filterSearch" placeholder="รหัสบ้าน / ชื่อ-นามสกุล" @input="onSearchInput" />
+      </div>
       <div class="form-group" style="min-width:140px">
         <label>ปี พ.ศ.</label>
         <select v-model="filterYear" @change="load">
@@ -24,142 +29,242 @@
           <option value="before">ก่อนโครงการ</option>
         </select>
       </div>
+      <div class="form-group" style="min-width:140px">
+        <label>สถานะการเปลี่ยนแปลง</label>
+        <select v-model="filterStatus">
+          <option value="">ทุกสถานะ</option>
+          <option value="ดีขึ้น">🟢 ดีขึ้น</option>
+          <option value="คงที่">🟡 คงที่</option>
+          <option value="แย่ลง">🔴 แย่ลง</option>
+        </select>
+      </div>
+      <div class="form-group" style="min-width:130px">
+        <label>&nbsp;</label>
+        <label class="toggle-label">
+          <input type="checkbox" v-model="groupByHousehold" />
+          <span>จัดกลุ่มตามบ้าน</span>
+        </label>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">กำลังโหลด...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>รหัสบ้าน</th>
-              <th>ช่วงเวลา</th>
-              <th>ปี พ.ศ.</th>
-              <th>ระดับความเป็นอยู่</th>
-              <th>คะแนนรวม</th>
-              <th>ทุนมนุษย์</th>
-              <th>ทุนกายภาพ</th>
-              <th>ทุนการเงิน</th>
-              <th>ทุนธรรมชาติ</th>
-              <th>ทุนสังคม</th>
-              <th>จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in responses.data" :key="r.id">
-              <td><code>{{ r.household?.house_code || '—' }}</code></td>
-              <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ r.period }}</span></td>
-              <td>{{ r.survey_year || '—' }}</td>
-              <td>
-                <span v-if="r.poverty_level" class="badge" :style="{background: levelColor(r.poverty_level), color: '#fff'}">
-                  {{ levelLabel(r.poverty_level) }}
-                </span>
-                <span v-else class="text-muted">—</span>
-              </td>
-              <td>{{ r.score_aggregate?.toFixed(2) || '—' }}</td>
-              <td>{{ r.score_human?.toFixed(1) || '—' }}</td>
-              <td>{{ r.score_physical?.toFixed(1) || '—' }}</td>
-              <td>{{ r.score_financial?.toFixed(1) || '—' }}</td>
-              <td>{{ r.score_natural?.toFixed(1) || '—' }}</td>
-              <td>{{ r.score_social?.toFixed(1) || '—' }}</td>
-              <td>
-                <div class="flex gap-1">
-                  <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️ ดู</button>
-                  <button class="btn btn-secondary btn-sm" @click="openEditModal(r)" title="แก้ไข">✏️</button>
-                  <button class="btn btn-danger btn-sm" @click="confirmDelete(r)" title="ลบ">🗑️</button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!responses.data?.length">
-              <td colspan="11" class="text-muted text-center">ไม่มีข้อมูล</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Grouped view -->
+      <div v-if="groupByHousehold">
+        <div v-for="group in groupedRows" :key="group.house_code" class="household-group mb-4">
+          <div class="household-group-header">
+            <span class="house-code-badge">🏠 {{ group.house_code }}</span>
+            <span class="text-muted" style="font-size:0.85rem">{{ group.responses.length }} คน</span>
+            <span v-if="group.overallStatus" class="badge ml-2" :style="statusStyle(group.overallStatus)">
+              {{ statusIcon(group.overallStatus) }} {{ group.overallStatus }}
+            </span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ชื่อผู้ตอบ</th>
+                  <th>ช่วงเวลา</th>
+                  <th>ปี/รอบ</th>
+                  <th>ทุนมนุษย์</th>
+                  <th>ทุนกายภาพ</th>
+                  <th>ทุนการเงิน</th>
+                  <th>ทุนธรรมชาติ</th>
+                  <th>ทุนสังคม</th>
+                  <th>สถานะ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in group.responses" :key="r.id">
+                  <td>{{ personName(r) }}</td>
+                  <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
+                  <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
+                  <td><span v-html="capitalCell(r, 'human')"></span></td>
+                  <td><span v-html="capitalCell(r, 'physical')"></span></td>
+                  <td><span v-html="capitalCell(r, 'financial')"></span></td>
+                  <td><span v-html="capitalCell(r, 'natural')"></span></td>
+                  <td><span v-html="capitalCell(r, 'social')"></span></td>
+                  <td>
+                    <span v-if="r.overall_status" class="badge" :style="statusStyle(r.overall_status)">
+                      {{ statusIcon(r.overall_status) }} {{ r.overall_status }}
+                    </span>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                  <td>
+                    <div class="flex gap-1">
+                      <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
+                      <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข">✏️</RouterLink>
+                      <button class="btn btn-danger btn-sm" @click="confirmDelete(r)" title="ลบ">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+                <!-- Average row -->
+                <tr class="avg-row">
+                  <td colspan="3"><strong>เฉลี่ยบ้าน</strong></td>
+                  <td>{{ fmtAvg(group.averages.human) }}</td>
+                  <td>{{ fmtAvg(group.averages.physical) }}</td>
+                  <td>{{ fmtAvg(group.averages.financial) }}</td>
+                  <td>{{ fmtAvg(group.averages.natural) }}</td>
+                  <td>{{ fmtAvg(group.averages.social) }}</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div v-if="!groupedRows.length" class="text-muted text-center mt-4">ไม่มีข้อมูล</div>
       </div>
-      <div class="flex justify-between items-center mt-4 text-sm text-muted">
-        <span>รวม {{ responses.total }} รายการ</span>
-        <div class="flex gap-2">
-          <button class="btn btn-secondary" :disabled="page <= 1" @click="prevPage">‹ ก่อนหน้า</button>
-          <span>หน้า {{ page }} / {{ responses.last_page }}</span>
-          <button class="btn btn-secondary" :disabled="page >= responses.last_page" @click="nextPage">ถัดไป ›</button>
+
+      <!-- Flat table view -->
+      <div v-else>
+        <div v-if="filterStatus" class="text-muted text-sm mb-2">
+          ⚠️ กรองสถานะ "{{ filterStatus }}" แสดงเฉพาะหน้านี้ ({{ filteredRows.length }} จาก {{ responses.data?.length }} รายการ)
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>รหัสบ้าน</th>
+                <th>ชื่อผู้ตอบ</th>
+                <th>ช่วงเวลา</th>
+                <th>ปี/รอบ</th>
+                <th>ทุนมนุษย์</th>
+                <th>ทุนกายภาพ</th>
+                <th>ทุนการเงิน</th>
+                <th>ทุนธรรมชาติ</th>
+                <th>ทุนสังคม</th>
+                <th>สถานะ</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in filteredRows" :key="r.id">
+                <td><code class="house-code">{{ r.household?.house_code || '—' }}</code></td>
+                <td>{{ personName(r) }}</td>
+                <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
+                <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
+                <td><span v-html="capitalCell(r, 'human')"></span></td>
+                <td><span v-html="capitalCell(r, 'physical')"></span></td>
+                <td><span v-html="capitalCell(r, 'financial')"></span></td>
+                <td><span v-html="capitalCell(r, 'natural')"></span></td>
+                <td><span v-html="capitalCell(r, 'social')"></span></td>
+                <td>
+                  <span v-if="r.overall_status" class="badge" :style="statusStyle(r.overall_status)">
+                    {{ statusIcon(r.overall_status) }} {{ r.overall_status }}
+                  </span>
+                  <span v-else class="text-muted">—</span>
+                </td>
+                <td>
+                  <div class="flex gap-1">
+                    <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
+                    <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข">✏️</RouterLink>
+                    <button class="btn btn-danger btn-sm" @click="confirmDelete(r)" title="ลบ">🗑️</button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="!filteredRows.length">
+                <td colspan="11" class="text-muted text-center">ไม่มีข้อมูล</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex justify-between items-center mt-4 text-sm text-muted">
+          <span>รวม {{ responses.total }} รายการ</span>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary" :disabled="page <= 1" @click="prevPage">‹ ก่อนหน้า</button>
+            <span>หน้า {{ page }} / {{ responses.last_page }}</span>
+            <button class="btn btn-secondary" :disabled="page >= responses.last_page" @click="nextPage">ถัดไป ›</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Detail Modal -->
     <div v-if="showDetailModal" class="modal-backdrop" @click.self="showDetailModal = false">
-      <div class="modal-box">
+      <div class="modal-box modal-box-wide">
         <div class="flex justify-between items-center mb-4">
           <h3 style="font-size:1.1rem;font-weight:700">👁️ รายละเอียดการสำรวจ</h3>
-          <button class="btn btn-secondary btn-sm" @click="showDetailModal = false">✕ ปิด</button>
-        </div>
-        <div v-if="detailResponse" class="detail-grid">
-          <div class="detail-item"><span class="detail-label">ID</span><span class="detail-value"><code>{{ detailResponse.id }}</code></span></div>
-          <div class="detail-item"><span class="detail-label">รหัสบ้าน</span><span class="detail-value"><code>{{ detailResponse.household?.house_code || '—' }}</code></span></div>
-          <div class="detail-item"><span class="detail-label">ช่วงเวลา</span><span class="detail-value">{{ detailResponse.period }}</span></div>
-          <div class="detail-item"><span class="detail-label">ปี พ.ศ.</span><span class="detail-value">{{ detailResponse.survey_year || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">รอบสำรวจ</span><span class="detail-value">{{ detailResponse.survey_round || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ผู้สำรวจ</span><span class="detail-value">{{ detailResponse.surveyor_name || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ชื่อโมเดล</span><span class="detail-value">{{ detailResponse.model_name || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">วันที่สำรวจ</span><span class="detail-value">{{ detailResponse.surveyed_at || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ระดับความเป็นอยู่</span><span class="detail-value">{{ detailResponse.poverty_level ? `ระดับ ${detailResponse.poverty_level} — ${levelLabel(detailResponse.poverty_level)}` : '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">คะแนนรวม</span><span class="detail-value">{{ detailResponse.score_aggregate?.toFixed(2) || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ทุนมนุษย์</span><span class="detail-value">{{ detailResponse.score_human?.toFixed(2) || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ทุนกายภาพ</span><span class="detail-value">{{ detailResponse.score_physical?.toFixed(2) || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ทุนการเงิน</span><span class="detail-value">{{ detailResponse.score_financial?.toFixed(2) || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ทุนธรรมชาติ</span><span class="detail-value">{{ detailResponse.score_natural?.toFixed(2) || '—' }}</span></div>
-          <div class="detail-item"><span class="detail-label">ทุนสังคม</span><span class="detail-value">{{ detailResponse.score_social?.toFixed(2) || '—' }}</span></div>
-          <div v-if="detailResponse.household" class="detail-item detail-item-full">
-            <span class="detail-label">ที่อยู่</span>
-            <span class="detail-value">{{ [detailResponse.household.house_no, 'หมู่', detailResponse.household.village_no, detailResponse.household.village_name, detailResponse.household.subdistrict_name, detailResponse.household.district_name].filter(Boolean).join(' ') || '—' }}</span>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" @click="printDetail">🖨️ พิมพ์</button>
+            <button class="btn btn-secondary btn-sm" @click="showDetailModal = false">✕ ปิด</button>
           </div>
         </div>
-      </div>
-    </div>
+        <div v-if="detailLoading" class="loading">กำลังโหลดรายละเอียด...</div>
+        <div v-else-if="detailResponse" id="detail-print-area">
+          <!-- Basic info -->
+          <h4 class="section-title">📋 ข้อมูลพื้นฐาน</h4>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="detail-label">รหัสบ้าน</span><span class="detail-value"><code>{{ detailResponse.household?.house_code || '—' }}</code></span></div>
+            <div class="detail-item"><span class="detail-label">ชื่อผู้ตอบ</span><span class="detail-value">{{ personName(detailResponse) }}</span></div>
+            <div class="detail-item"><span class="detail-label">เลขบัตรประชาชน</span><span class="detail-value">{{ detailResponse.person?.citizen_id || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">วันเกิด</span><span class="detail-value">{{ detailResponse.person?.birthdate || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">เบอร์โทร</span><span class="detail-value">{{ detailResponse.person?.phone || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">ช่วงเวลา</span><span class="detail-value">{{ periodLabel(detailResponse.period) }}</span></div>
+            <div class="detail-item"><span class="detail-label">ปีที่สำรวจ</span><span class="detail-value">{{ detailResponse.survey_year || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">รอบสำรวจ</span><span class="detail-value">{{ detailResponse.survey_round || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">วันที่สำรวจ</span><span class="detail-value">{{ detailResponse.surveyed_at || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">ผู้สำรวจ</span><span class="detail-value">{{ detailResponse.surveyor_name || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">ชื่อโมเดล</span><span class="detail-value">{{ detailResponse.model_name || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">ระดับความเป็นอยู่</span><span class="detail-value">{{ detailResponse.poverty_level ? `ระดับ ${detailResponse.poverty_level} — ${levelLabel(detailResponse.poverty_level)}` : '—' }}</span></div>
+            <div v-if="detailResponse.household" class="detail-item detail-item-full">
+              <span class="detail-label">ที่อยู่</span>
+              <span class="detail-value">{{ addressStr(detailResponse.household) }}</span>
+            </div>
+          </div>
 
-    <!-- Edit Modal -->
-    <div v-if="showEditModal" class="modal-backdrop" @click.self="showEditModal = false">
-      <div class="modal-box">
-        <div class="flex justify-between items-center mb-4">
-          <h3 style="font-size:1.1rem;font-weight:700">✏️ แก้ไขการสำรวจ</h3>
-          <button class="btn btn-secondary btn-sm" @click="showEditModal = false">✕ ปิด</button>
+          <!-- Capital scores with comparison -->
+          <h4 class="section-title mt-4">📊 คะแนนทุนและการเปลี่ยนแปลง</h4>
+          <div class="capital-compare-grid">
+            <div v-for="(cap, slug) in capitalMeta" :key="slug" class="capital-card">
+              <div class="capital-card-title">{{ cap.icon }} {{ cap.label }}</div>
+              <div class="capital-card-score">{{ detailResponse[`score_${slug}`]?.toFixed(1) || '—' }}</div>
+              <div v-if="detailResponse.comparison?.[slug]" class="capital-card-diff" :style="diffStyle(detailResponse.comparison[slug])">
+                <span>{{ diffLabel(detailResponse.comparison[slug]) }}</span>
+              </div>
+              <div v-if="detailResponse.comparison?.[slug]?.before != null" class="capital-card-baseline">
+                Baseline: {{ detailResponse.comparison[slug].before.toFixed(1) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Answers -->
+          <div v-if="detailResponse.answers?.length">
+            <h4 class="section-title mt-4">📝 คำตอบแบบสอบถาม</h4>
+            <div class="answers-list">
+              <div v-for="ans in detailResponse.answers" :key="ans.id" class="answer-item">
+                <span class="answer-question">{{ ans.question?.code || `Q${ans.question_id}` }}. {{ ans.question?.text || '' }}</span>
+                <span class="answer-value">
+                  <span v-if="ans.value_text">{{ ans.value_text }}</span>
+                  <span v-else-if="ans.value_numeric !== null && ans.value_numeric !== undefined">{{ ans.value_numeric }}</span>
+                  <span v-else-if="ans.selected_choice_ids?.length">ตัวเลือก: {{ ans.selected_choice_ids.join(', ') }}</span>
+                  <span v-else class="text-muted">—</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detailed answers -->
+          <div v-if="detailResponse.detailedAnswers?.length">
+            <h4 class="section-title mt-4">📊 ข้อมูลเพิ่มเติม (Q8-Q13)</h4>
+            <div class="answers-list">
+              <div v-for="da in detailResponse.detailedAnswers" :key="da.id" class="answer-item">
+                <span class="answer-question">{{ da.question_code }}</span>
+                <span class="answer-value">
+                  <span v-if="da.answer_value">{{ da.answer_value }}</span>
+                  <span v-if="da.sub_answers" class="sub-answers">
+                    <pre style="font-size:0.75rem;margin:0;white-space:pre-wrap">{{ JSON.stringify(da.sub_answers, null, 2) }}</pre>
+                  </span>
+                  <span v-if="!da.answer_value && !da.sub_answers" class="text-muted">—</span>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div v-if="editingResponse" class="form-grid">
-          <div class="form-group">
-            <label>ช่วงเวลา</label>
-            <select v-model="editForm.period">
-              <option value="before">ก่อนโครงการ</option>
-              <option value="after">หลังโครงการ</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>ปี พ.ศ.</label>
-            <input type="number" v-model="editForm.survey_year" placeholder="เช่น 2568" />
-          </div>
-          <div class="form-group">
-            <label>รอบสำรวจ</label>
-            <input type="number" v-model="editForm.survey_round" placeholder="เช่น 1" />
-          </div>
-          <div class="form-group">
-            <label>ผู้สำรวจ</label>
-            <input type="text" v-model="editForm.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
-          </div>
-          <div class="form-group">
-            <label>ชื่อโมเดล</label>
-            <input type="text" v-model="editForm.model_name" placeholder="ชื่อโมเดล" />
-          </div>
-          <div class="form-group">
-            <label>วันที่สำรวจ</label>
-            <input type="date" v-model="editForm.surveyed_at" />
-          </div>
-        </div>
-        <div v-if="editError" class="error mt-2">{{ editError }}</div>
-        <div class="flex gap-2 justify-end mt-4">
-          <button class="btn btn-secondary" @click="showEditModal = false">ยกเลิก</button>
-          <button class="btn btn-primary" :disabled="saving" @click="saveEdit">
-            {{ saving ? 'กำลังบันทึก...' : '💾 บันทึก' }}
-          </button>
+        <div class="flex justify-end mt-4">
+          <RouterLink v-if="detailResponse" :to="`/admin/responses/${detailResponse.id}/edit`" class="btn btn-secondary mr-2" @click="showDetailModal = false">✏️ แก้ไข</RouterLink>
+          <button class="btn btn-secondary" @click="showDetailModal = false">ปิด</button>
         </div>
       </div>
     </div>
@@ -203,7 +308,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import api from '../../api'
 import { useAvailableYears } from '../../composables/useAvailableYears'
 
@@ -212,6 +318,12 @@ const loading = ref(false)
 const error = ref('')
 const page = ref(1)
 const filterPeriod = ref('')
+const filterSearch = ref('')
+const filterStatus = ref('')
+const groupByHousehold = ref(false)
+let searchTimer = null
+const SEARCH_DEBOUNCE_MS = 400
+
 const { availableYears, selectedYear: filterYear, loadYears } = useAvailableYears()
 
 // Delete state
@@ -222,62 +334,128 @@ const deleting = ref(false)
 // Detail modal state
 const showDetailModal = ref(false)
 const detailResponse = ref(null)
-
-// Edit modal state
-const showEditModal = ref(false)
-const editingResponse = ref(null)
-const editForm = ref({})
-const editError = ref('')
-const saving = ref(false)
-
-function openDetailModal(r) {
-  detailResponse.value = r
-  showDetailModal.value = true
-}
-
-function openEditModal(r) {
-  editingResponse.value = r
-  editForm.value = {
-    period: r.period,
-    survey_year: r.survey_year || '',
-    survey_round: r.survey_round || '',
-    surveyor_name: r.surveyor_name || '',
-    model_name: r.model_name || '',
-    surveyed_at: r.surveyed_at || '',
-  }
-  editError.value = ''
-  showEditModal.value = true
-}
-
-async function saveEdit() {
-  if (!editingResponse.value) return
-  saving.value = true
-  editError.value = ''
-  try {
-    await api.put(`/responses/${editingResponse.value.id}`, editForm.value)
-    showEditModal.value = false
-    editingResponse.value = null
-    load()
-  } catch (e) {
-    editError.value = e.response?.data?.message || 'ไม่สามารถบันทึกได้'
-  } finally {
-    saving.value = false
-  }
-}
+const detailLoading = ref(false)
 
 // Export state
 const showExportModal = ref(false)
 const exportFormat = ref('csv')
 
-function levelColor(level) {
-  const colors = { 1: '#ef4444', 2: '#f97316', 3: '#eab308', 4: '#22c55e' }
-  return colors[level] || '#94a3b8'
+// Capital metadata for display
+const capitalMeta = {
+  human:    { label: 'ทุนมนุษย์',    icon: '👤' },
+  physical: { label: 'ทุนกายภาพ',   icon: '🏠' },
+  financial:{ label: 'ทุนการเงิน',   icon: '💰' },
+  natural:  { label: 'ทุนธรรมชาติ',  icon: '🌿' },
+  social:   { label: 'ทุนสังคม',     icon: '🤝' },
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function personName(r) {
+  if (!r.person) return '—'
+  const parts = [r.person.title, r.person.first_name, r.person.last_name].filter(Boolean)
+  return parts.join(' ') || '—'
+}
+
+function periodLabel(period) {
+  return period === 'after' ? 'หลังโครงการ' : period === 'before' ? 'ก่อนโครงการ' : period || '—'
 }
 
 function levelLabel(level) {
   const labels = { 1: 'อยู่ลำบาก', 2: 'อยู่ยาก', 3: 'อยู่พอได้', 4: 'อยู่ดี' }
-  return labels[level] ? `ระดับ ${level} ${labels[level]}` : `ระดับ ${level}`
+  return labels[level] || `ระดับ ${level}`
 }
+
+function addressStr(household) {
+  return [household.house_no, 'หมู่', household.village_no, household.village_name,
+    household.subdistrict_name, household.district_name].filter(Boolean).join(' ') || '—'
+}
+
+function statusStyle(status) {
+  const styles = {
+    'ดีขึ้น': { background: '#22c55e', color: '#fff' },
+    'คงที่':  { background: '#eab308', color: '#fff' },
+    'แย่ลง': { background: '#ef4444', color: '#fff' },
+  }
+  return styles[status] || { background: '#94a3b8', color: '#fff' }
+}
+
+function statusIcon(status) {
+  const icons = { 'ดีขึ้น': '🟢', 'คงที่': '🟡', 'แย่ลง': '🔴' }
+  return icons[status] || ''
+}
+
+function diffStyle(comp) {
+  if (!comp || comp.diff === null) return {}
+  const trend = comp.trend
+  if (trend === 'ดีขึ้น') return { color: '#16a34a', fontWeight: '600' }
+  if (trend === 'แย่ลง') return { color: '#dc2626', fontWeight: '600' }
+  return { color: '#92400e' }
+}
+
+function diffLabel(comp) {
+  if (!comp || comp.diff === null) return ''
+  const sign = comp.diff > 0 ? '+' : ''
+  return `${sign}${comp.diff.toFixed(1)}`
+}
+
+/**
+ * Render a capital score cell with optional diff indicator.
+ * Returns safe HTML string.
+ */
+function capitalCell(r, capital) {
+  const score = r[`score_${capital}`]
+  if (score === null || score === undefined) return '<span class="text-muted">—</span>'
+
+  const comp = r.comparison?.[capital]
+  if (!comp || comp.diff === null) return `<span>${score.toFixed(1)}</span>`
+
+  const sign = comp.diff > 0 ? '+' : ''
+  const cls = comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
+  return `<span>${score.toFixed(1)}</span> <span class="${cls}">(${sign}${comp.diff.toFixed(1)})</span>`
+}
+
+function fmtAvg(val) {
+  return val !== null && val !== undefined ? val.toFixed(1) : '—'
+}
+
+// ── Filtered / grouped rows ──────────────────────────────────────────────────
+
+const filteredRows = computed(() => {
+  const data = responses.value.data || []
+  if (!filterStatus.value) return data
+  return data.filter(r => r.overall_status === filterStatus.value)
+})
+
+const groupedRows = computed(() => {
+  const groups = {}
+  for (const r of filteredRows.value) {
+    const code = r.household?.house_code || 'unknown'
+    if (!groups[code]) {
+      groups[code] = { house_code: code, responses: [], household: r.household, averages: {} }
+    }
+    groups[code].responses.push(r)
+  }
+
+  for (const code in groups) {
+    const g = groups[code]
+    const capitals = ['human', 'physical', 'financial', 'natural', 'social']
+    for (const cap of capitals) {
+      const scores = g.responses.map(r => r[`score_${cap}`]).filter(s => s !== null && s !== undefined)
+      g.averages[cap] = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null
+    }
+    // Overall group status: take majority or best
+    const statuses = g.responses.map(r => r.overall_status).filter(Boolean)
+    if (statuses.includes('ดีขึ้น')) g.overallStatus = 'ดีขึ้น'
+    else if (statuses.includes('คงที่')) g.overallStatus = 'คงที่'
+    else if (statuses.includes('แย่ลง')) g.overallStatus = 'แย่ลง'
+    else g.overallStatus = null
+  }
+
+  return Object.values(groups)
+})
+
+// ── Data loading ──────────────────────────────────────────────────────────────
 
 async function load() {
   loading.value = true
@@ -286,6 +464,7 @@ async function load() {
     const params = { page: page.value }
     if (filterYear.value) params.survey_year = filterYear.value
     if (filterPeriod.value) params.period = filterPeriod.value
+    if (filterSearch.value.trim()) params.search = filterSearch.value.trim()
     const res = await api.get('/responses', { params })
     responses.value = res.data
   } catch (e) {
@@ -295,10 +474,47 @@ async function load() {
   }
 }
 
+function onSearchInput() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { page.value = 1; load() }, SEARCH_DEBOUNCE_MS)
+}
+
 function prevPage() { page.value--; load() }
 function nextPage() { page.value++; load() }
 
-// Delete
+// ── Detail modal ─────────────────────────────────────────────────────────────
+
+async function openDetailModal(r) {
+  showDetailModal.value = true
+  detailLoading.value = true
+  detailResponse.value = null
+  try {
+    const res = await api.get(`/responses/${r.id}`)
+    // Merge comparison data from list row (already computed)
+    res.data.comparison = r.comparison
+    res.data.overall_status = r.overall_status
+    detailResponse.value = res.data
+  } catch {
+    detailResponse.value = r
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function printDetail() {
+  const el = document.getElementById('detail-print-area')
+  if (!el) return
+  const w = window.open('', '_blank')
+  if (!w) return
+  w.document.write(`<html><head><title>รายละเอียดการสำรวจ</title>
+    <style>body{font-family:sans-serif;padding:1rem} table{border-collapse:collapse;width:100%} td,th{border:1px solid #ccc;padding:4px 8px}</style>
+    </head><body>${el.innerHTML}</body></html>`)
+  w.document.close()
+  w.print()
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+
 function confirmDelete(r) { deletingResponse.value = r; showDeleteConfirm.value = true }
 
 async function deleteResponse() {
@@ -316,7 +532,8 @@ async function deleteResponse() {
   }
 }
 
-// Export
+// ── Export ────────────────────────────────────────────────────────────────────
+
 function openExportModal() { showExportModal.value = true }
 
 function doExport() {
@@ -345,10 +562,40 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.filter-bar {
+  display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: flex-end;
+}
+.toggle-label {
+  display: flex; align-items: center; gap: 0.4rem; cursor: pointer;
+  font-size: 0.875rem; padding: 0.5rem 0; white-space: nowrap;
+}
+.toggle-label input { width: auto; margin: 0; }
+
+/* Capital diff classes */
+.diff-up   { color: #16a34a; font-size: 0.78rem; font-weight: 600; }
+.diff-down { color: #dc2626; font-size: 0.78rem; font-weight: 600; }
+.diff-same { color: #92400e; font-size: 0.78rem; }
+
+.house-code { font-size: 0.8rem; }
+
+/* Household group styles */
+.household-group { border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+.household-group-header {
+  background: #f1f5f9; padding: 0.6rem 1rem;
+  display: flex; align-items: center; gap: 0.75rem; font-weight: 600;
+}
+.house-code-badge {
+  background: #0ea5e9; color: #fff; border-radius: 6px;
+  padding: 0.15rem 0.6rem; font-size: 0.85rem;
+}
+.avg-row { background: #f8fafc; font-style: italic; }
+.avg-row td { border-top: 2px solid #e2e8f0; }
+
+/* Modal */
 .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; min-height: unset; }
 .btn-info {
   background: #0ea5e9; color: #fff; border: none; border-radius: 8px;
-  padding: 0.5rem 1rem; font-size: 0.875rem; cursor: pointer;
+  padding: 0.5rem 0.75rem; font-size: 0.875rem; cursor: pointer;
   font-family: 'Prompt', sans-serif; min-height: 40px;
 }
 .btn-info:hover { background: #0284c7; }
@@ -359,6 +606,7 @@ onMounted(async () => {
 }
 .btn-danger:hover { background: #dc2626; }
 .btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
+
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
   display: flex; align-items: center; justify-content: center;
@@ -369,16 +617,57 @@ onMounted(async () => {
   width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,0.25);
 }
+.modal-box-wide { max-width: 860px; }
+
+.section-title {
+  font-size: 0.95rem; font-weight: 700; color: #1e293b;
+  border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-bottom: 0.75rem;
+}
 .detail-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;
 }
 .detail-item {
   display: flex; flex-direction: column; gap: 0.2rem;
-  background: #f8fafc; border-radius: 8px; padding: 0.6rem 0.75rem;
+  background: #f8fafc; border-radius: 8px; padding: 0.5rem 0.75rem;
 }
 .detail-item-full { grid-column: 1 / -1; }
-.detail-label { font-size: 0.75rem; color: #64748b; font-weight: 600; }
-.detail-value { font-size: 0.9rem; color: #1e293b; word-break: break-all; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-.mb-3 { margin-bottom: 0.75rem; }
+.detail-label { font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+.detail-value { font-size: 0.875rem; color: #1e293b; word-break: break-all; }
+
+/* Capital cards in detail modal */
+.capital-compare-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;
+}
+@media (max-width: 600px) {
+  .capital-compare-grid { grid-template-columns: repeat(2, 1fr); }
+  .detail-grid { grid-template-columns: 1fr; }
+}
+.capital-card {
+  background: #f8fafc; border-radius: 10px; padding: 0.75rem;
+  text-align: center; border: 1px solid #e2e8f0;
+}
+.capital-card-title { font-size: 0.72rem; color: #64748b; font-weight: 600; margin-bottom: 0.25rem; }
+.capital-card-score { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+.capital-card-diff { font-size: 0.85rem; font-weight: 600; margin-top: 0.2rem; }
+.capital-card-baseline { font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; }
+
+/* Answers list */
+.answers-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.answer-item {
+  background: #f8fafc; border-radius: 8px; padding: 0.5rem 0.75rem;
+  display: flex; flex-direction: column; gap: 0.15rem;
+}
+.answer-question { font-size: 0.78rem; color: #64748b; font-weight: 600; }
+.answer-value { font-size: 0.875rem; color: #1e293b; }
+.sub-answers { margin-top: 0.25rem; }
+
+.mt-4 { margin-top: 1rem; }
+.mr-2 { margin-right: 0.5rem; }
+.ml-2 { margin-left: 0.5rem; }
+.text-muted { color: #94a3b8; }
+.text-sm { font-size: 0.875rem; }
+.text-center { text-align: center; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
 </style>
+
