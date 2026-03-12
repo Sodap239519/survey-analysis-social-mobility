@@ -514,7 +514,7 @@
                     <div class="debt-source-label">
                       <span class="debt-key">{{ debtItem.key }})</span>
                       <span>{{ debtItem.label }}</span>
-                      <template v-if="debtItem.hasText && debtData[debtItem.key]?.amount > 0">
+                      <template v-if="debtItem.hasText">
                         <input type="text" v-model="debtData[debtItem.key].name" placeholder="ระบุแหล่งหนี้..." class="debt-text-input" />
                       </template>
                     </div>
