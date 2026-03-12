@@ -58,6 +58,12 @@ class CompareHouseholdSurveyLogic
     public const COMPARISON_THRESHOLD = 2.0;
 
     /**
+     * Equivalent comparison threshold on the X scale (1.0–4.0).
+     * Derived from COMPARISON_THRESHOLD: (2.0 / 100) * 3 = 0.06
+     */
+    public const COMPARISON_THRESHOLD_X = 0.06;
+
+    /**
      * Capital metadata: slug => [label (Thai), raw_data column index, score field]
      *
      * raw_data_col: 0-based integer index in Household.raw_data (from legacy CSV).
@@ -303,6 +309,92 @@ class CompareHouseholdSurveyLogic
             $x = (float) $value;
             $x = max(1.0, min(4.0, $x));
             $scores[$slug] = round(($x - 1.0) / 3.0 * 100, 4);
+        }
+
+        return $scores;
+    }
+
+    /**
+     * Convert a normalized score (0–100) to the X scale (1.0–4.0).
+     *
+     * Uses the same formula as ScoringService::computeAggregateScore():
+     *   X = 1.0 + (normalized / 100) * 3.0
+     *
+     * Input is clamped to [0, 100] before conversion to guarantee output stays in [1.0, 4.0].
+     *
+     * @param  float $normalizedScore Score on the 0–100 scale
+     * @return float Score on the X scale (1.0–4.0)
+     */
+    public function convertToXScale(float $normalizedScore): float
+    {
+        $clamped = max(0.0, min(100.0, $normalizedScore));
+        return round(1.0 + ($clamped / 100.0) * 3.0, 4);
+    }
+
+    /**
+     * Extract per-capital baseline scores directly in X scale (1.0–4.0).
+     *
+     * Unlike scoresFromRawData() which converts to 0–100, this method returns
+     * the raw X-scale values so that survey scores (converted via convertToXScale)
+     * can be compared in the same unit.
+     *
+     * Priority:
+     *  1. Household.baseline_score_* columns (already X scale; no conversion needed).
+     *  2. Legacy raw_data array (index-based, X scale 1–4; no conversion needed).
+     *
+     * @return array<string, float|null>
+     */
+    public function baselineScoresXScale(Household $household): array
+    {
+        $scores = [];
+
+        // 1. Try dedicated baseline_score_* columns (set by MultiSheetHouseholdImport)
+        $hasBaseline = $household->baseline_score_human !== null
+            || $household->baseline_score_physical !== null
+            || $household->baseline_score_financial !== null
+            || $household->baseline_score_natural !== null
+            || $household->baseline_score_social !== null;
+
+        if ($hasBaseline) {
+            $fieldMap = [
+                'human'     => 'baseline_score_human',
+                'physical'  => 'baseline_score_physical',
+                'financial' => 'baseline_score_financial',
+                'natural'   => 'baseline_score_natural',
+                'social'    => 'baseline_score_social',
+            ];
+
+            foreach ($fieldMap as $slug => $field) {
+                $value = $household->{$field};
+                if ($value === null) {
+                    $scores[$slug] = null;
+                    continue;
+                }
+                $x = (float) $value;
+                $scores[$slug] = round(max(1.0, min(4.0, $x)), 4);
+            }
+
+            return $scores;
+        }
+
+        // 2. Legacy fallback: raw_data array (X scale 1–4, read directly without conversion)
+        $raw = $household->raw_data;
+
+        if (empty($raw) || !is_array($raw)) {
+            return array_fill_keys(array_keys(self::CAPITALS), null);
+        }
+
+        foreach (self::CAPITALS as $slug => $meta) {
+            $col   = $meta['raw_data_col'];
+            $value = $raw[$col] ?? null;
+
+            if ($value === null || $value === '') {
+                $scores[$slug] = null;
+                continue;
+            }
+
+            $x = (float) $value;
+            $scores[$slug] = round(max(1.0, min(4.0, $x)), 4);
         }
 
         return $scores;

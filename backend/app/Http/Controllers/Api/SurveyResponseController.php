@@ -62,9 +62,12 @@ class SurveyResponseController extends Controller
     /**
      * Compute and attach baseline-comparison metadata to a SurveyResponse instance.
      *
-     * Uses household.baseline_score_* (X scale 1-4) as "before" and score_* (0-100)
-     * as "after".  Falls back to Household.raw_data legacy columns when baseline_score_*
-     * are not set (matching CompareHouseholdSurveyLogic::scoresFromRawData logic).
+     * Both before and after scores are expressed in X scale (1.0–4.0) so they can be
+     * directly compared with the baseline imported from the XLSX file.
+     *
+     * Uses household.baseline_score_* (X scale 1-4) as "before" directly.
+     * Converts survey score_* (0-100 normalized) to X scale via convertToXScale().
+     * Falls back to Household.raw_data legacy columns when baseline_score_* are not set.
      */
     private function appendComparison(SurveyResponse $response): void
     {
@@ -72,16 +75,20 @@ class SurveyResponseController extends Controller
             return;
         }
 
-        $beforeScores = $this->compare->scoresFromRawData($response->household);
-        $afterScores  = $this->compare->scoresFromResponse($response);
+        // Get baseline (before) scores in X scale (1.0–4.0) directly
+        $beforeScores    = $this->compare->baselineScoresXScale($response->household);
+        // Get survey (after) scores in 0-100 normalized scale, then convert to X scale
+        $afterScoresNorm = $this->compare->scoresFromResponse($response);
 
         $comparison = [];
         $diffs      = [];
 
         foreach (['human', 'physical', 'financial', 'natural', 'social'] as $capital) {
-            $before     = $beforeScores[$capital] ?? null;
-            $after      = $afterScores[$capital]  ?? null;
-            $diff       = ($before !== null && $after !== null) ? round($after - $before, 2) : null;
+            $before    = $beforeScores[$capital] ?? null;
+            $afterNorm = $afterScoresNorm[$capital] ?? null;
+            // Convert normalized (0-100) survey score to X scale (1-4)
+            $after     = $afterNorm !== null ? $this->compare->convertToXScale($afterNorm) : null;
+            $diff      = ($before !== null && $after !== null) ? round($after - $before, 4) : null;
             $percentage = ($before !== null && $before > 0 && $diff !== null)
                 ? round(($diff / $before) * 100, 1)
                 : null;
@@ -89,9 +96,9 @@ class SurveyResponseController extends Controller
 
             $trend = null;
             if ($diff !== null) {
-                if ($diff > CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+                if ($diff > CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD_X) {
                     $trend = 'ดีขึ้น';
-                } elseif ($diff < -CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+                } elseif ($diff < -CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD_X) {
                     $trend = 'แย่ลง';
                 } else {
                     $trend = 'คงที่';
@@ -112,9 +119,9 @@ class SurveyResponseController extends Controller
 
         $overallStatus = null;
         if ($avgDiff !== null) {
-            if ($avgDiff > CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+            if ($avgDiff > CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD_X) {
                 $overallStatus = 'ดีขึ้น';
-            } elseif ($avgDiff < -CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD) {
+            } elseif ($avgDiff < -CompareHouseholdSurveyLogic::COMPARISON_THRESHOLD_X) {
                 $overallStatus = 'แย่ลง';
             } else {
                 $overallStatus = 'คงที่';

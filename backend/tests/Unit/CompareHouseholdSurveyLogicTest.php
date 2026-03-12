@@ -448,4 +448,86 @@ class CompareHouseholdSurveyLogicTest extends TestCase
         $this->assertEquals('ทุนธรรมชาติ',   $result['capitals']['natural']['label']);
         $this->assertEquals('ทุนทางสังคม',   $result['capitals']['social']['label']);
     }
+
+    // ─── convertToXScale ─────────────────────────────────────────────────────
+
+    public function test_convert_to_x_scale_boundaries(): void
+    {
+        // 0 → 1.0, 100 → 4.0, 50 → 2.5
+        $this->assertEqualsWithDelta(1.0, $this->logic->convertToXScale(0.0),   0.0001);
+        $this->assertEqualsWithDelta(4.0, $this->logic->convertToXScale(100.0), 0.0001);
+        $this->assertEqualsWithDelta(2.5, $this->logic->convertToXScale(50.0),  0.0001);
+    }
+
+    public function test_convert_to_x_scale_matches_problem_statement_examples(): void
+    {
+        // From problem statement: house_code 30010011391
+        // score_human=28 → X = 1 + (28/100)*3 = 1.84
+        $this->assertEqualsWithDelta(1.84, $this->logic->convertToXScale(28.0),    0.001);
+        // score_physical=40 → X = 1 + (40/100)*3 = 2.20
+        $this->assertEqualsWithDelta(2.20, $this->logic->convertToXScale(40.0),    0.001);
+        // score_financial=43.3333 → X = 1 + (43.3333/100)*3 ≈ 2.30
+        $this->assertEqualsWithDelta(2.30, $this->logic->convertToXScale(43.3333), 0.001);
+        // score_natural=55 → X = 1 + (55/100)*3 = 2.65
+        $this->assertEqualsWithDelta(2.65, $this->logic->convertToXScale(55.0),    0.001);
+        // score_social=28 → X = 1.84
+        $this->assertEqualsWithDelta(1.84, $this->logic->convertToXScale(28.0),    0.001);
+    }
+
+    // ─── baselineScoresXScale ─────────────────────────────────────────────────
+
+    public function test_baseline_scores_x_scale_uses_baseline_columns_directly(): void
+    {
+        // baseline_score_* are X-scale 1-4; should be returned as-is (no conversion)
+        $household = Household::create([
+            'house_code'              => '30010011391',
+            'baseline_score_human'    => 2.5195,
+            'baseline_score_physical' => 2.2920,
+            'baseline_score_financial'=> 1.0,
+            'baseline_score_natural'  => 1.95,
+            'baseline_score_social'   => 2.1500,
+        ]);
+
+        $scores = $this->logic->baselineScoresXScale($household);
+
+        $this->assertEqualsWithDelta(2.5195, $scores['human'],    0.0001);
+        $this->assertEqualsWithDelta(2.2920, $scores['physical'], 0.0001);
+        $this->assertEqualsWithDelta(1.0,    $scores['financial'],0.0001);
+        $this->assertEqualsWithDelta(1.95,   $scores['natural'],  0.0001);
+        $this->assertEqualsWithDelta(2.15,   $scores['social'],   0.0001);
+    }
+
+    public function test_baseline_scores_x_scale_falls_back_to_raw_data(): void
+    {
+        // No baseline_score_* columns; should read X-scale from raw_data without converting
+        $household = new Household();
+        $raw = array_fill(0, 100, null);
+        $raw[44] = '2.5';  // human    → X = 2.5 (not 50.0)
+        $raw[55] = '1.0';  // physical → X = 1.0 (not 0.0)
+        $raw[69] = '4.0';  // financial→ X = 4.0 (not 100.0)
+        $raw[78] = '1.75'; // natural  → X = 1.75
+        $raw[87] = '3.25'; // social   → X = 3.25
+        $household->raw_data = $raw;
+
+        $scores = $this->logic->baselineScoresXScale($household);
+
+        $this->assertEqualsWithDelta(2.5,  $scores['human'],    0.001);
+        $this->assertEqualsWithDelta(1.0,  $scores['physical'], 0.001);
+        $this->assertEqualsWithDelta(4.0,  $scores['financial'],0.001);
+        $this->assertEqualsWithDelta(1.75, $scores['natural'],  0.001);
+        $this->assertEqualsWithDelta(3.25, $scores['social'],   0.001);
+    }
+
+    public function test_baseline_scores_x_scale_returns_null_for_empty_household(): void
+    {
+        $household = new Household();
+        $household->raw_data = null;
+
+        $scores = $this->logic->baselineScoresXScale($household);
+
+        $this->assertCount(5, $scores);
+        foreach ($scores as $v) {
+            $this->assertNull($v);
+        }
+    }
 }
