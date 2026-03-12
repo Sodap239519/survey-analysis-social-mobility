@@ -22,6 +22,8 @@ class ImportController extends Controller
 
         $filename  = $request->file('file')->getClientOriginalName();
         $extension = strtolower($request->file('file')->getClientOriginalExtension());
+        $fileSizeMb = round($request->file('file')->getSize() / 1024 / 1024, 2);
+        $startTime = microtime(true);
 
         // Use the multi-sheet importer for XLSX files; fall back to the legacy
         // single-sheet CSV importer for .csv files.
@@ -44,22 +46,81 @@ class ImportController extends Controller
             ], 422);
         }
 
+        $processingTime = round(microtime(true) - $startTime, 2);
+        $sheetResults = $this->buildSheetResults($import);
+
         // Log this import
         ImportLog::create([
-            'user_id'        => $request->user()?->id,
-            'filename'       => $request->file('file')->getClientOriginalName(),
-            'imported_count' => $import->imported,
-            'exists_count'   => $import->exists,
-            'skipped_count'  => $import->skipped,
+            'user_id'         => $request->user()?->id,
+            'filename'        => $filename,
+            'imported_count'  => $import->imported,
+            'exists_count'    => $import->exists,
+            'skipped_count'   => $import->skipped,
+            'sheet_results'   => $sheetResults,
+            'file_size_mb'    => $fileSizeMb,
+            'processing_time' => $processingTime,
         ]);
 
         return response()->json([
-            'message'  => 'Import completed',
-            'imported' => $import->imported,
-            'exists'   => $import->exists,
-            'skipped'  => $import->skipped,
-            'rows'     => $import->rows,
+            'message'         => 'Import completed',
+            'imported'        => $import->imported,
+            'exists'          => $import->exists,
+            'skipped'         => $import->skipped,
+            'rows'            => $import->rows,
+            'sheet_results'   => $sheetResults,
+            'file_size_mb'    => $fileSizeMb,
+            'processing_time' => $processingTime,
         ]);
+    }
+
+    private function buildSheetResults($import): array
+    {
+        if (!($import instanceof MultiSheetHouseholdImport)) {
+            return [];
+        }
+
+        $sheets = [
+            [
+                'name'        => 'ข้อมูลพื้นฐาน',
+                'type'        => 'household',
+                'total_rows'  => $import->basicDataRows,
+                'imported'    => $import->householdsImported,
+                'exists'      => $import->householdsExists,
+                'skipped'     => $import->householdsSkipped,
+                'description' => 'ครัวเรือน',
+            ],
+            [
+                'name'        => 'ทุนมนุษย์',
+                'type'        => 'person',
+                'total_rows'  => $import->humanCapitalRows,
+                'imported'    => $import->personsImported,
+                'exists'      => $import->personsExists,
+                'skipped'     => $import->personsSkipped,
+                'description' => 'บุคคล',
+            ],
+        ];
+
+        // Reference sheets share the same household count as basic data
+        $referenceSheets = [
+            ['name' => 'ทุนกายภาพ',   'description' => 'ครัวเรือน (อ้างอิง)'],
+            ['name' => 'ทุนการเงิน',   'description' => 'ครัวเรือน (อ้างอิง)'],
+            ['name' => 'ทุนธรรมชาติ',  'description' => 'ครัวเรือน (อ้างอิง)'],
+            ['name' => 'ทุนทางสังคม',  'description' => 'ครัวเรือน (อ้างอิง)'],
+        ];
+
+        foreach ($referenceSheets as $ref) {
+            $sheets[] = [
+                'name'        => $ref['name'],
+                'type'        => 'reference',
+                'total_rows'  => $import->basicDataRows,
+                'imported'    => $import->basicDataRows,
+                'exists'      => 0,
+                'skipped'     => 0,
+                'description' => $ref['description'],
+            ];
+        }
+
+        return $sheets;
     }
 
     public function show(int $id): JsonResponse
@@ -85,13 +146,16 @@ class ImportController extends Controller
             ->limit(50)
             ->get()
             ->map(fn ($log) => [
-                'id'             => $log->id,
-                'filename'       => $log->filename,
-                'imported_count' => $log->imported_count,
-                'exists_count'   => $log->exists_count,
-                'skipped_count'  => $log->skipped_count,
-                'imported_by'    => $log->user?->name ?? 'ระบบ',
-                'imported_at'    => $log->created_at?->toDateTimeString(),
+                'id'              => $log->id,
+                'filename'        => $log->filename,
+                'imported_count'  => $log->imported_count,
+                'exists_count'    => $log->exists_count,
+                'skipped_count'   => $log->skipped_count,
+                'imported_by'     => $log->user?->name ?? 'ระบบ',
+                'imported_at'     => $log->created_at?->toDateTimeString(),
+                'sheet_results'   => $log->sheet_results ?? [],
+                'file_size_mb'    => $log->file_size_mb,
+                'processing_time' => $log->processing_time,
             ]);
 
         return response()->json($logs);

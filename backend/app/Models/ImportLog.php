@@ -13,6 +13,13 @@ class ImportLog extends Model
         'imported_count',
         'exists_count',
         'skipped_count',
+        'sheet_results',
+        'file_size_mb',
+        'processing_time',
+    ];
+
+    protected $casts = [
+        'sheet_results' => 'array',
     ];
 
     public function user(): BelongsTo
