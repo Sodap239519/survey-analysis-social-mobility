@@ -63,19 +63,6 @@
             <label>ชื่อโมเดล</label>
             <input v-model="form.model_name" placeholder="เช่น รุ่นที่ 1 / Model A" />
           </div>
-          <!-- Area -->
-          <div class="form-group">
-            <label>พื้นที่/ตำบล</label>
-            <input v-model="form.subdistrict_name" placeholder="เช่น ในเมือง" />
-          </div>
-          <div class="form-group">
-            <label>อำเภอ</label>
-            <input v-model="form.district_name" placeholder="เช่น เมืองนครราชสีมา" />
-          </div>
-          <div class="form-group">
-            <label>จังหวัด</label>
-            <input v-model="form.province_name" placeholder="เช่น นครราชสีมา" />
-          </div>
           <!-- Survey meta -->
           <div class="form-group" :class="{ 'has-error': errors.period }">
             <label>ช่วงเวลา <span class="required">*</span></label>
@@ -109,6 +96,38 @@
         <!-- Informant data -->
         <div class="informant-section">
           <h4 class="informant-title">ข้อมูลผู้ให้ข้อมูล</h4>
+
+          <!-- Smart person dropdown — shown when house_code matches > 1 person -->
+          <Transition name="person-dropdown-slide">
+            <div v-if="showPersonDropdown || loadingPersons" class="person-select-wrap">
+              <div v-if="loadingPersons" class="person-loading-hint">
+                <span class="person-spinner"></span> กำลังดึงข้อมูลผู้อยู่อาศัย...
+              </div>
+              <div v-else class="form-group">
+                <label>
+                  เลือกผู้ให้ข้อมูล
+                  <span class="person-count-badge">พบ {{ householdPersons.length }} คนในรหัสบ้านนี้</span>
+                </label>
+                <select
+                  v-model.number="selectedPersonId"
+                  class="person-select"
+                  @change="onPersonSelect(selectedPersonId)"
+                >
+                  <option :value="null">-- เลือกผู้ให้ข้อมูล --</option>
+                  <option
+                    v-for="person in householdPersons"
+                    :key="person.id"
+                    :value="person.id"
+                  >
+                    {{ person.first_name }} {{ person.last_name }}
+                    {{ person.citizen_id ? ' (' + person.citizen_id + ')' : '' }}
+                    {{ person.is_head ? ' ★ หัวหน้าครัวเรือน' : '' }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </Transition>
+
           <div class="form-grid">
             <div class="form-group">
               <label>คำนำหน้า</label>
@@ -711,6 +730,12 @@ const householdSuggestions = ref([])
 const loadingHouseholds    = ref(false)
 let hhDebounce = null
 
+// Smart person selection state
+const householdPersons   = ref([])   // all persons in matched household
+const selectedPersonId   = ref(null) // selected person id in dropdown
+const loadingPersons     = ref(false)
+const showPersonDropdown = computed(() => householdPersons.value.length > 1)
+
 // Form data
 const form = ref({
   house_code: '', model_name: '', period: 'after',
@@ -1257,6 +1282,9 @@ async function loadHouseholdSuggestions(search) {
 
 async function onHouseCodeInput() {
   clearTimeout(hhDebounce)
+  // Immediately hide person dropdown when house code changes
+  householdPersons.value   = []
+  selectedPersonId.value   = null
   hhDebounce = setTimeout(async () => {
     const code = form.value.house_code
     await loadHouseholdSuggestions(code)
@@ -1271,7 +1299,66 @@ async function onHouseCodeInput() {
       if (!form.value.province_name && match.province_name)   form.value.province_name = match.province_name
       if (!form.value.postal_code && match.postal_code)       form.value.postal_code = match.postal_code
     }
+    // Fetch persons for smart dropdown / single-person autofill
+    await fetchPersonsForHouseCode(code)
   }, 300)
+}
+
+// ─── Person autofill helpers ─────────────────────────────────────────────────
+function clearPersonFields() {
+  form.value.person_title      = ''
+  form.value.person_first_name = ''
+  form.value.person_last_name  = ''
+  form.value.person_citizen_id = ''
+  form.value.person_birthdate  = ''
+  form.value.person_phone      = ''
+}
+
+function autofillPerson(person) {
+  form.value.person_title      = person.title      || ''
+  form.value.person_first_name = person.first_name || ''
+  form.value.person_last_name  = person.last_name  || ''
+  form.value.person_citizen_id = person.citizen_id || ''
+  form.value.person_birthdate  = person.birthdate  || ''
+  form.value.person_phone      = person.phone      || ''
+  console.log('[Autofill] filled person:', person.first_name, person.last_name)
+}
+
+function onPersonSelect(personId) {
+  if (!personId) {
+    clearPersonFields()
+    return
+  }
+  const person = householdPersons.value.find(p => p.id === personId)
+  if (person) autofillPerson(person)
+}
+
+async function fetchPersonsForHouseCode(code) {
+  if (!code || !/^\d{11}$/.test(code)) {
+    householdPersons.value = []
+    selectedPersonId.value = null
+    return
+  }
+  loadingPersons.value = true
+  try {
+    const res = await api.get('/persons', { params: { house_code: code, per_page: 100 } })
+    const persons = res.data.data || []
+    console.log('[Autofill] persons for house_code', code, '→', persons.length)
+    householdPersons.value = persons
+    selectedPersonId.value = null
+    if (persons.length === 1) {
+      // Single person — autofill immediately
+      autofillPerson(persons[0])
+    } else if (persons.length === 0) {
+      clearPersonFields()
+    }
+    // If > 1 persons, dropdown will be shown via showPersonDropdown computed
+  } catch (e) {
+    console.error('[Autofill] fetchPersonsForHouseCode error', e)
+    householdPersons.value = []
+  } finally {
+    loadingPersons.value = false
+  }
 }
 
 // ─── Load existing response (edit mode) ──────────────────────────────────────
@@ -1925,6 +2012,82 @@ onMounted(async () => {
 .slide-down-leave-active { transition: all 0.2s ease; }
 .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-8px); max-height: 0; overflow: hidden; }
 .slide-down-enter-to, .slide-down-leave-from { opacity: 1; transform: translateY(0); max-height: 2000px; }
+
+/* ─── Smart person dropdown ─────────────────────────────────────────────────── */
+.person-select-wrap {
+  margin-bottom: 1rem;
+  padding: 0.875rem 1rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+  border: 1.5px solid #93c5fd;
+  border-radius: var(--radius-sm, 8px);
+}
+.person-select-wrap .form-group { margin-bottom: 0; }
+.person-select-wrap label {
+  font-weight: 700;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.person-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.person-select {
+  width: 100%;
+  padding: 0.55rem 0.875rem;
+  border: 1.5px solid #93c5fd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.9rem;
+  font-family: 'Prompt', sans-serif;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: auto;
+}
+.person-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.person-loading-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #2563eb;
+  font-style: italic;
+}
+.person-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #93c5fd;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: person-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes person-spin { to { transform: rotate(360deg); } }
+
+/* Person dropdown slide transition */
+.person-dropdown-slide-enter-active { transition: all 0.25s ease; max-height: var(--person-dropdown-max-h, 200px); }
+.person-dropdown-slide-leave-active { transition: all 0.2s ease; }
+.person-dropdown-slide-enter-from, .person-dropdown-slide-leave-to {
+  opacity: 0; transform: translateY(-6px); max-height: 0; overflow: hidden;
+}
+.person-dropdown-slide-enter-to, .person-dropdown-slide-leave-from {
+  opacity: 1; transform: translateY(0); max-height: var(--person-dropdown-max-h, 200px);
+}
 
 /* ─── Mobile adjustments for new sections ──────────────────────────────────── */
 @media (max-width: 700px) {
