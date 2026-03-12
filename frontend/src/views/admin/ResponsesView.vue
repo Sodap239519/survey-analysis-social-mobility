@@ -67,11 +67,15 @@
                   <th>ชื่อผู้ตอบ</th>
                   <th>ช่วงเวลา</th>
                   <th>ปี/รอบ</th>
-                  <th>ทุนมนุษย์</th>
-                  <th>ทุนกายภาพ</th>
-                  <th>ทุนการเงิน</th>
-                  <th>ทุนธรรมชาติ</th>
-                  <th>ทุนสังคม</th>
+                  <th>ทุนมนุษย์ (เฉลี่ย)</th>
+                  <th>สถานะ</th>
+                  <th>ทุนกายภาพ (เฉลี่ย)</th>
+                  <th>สถานะ</th>
+                  <th>ทุนการเงิน (เฉลี่ย)</th>
+                  <th>สถานะ</th>
+                  <th>ทุนธรรมชาติ (เฉลี่ย)</th>
+                  <th>สถานะ</th>
+                  <th>ทุนสังคม (เฉลี่ย)</th>
                   <th>สถานะ</th>
                   <th>จัดการ</th>
                 </tr>
@@ -82,16 +86,15 @@
                   <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
                   <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
                   <td><span v-html="capitalCell(r, 'human')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
                   <td><span v-html="capitalCell(r, 'physical')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
                   <td><span v-html="capitalCell(r, 'financial')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
                   <td><span v-html="capitalCell(r, 'natural')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
                   <td><span v-html="capitalCell(r, 'social')"></span></td>
-                  <td>
-                    <span v-if="r.overall_status" class="badge" :style="statusStyle(r.overall_status)">
-                      {{ statusIcon(r.overall_status) }} {{ r.overall_status }}
-                    </span>
-                    <span v-else class="text-muted">—</span>
-                  </td>
+                  <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
                   <td>
                     <div class="flex gap-1">
                       <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
@@ -104,9 +107,13 @@
                 <tr class="avg-row">
                   <td colspan="3"><strong>เฉลี่ยบ้าน</strong></td>
                   <td>{{ fmtAvg(group.averages.human) }}</td>
+                  <td></td>
                   <td>{{ fmtAvg(group.averages.physical) }}</td>
+                  <td></td>
                   <td>{{ fmtAvg(group.averages.financial) }}</td>
+                  <td></td>
                   <td>{{ fmtAvg(group.averages.natural) }}</td>
+                  <td></td>
                   <td>{{ fmtAvg(group.averages.social) }}</td>
                   <td colspan="2"></td>
                 </tr>
@@ -130,11 +137,15 @@
                 <th>ชื่อผู้ตอบ</th>
                 <th>ช่วงเวลา</th>
                 <th>ปี/รอบ</th>
-                <th>ทุนมนุษย์</th>
-                <th>ทุนกายภาพ</th>
-                <th>ทุนการเงิน</th>
-                <th>ทุนธรรมชาติ</th>
-                <th>ทุนสังคม</th>
+                <th>ทุนมนุษย์ (เฉลี่ย)</th>
+                <th>สถานะ</th>
+                <th>ทุนกายภาพ (เฉลี่ย)</th>
+                <th>สถานะ</th>
+                <th>ทุนการเงิน (เฉลี่ย)</th>
+                <th>สถานะ</th>
+                <th>ทุนธรรมชาติ (เฉลี่ย)</th>
+                <th>สถานะ</th>
+                <th>ทุนสังคม (เฉลี่ย)</th>
                 <th>สถานะ</th>
                 <th>จัดการ</th>
               </tr>
@@ -146,16 +157,15 @@
                 <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
                 <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
                 <td><span v-html="capitalCell(r, 'human')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
                 <td><span v-html="capitalCell(r, 'physical')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
                 <td><span v-html="capitalCell(r, 'financial')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
                 <td><span v-html="capitalCell(r, 'natural')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
                 <td><span v-html="capitalCell(r, 'social')"></span></td>
-                <td>
-                  <span v-if="r.overall_status" class="badge" :style="statusStyle(r.overall_status)">
-                    {{ statusIcon(r.overall_status) }} {{ r.overall_status }}
-                  </span>
-                  <span v-else class="text-muted">—</span>
-                </td>
+                <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
                 <td>
                   <div class="flex gap-1">
                     <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
@@ -165,7 +175,7 @@
                 </td>
               </tr>
               <tr v-if="!filteredRows.length">
-                <td colspan="11" class="text-muted text-center">ไม่มีข้อมูล</td>
+                <td colspan="15" class="text-muted text-center">ไม่มีข้อมูล</td>
               </tr>
             </tbody>
           </table>
@@ -239,7 +249,7 @@
             <h4 class="section-title mt-4">📝 คำตอบแบบสอบถาม</h4>
             <div class="answers-list">
               <div v-for="ans in detailResponse.answers" :key="ans.id" class="answer-item">
-                <span class="answer-question">{{ ans.question?.code || `Q${ans.question_id}` }}. {{ ans.question?.text || '' }}</span>
+                <span class="answer-question">{{ ans.question?.question_key || `Q${ans.question_id}` }}. {{ ans.question?.text_th || '' }}</span>
                 <span class="answer-value">
                   <span v-if="ans.value_text">{{ ans.value_text }}</span>
                   <span v-else-if="ans.value_numeric !== null && ans.value_numeric !== undefined">{{ ans.value_numeric }}</span>
@@ -251,10 +261,10 @@
           </div>
 
           <!-- Detailed answers -->
-          <div v-if="detailResponse.detailedAnswers?.length">
+          <div v-if="detailResponse.detailed_answers?.length">
             <h4 class="section-title mt-4">📊 ข้อมูลเพิ่มเติม (Q8-Q13)</h4>
             <div class="answers-list">
-              <div v-for="da in detailResponse.detailedAnswers" :key="da.id" class="answer-item">
+              <div v-for="da in detailResponse.detailed_answers" :key="da.id" class="answer-item">
                 <span class="answer-question">{{ da.question_code }}</span>
                 <span class="answer-value">
                   <span v-if="da.answer_value">{{ da.answer_value }}</span>
@@ -405,7 +415,8 @@ function diffLabel(comp) {
 }
 
 /**
- * Render a capital score cell with diff and per-capital status indicator.
+ * Render a capital score cell with diff percentage.
+ * Format: "49.0 (-8.0%)" or just "49.0" when no comparison.
  * Returns safe HTML string.
  */
 function capitalCell(r, capital) {
@@ -415,11 +426,25 @@ function capitalCell(r, capital) {
   const comp = r.comparison?.[capital]
   if (!comp || comp.diff === null) return `<span>${score.toFixed(1)}</span>`
 
-  const sign = comp.diff > 0 ? '+' : ''
-  const cls = comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
+  const pct = comp.percentage
+  if (pct === null || pct === undefined) {
+    return `<span>${score.toFixed(1)}</span>`
+  }
+  const sign = pct >= 0 ? '+' : ''
+  const cls  = comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
+  return `<span>${score.toFixed(1)}</span> <span class="${cls}">(${sign}${pct.toFixed(1)}%)</span>`
+}
+
+/**
+ * Render a per-capital status badge cell.
+ * Returns safe HTML string with the trend badge or em dash.
+ */
+function capitalStatusCell(r, capital) {
+  const comp = r.comparison?.[capital]
+  if (!comp || !comp.trend) return '<span class="text-muted">—</span>'
   const icon = comp.trend === 'ดีขึ้น' ? '🟢' : comp.trend === 'แย่ลง' ? '🔴' : '🟡'
-  const trendHtml = comp.trend ? ` <span class="trend-badge ${cls}">${icon} ${comp.trend}</span>` : ''
-  return `<span>${score.toFixed(1)}</span> <span class="${cls}">(${sign}${comp.diff.toFixed(1)})</span>${trendHtml}`
+  const cls  = comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
+  return `<span class="trend-badge ${cls}">${icon} ${comp.trend}</span>`
 }
 
 function fmtAvg(val) {
@@ -497,9 +522,11 @@ async function openDetailModal(r) {
   detailResponse.value = null
   try {
     const res = await api.get(`/responses/${r.id}`)
-    // Merge comparison data from list row (already computed)
-    res.data.comparison = r.comparison
-    res.data.overall_status = r.overall_status
+    // Use API-computed comparison; fall back to list-row comparison if not present
+    if (!res.data.comparison && r.comparison) {
+      res.data.comparison = r.comparison
+      res.data.overall_status = r.overall_status
+    }
     detailResponse.value = res.data
   } catch {
     detailResponse.value = r

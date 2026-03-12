@@ -144,6 +144,24 @@ class BasicDataSheetImport implements ToCollection
                 ]
             );
 
+            // For existing households, update baseline scores and raw_data if any score is missing
+            if (! $household->wasRecentlyCreated
+                && ($household->baseline_score_human    === null
+                    || $household->baseline_score_physical  === null
+                    || $household->baseline_score_financial === null
+                    || $household->baseline_score_natural   === null
+                    || $household->baseline_score_social    === null)
+            ) {
+                $household->update([
+                    'baseline_score_human'    => $baselineHuman,
+                    'baseline_score_physical' => $baselinePhysical,
+                    'baseline_score_financial'=> $baselineFinancial,
+                    'baseline_score_natural'  => $baselineNatural,
+                    'baseline_score_social'   => $baselineSocial,
+                    'raw_data'                => $household->raw_data ?? $data,
+                ]);
+            }
+
             $status = $household->wasRecentlyCreated ? 'created' : 'exists';
             if ($status === 'created') {
                 $this->parent->imported++;

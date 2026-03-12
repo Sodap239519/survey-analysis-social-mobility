@@ -79,9 +79,12 @@ class SurveyResponseController extends Controller
         $diffs      = [];
 
         foreach (['human', 'physical', 'financial', 'natural', 'social'] as $capital) {
-            $before = $beforeScores[$capital] ?? null;
-            $after  = $afterScores[$capital]  ?? null;
-            $diff   = ($before !== null && $after !== null) ? round($after - $before, 2) : null;
+            $before     = $beforeScores[$capital] ?? null;
+            $after      = $afterScores[$capital]  ?? null;
+            $diff       = ($before !== null && $after !== null) ? round($after - $before, 2) : null;
+            $percentage = ($before !== null && $before > 0 && $diff !== null)
+                ? round(($diff / $before) * 100, 1)
+                : null;
             $diffs[] = $diff;
 
             $trend = null;
@@ -95,7 +98,13 @@ class SurveyResponseController extends Controller
                 }
             }
 
-            $comparison[$capital] = ['before' => $before, 'diff' => $diff, 'trend' => $trend];
+            $comparison[$capital] = [
+                'before'     => $before,
+                'after'      => $after,
+                'diff'       => $diff,
+                'percentage' => $percentage,
+                'trend'      => $trend,
+            ];
         }
 
         $validDiffs = array_filter($diffs, fn ($d) => $d !== null);
@@ -118,7 +127,10 @@ class SurveyResponseController extends Controller
 
     public function show(SurveyResponse $surveyResponse): JsonResponse
     {
-        return response()->json($surveyResponse->load(['household', 'person', 'answers.question', 'detailedAnswers']));
+        $surveyResponse->load(['household', 'person', 'answers.question', 'detailedAnswers']);
+        $this->appendComparison($surveyResponse);
+
+        return response()->json($surveyResponse);
     }
 
     /**

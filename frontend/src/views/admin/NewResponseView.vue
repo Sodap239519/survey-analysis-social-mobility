@@ -1438,7 +1438,7 @@ async function loadExistingResponse(id) {
     }
 
     // Restore detailed answers for special sections
-    for (const da of r.detailedAnswers || []) {
+    for (const da of r.detailed_answers || []) {
       if (da.question_code === 'Q9_savings') {
         q9SavingsData.value = da.sub_answers || {}
       } else if (da.question_code === 'Q10_debt') {
