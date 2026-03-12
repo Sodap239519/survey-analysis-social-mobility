@@ -223,6 +223,11 @@
               <div v-if="detailResponse.comparison?.[slug]" class="capital-card-diff" :style="diffStyle(detailResponse.comparison[slug])">
                 <span>{{ diffLabel(detailResponse.comparison[slug]) }}</span>
               </div>
+              <div v-if="detailResponse.comparison?.[slug]?.trend" class="capital-card-trend">
+                <span class="badge" :style="statusStyle(detailResponse.comparison[slug].trend)">
+                  {{ statusIcon(detailResponse.comparison[slug].trend) }} {{ detailResponse.comparison[slug].trend }}
+                </span>
+              </div>
               <div v-if="detailResponse.comparison?.[slug]?.before != null" class="capital-card-baseline">
                 Baseline: {{ detailResponse.comparison[slug].before.toFixed(1) }}
               </div>
@@ -400,7 +405,7 @@ function diffLabel(comp) {
 }
 
 /**
- * Render a capital score cell with optional diff indicator.
+ * Render a capital score cell with diff and per-capital status indicator.
  * Returns safe HTML string.
  */
 function capitalCell(r, capital) {
@@ -412,7 +417,9 @@ function capitalCell(r, capital) {
 
   const sign = comp.diff > 0 ? '+' : ''
   const cls = comp.trend === 'ดีขึ้น' ? 'diff-up' : comp.trend === 'แย่ลง' ? 'diff-down' : 'diff-same'
-  return `<span>${score.toFixed(1)}</span> <span class="${cls}">(${sign}${comp.diff.toFixed(1)})</span>`
+  const icon = comp.trend === 'ดีขึ้น' ? '🟢' : comp.trend === 'แย่ลง' ? '🔴' : '🟡'
+  const trendHtml = comp.trend ? ` <span class="trend-badge ${cls}">${icon} ${comp.trend}</span>` : ''
+  return `<span>${score.toFixed(1)}</span> <span class="${cls}">(${sign}${comp.diff.toFixed(1)})</span>${trendHtml}`
 }
 
 function fmtAvg(val) {
@@ -576,6 +583,15 @@ onMounted(async () => {
 .diff-down { color: #dc2626; font-size: 0.78rem; font-weight: 600; }
 .diff-same { color: #92400e; font-size: 0.78rem; }
 
+/* Per-capital trend badge in table cells */
+.trend-badge {
+  display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.3rem;
+  border-radius: 4px; vertical-align: middle; margin-left: 0.15rem; white-space: nowrap;
+}
+.trend-badge.diff-up   { background: #dcfce7; color: #15803d; }
+.trend-badge.diff-down { background: #fee2e2; color: #b91c1c; }
+.trend-badge.diff-same { background: #fef9c3; color: #92400e; }
+
 .house-code { font-size: 0.8rem; }
 
 /* Household group styles */
@@ -649,6 +665,7 @@ onMounted(async () => {
 .capital-card-title { font-size: 0.72rem; color: #64748b; font-weight: 600; margin-bottom: 0.25rem; }
 .capital-card-score { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
 .capital-card-diff { font-size: 0.85rem; font-weight: 600; margin-top: 0.2rem; }
+.capital-card-trend { margin-top: 0.25rem; }
 .capital-card-baseline { font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; }
 
 /* Answers list */
