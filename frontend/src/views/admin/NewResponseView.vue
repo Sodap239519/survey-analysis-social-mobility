@@ -1341,7 +1341,7 @@ async function fetchPersonsForHouseCode(code) {
   }
   loadingPersons.value = true
   try {
-    const res = await api.get('/persons', { params: { house_code: code, per_page: 100 } })
+    const res = await api.get('/persons', { params: { house_code: code, per_page: 200 } })
     const persons = res.data.data || []
     console.log('[Autofill] persons for house_code', code, '→', persons.length)
     householdPersons.value = persons
