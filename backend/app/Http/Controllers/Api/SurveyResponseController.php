@@ -132,11 +132,27 @@ class SurveyResponseController extends Controller
         $response->overall_status = $overallStatus;
     }
 
-    public function show(SurveyResponse $surveyResponse): JsonResponse
+    public function show(SurveyResponse $response): JsonResponse
     {
-        $surveyResponse->load(['household', 'person', 'answers.question', 'detailedAnswers']);
-        $this->appendComparison($surveyResponse);
+        $response->load(['household', 'person', 'answers.question.choices', 'detailedAnswers']);
+        $this->appendComparison($response);
 
+        return response()->json($response);
+    }
+
+    public function edit(SurveyResponse $surveyResponse): JsonResponse
+    {
+        // Load relationships ครบสำหรับการแก้ไข
+        $surveyResponse->load([
+            'household', 
+            'person', 
+            'answers.question.capital',
+            'answers.question.choices',
+            'detailedAnswers'
+        ]);
+        
+        // ไม่ต้อง appendComparison ใน edit เพราะแค่ต้องการข้อมูลเดิม
+        
         return response()->json($surveyResponse);
     }
 

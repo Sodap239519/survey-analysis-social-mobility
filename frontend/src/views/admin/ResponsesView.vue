@@ -137,11 +137,11 @@
                 <td>{{ personName(r) }}</td>
                 <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
                 <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
-                <td><span v-html="capitalCell(r, 'human')"></span></td>
-                <td><span v-html="capitalCell(r, 'physical')"></span></td>
-                <td><span v-html="capitalCell(r, 'financial')"></span></td>
-                <td><span v-html="capitalCell(r, 'natural')"></span></td>
-                <td><span v-html="capitalCell(r, 'social')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
+                <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
                 <td>
                   <div class="flex gap-1">
                     <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
@@ -185,12 +185,12 @@
             <div class="detail-item"><span class="detail-label">รหัสบ้าน</span><span class="detail-value"><code>{{ detailResponse.household?.house_code || '—' }}</code></span></div>
             <div class="detail-item"><span class="detail-label">ชื่อผู้ตอบ</span><span class="detail-value">{{ personName(detailResponse) }}</span></div>
             <div class="detail-item"><span class="detail-label">เลขบัตรประชาชน</span><span class="detail-value">{{ detailResponse.person?.citizen_id || '—' }}</span></div>
-            <div class="detail-item"><span class="detail-label">วันเกิด</span><span class="detail-value">{{ detailResponse.person?.birthdate || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">วันเกิด</span><span class="detail-value">{{ formatThaiDate(detailResponse.person?.birthdate) }}</span></div>
             <div class="detail-item"><span class="detail-label">เบอร์โทร</span><span class="detail-value">{{ detailResponse.person?.phone || '—' }}</span></div>
             <div class="detail-item"><span class="detail-label">ช่วงเวลา</span><span class="detail-value">{{ periodLabel(detailResponse.period) }}</span></div>
             <div class="detail-item"><span class="detail-label">ปีที่สำรวจ</span><span class="detail-value">{{ detailResponse.survey_year || '—' }}</span></div>
             <div class="detail-item"><span class="detail-label">รอบสำรวจ</span><span class="detail-value">{{ detailResponse.survey_round || '—' }}</span></div>
-            <div class="detail-item"><span class="detail-label">วันที่สำรวจ</span><span class="detail-value">{{ detailResponse.surveyed_at || '—' }}</span></div>
+            <div class="detail-item"><span class="detail-label">วันที่สำรวจ</span><span class="detail-value">{{ formatThaiDate(detailResponse.surveyed_at) }}</span></div>
             <div class="detail-item"><span class="detail-label">ผู้สำรวจ</span><span class="detail-value">{{ detailResponse.surveyor_name || '—' }}</span></div>
             <div class="detail-item"><span class="detail-label">ชื่อโมเดล</span><span class="detail-value">{{ detailResponse.model_name || '—' }}</span></div>
             <div class="detail-item"><span class="detail-label">ระดับความเป็นอยู่</span><span class="detail-value">{{ detailResponse.poverty_level ? `ระดับ ${detailResponse.poverty_level} — ${levelLabel(detailResponse.poverty_level)}` : '—' }}</span></div>
@@ -252,7 +252,9 @@
                 <span class="answer-value">
                   <span v-if="ans.value_text">{{ ans.value_text }}</span>
                   <span v-else-if="ans.value_numeric !== null && ans.value_numeric !== undefined">{{ ans.value_numeric }}</span>
-                  <span v-else-if="ans.selected_choice_ids?.length">ตัวเลือก: {{ ans.selected_choice_ids.join(', ') }}</span>
+                  <span v-else-if="ans.selected_choice_ids?.length && ans.question?.choices">
+                    {{ getSelectedChoiceNames(ans) }}
+                  </span>
                   <span v-else class="text-muted">—</span>
                 </span>
               </div>
@@ -264,12 +266,12 @@
             <h4 class="section-title mt-4">📊 ข้อมูลเพิ่มเติม (Q8-Q13)</h4>
             <div class="answers-list">
               <div v-for="da in detailResponse.detailed_answers" :key="da.id" class="answer-item">
-                <span class="answer-question">{{ da.question_code }}</span>
+                <span class="answer-question">{{ getQuestionText(da.question_code) }}</span>
                 <span class="answer-value">
                   <span v-if="da.answer_value">{{ da.answer_value }}</span>
-                  <span v-if="da.sub_answers" class="sub-answers">
-                    <pre style="font-size:0.75rem;margin:0;white-space:pre-wrap">{{ JSON.stringify(da.sub_answers, null, 2) }}</pre>
-                  </span>
+                  <div v-if="da.sub_answers" class="detailed-answers-display">
+                    <div v-html="formatDetailedAnswers(da.question_code, da.sub_answers)"></div>
+                  </div>
                   <span v-if="!da.answer_value && !da.sub_answers" class="text-muted">—</span>
                 </span>
               </div>
@@ -381,8 +383,48 @@ function levelLabel(level) {
 }
 
 function addressStr(household) {
-  return [household.house_no, 'หมู่', household.village_no, household.village_name,
-    household.subdistrict_name, household.district_name].filter(Boolean).join(' ') || '—'
+  if (!household) return '—'
+  
+  const parts = []
+  
+  // บ้านเลขที่
+  if (household.house_no) {
+    parts.push(`บ้านเลขที่ ${household.house_no}`)
+  }
+  
+  // ซอย/ถนน
+  if (household.alley) {
+    parts.push(`ซอย ${household.alley}`)
+  }
+  if (household.road) {
+    parts.push(`ถนน ${household.road}`)
+  }
+  
+  // หมู่บ้าน
+  if (household.village_no) {
+    parts.push(`หมู่ ${household.village_no}`)
+  }
+  if (household.village_name) {
+    parts.push(`บ้าน${household.village_name}`)
+  }
+  
+  // ตำบล อำเภอ จังหวัด
+  if (household.subdistrict_name) {
+    parts.push(`ตำบล${household.subdistrict_name}`)
+  }
+  if (household.district_name) {
+    parts.push(`อำเภอ${household.district_name}`)
+  }
+  if (household.province_name) {
+    parts.push(`จังหวัด${household.province_name}`)
+  }
+  
+  // รหัสไปรษณีย์
+  if (household.postal_code) {
+    parts.push(`รหัสไปรษณีย์ ${household.postal_code}`)
+  }
+  
+  return parts.length > 0 ? parts.join(' ') : '—'
 }
 
 function statusStyle(status) {
@@ -458,6 +500,206 @@ function capitalCell(r, capital) {
 
 function fmtAvg(val) {
   return val !== null && val !== undefined ? val.toFixed(1) : '—'
+}
+
+/**
+ * Render only the status (แค่สถานะ) สำหรับตารางหลัก
+ * Format: "🔴 แย่ลง" หรือ "—" เมื่อไม่มีการเปรียบเทียบ
+ */
+function capitalStatusCell(r, capital) {
+  const comp = r.comparison?.[capital]
+  if (!comp || !comp.trend) return '<span class="text-muted">—</span>'
+  
+  const icon = statusIcon(comp.trend)
+  const style = statusStyle(comp.trend)
+  return `<span class="badge" style="background:${style.background};color:${style.color}">${icon} ${comp.trend}</span>`
+}
+
+function getQuestionText(questionCode) {
+  const questionTexts = {
+    // Q8: รายได้
+    'Q8_income': 'Q8. รายได้รวมของครัวเรือน (บาท/เดือน)',
+    'Q8_income_sources': 'Q8. แหล่งรายได้หลักข���งครัวเรือน',
+    
+    // Q9: รายจ่าย  
+    'Q9_expenses': 'Q9. รายจ่ายรวมของครัวเรือน (บาท/เดือน)',
+    'Q9_expense_categories': 'Q9. หมวดหมู่รายจ่ายหลัก',
+    
+    // Q10: หนี้สิน
+    'Q10_debt': 'Q10. หนี้สินปัจจุบัน',
+    'Q10_debt_details': 'Q10. รายละเอียดหนี้สิน',
+    
+    // Q11: เงินออม
+    'Q11_savings': 'Q11. เงินออมและสินทรัพย์ทางการเงิน',
+    'Q11_saving_methods': 'Q11. วิธีการออมเงิน',
+    
+    // Q12: ความยากจน
+    'Q12_poverty': 'Q12. การประเมินสถานะความยากจน',
+    'Q12_poverty_indicators': 'Q12. ตัวชี้วัดความยากจน',
+    
+    // Q13: การสนับสนุน
+    'Q13_support': 'Q13. การสนับสนุนจากภาครัฐและเอกชน',
+    'Q13_support_types': 'Q13. ประเภทการสนับสนุน',
+    
+    // เพิ่มอื่นๆ ตามต้องการ
+  }
+  
+  // ถ้าไม่เจอ ให้แสดง code เดิม แต่ปรับรูปแบบ
+  return questionTexts[questionCode] || formatQuestionCode(questionCode)
+}
+
+function formatQuestionCode(code) {
+  // แปลง Q10_debt → Q10. ข้อมูลหนี้สิน
+  // แปลง Q8_income → Q8. ข้อมูลรายได้
+  
+  const codeMap = {
+    'debt': 'ข้อมูลหนี้สิน',
+    'income': 'ข้อมูลรายได้', 
+    'expenses': 'ข้อมูลรายจ่าย',
+    'savings': 'ข้อมูลเงินออม',
+    'poverty': 'ข้อมูลความยากจน',
+    'support': 'ข้อมูลการสนับสนุน'
+  }
+  
+  // แยก Q8_debt → ['Q8', 'debt']
+  const parts = code.split('_')
+  if (parts.length >= 2) {
+    const qNumber = parts[0] // Q8, Q9, Q10...
+    const topic = parts[1]   // debt, income, expenses...
+    
+    const topicText = codeMap[topic] || topic
+    return `${qNumber}. ${topicText}`
+  }
+  
+  return code // fallback
+}
+
+// เพิ่มใน methods หรือ computed
+function getSelectedChoiceNames(answer) {
+  if (!answer.selected_choice_ids?.length || !answer.question?.choices) {
+    return '—'
+  }
+  
+  const selectedIds = answer.selected_choice_ids
+  const choices = answer.question.choices
+  
+  const selectedChoices = choices
+    .filter(choice => selectedIds.includes(choice.id))
+    .map(choice => choice.text_th || choice.text_en || `Choice ${choice.id}`)
+  
+  return selectedChoices.length > 0 ? selectedChoices.join(', ') : '—'
+}
+
+function formatDetailedAnswers(questionCode, subAnswers) {
+  if (!subAnswers || typeof subAnswers !== 'object') {
+    return '<span class="text-muted">—</span>'
+  }
+
+  // แยกตาม question_code
+  switch (questionCode) {
+    case 'Q10_debt':
+      return formatDebtAnswers(subAnswers)
+    
+    case 'Q8_income':
+      return formatIncomeAnswers(subAnswers)
+    
+    case 'Q9_expenses': 
+      return formatExpenseAnswers(subAnswers)
+    
+    // เพิ่มอื่นๆ ตามต้องการ
+    default:
+      return formatGenericAnswers(subAnswers)
+  }
+}
+
+function formatDebtAnswers(debtData) {
+  let html = '<div class="debt-summary">'
+  let totalAmount = 0
+  
+  Object.entries(debtData).forEach(([key, debt]) => {
+    const amount = debt.amount || 0
+    totalAmount += amount
+    const payment = debt.default_payment || 'ไม่ระบุ'
+    const canBorrow = debt.can_borrow || 'ไม่ได้'
+    
+    html += `
+      <div class="debt-item">
+        <strong>${getDebtTypeName(key)}</strong>: 
+        ${amount.toLocaleString()} บาท
+        ${payment !== 'ไม่มี' ? '<span class="text-danger">(ไม่เคยผิดนัด)</span>' : ''}
+        ${canBorrow === 'ได้' ? '<span class="text-success">(สามารถกู้เพิ่ม)</span>' : ''}
+      </div>
+    `
+  })
+  
+  html += `<div class="debt-total"><strong>รวมหนี้ทั้งหมด: ${totalAmount.toLocaleString()} บาท</strong></div>`
+  html += '</div>'
+  
+  return html
+}
+
+function getDebtTypeName(key) {
+  const debtTypes = {
+    '1.1': 'หนี้ส่วนตัว 1.1',
+    '1.2': 'หนี้ส่วนตัว 1.2', 
+    '1.3': 'หนี้ส่วนตัว 1.3',
+    '1.4': 'หนี้ส่วนตัว 1.4',
+    '1.5': 'หนี้กลุ่ม/สหกรณ์',
+    '1.6': 'หนี้อื่นๆ'
+  }
+  return debtTypes[key] || `หนี้ ${key}`
+}
+
+function formatIncomeAnswers(incomeData) {
+  // Similar format for income data
+  let html = '<div class="income-summary">'
+  let totalIncome = 0
+  
+  Object.entries(incomeData).forEach(([key, income]) => {
+    const amount = income.amount || 0
+    totalIncome += amount
+    html += `<div class="income-item"><strong>${getIncomeSourceName(key)}</strong>: ${amount.toLocaleString()} บาท/เดือน</div>`
+  })
+  
+  html += `<div class="income-total"><strong>รวมรายได้: ${totalIncome.toLocaleString()} บาท/เดือน</strong></div>`
+  html += '</div>'
+  
+  return html
+}
+
+function formatGenericAnswers(data) {
+  // Fallback สำหรับข้อมูลอื่นๆ
+  let html = '<div class="generic-answers">'
+  
+  Object.entries(data).forEach(([key, value]) => {
+    if (typeof value === 'object') {
+      html += `<div><strong>${key}:</strong> ${JSON.stringify(value)}</div>`
+    } else {
+      html += `<div><strong>${key}:</strong> ${value}</div>`
+    }
+  })
+  
+  html += '</div>'
+  return html
+}
+
+// เพิ่มใน methods
+function formatThaiDate(dateString) {
+  if (!dateString) return '—'
+  
+  const thaiMonths = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ]
+  
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return '—'
+  
+  const day = date.getDate()
+  const month = thaiMonths[date.getMonth()]
+  const year = date.getFullYear() + 543 // แปลงเป็น พ.ศ.
+  
+  return `${day} ${month} ${year}`
 }
 
 // ── Filtered / grouped rows ──────────────────────────────────────────────────
