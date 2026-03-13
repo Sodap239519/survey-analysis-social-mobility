@@ -388,7 +388,7 @@
                     <td class="td-count td-same">{{ mobilityByCapitalByLevel(cap.slug, level).same }}</td>
                     <td class="td-count td-decreased">{{ mobilityByCapitalByLevel(cap.slug, level).decreased }}</td>
                   </template>
-                  <td style="text-align:right;font-weight:700">{{ mobilityTotal(cap.slug) }}</td>
+                  <td style="text-align:right;font-weight:700">{{ summaryGrandTotal }}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -414,20 +414,18 @@
               <thead>
                 <tr>
                   <th>อำเภอ</th>
-                  <th>รหัส</th>
-                  <th style="text-align:right">ตำบล</th>
-                  <th style="text-align:right">หมู่บ้าน</th>
-                  <th style="text-align:right">ครัวเรือน</th>
-                  <th style="text-align:right">ผู้ตอบ</th>
+                  <th style="text-align:center">ตำบล</th>
+                  <th style="text-align:center">หมู่บ้าน</th>
+                  <th style="text-align:center">ครัวเรือน</th>
+                  <th style="text-align:center">คน</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="d in store.data.by_district" :key="d.district_code">
                   <td>{{ d.district_name || '—' }}</td>
-                  <td class="text-muted">{{ d.district_code }}</td>
-                  <td style="text-align:right">{{ d.subdistrict_count }}</td>
-                  <td style="text-align:right">{{ d.village_count }}</td>
-                  <td style="text-align:right;font-weight:700">{{ d.household_count }}</td>
+                  <td style="text-align:center">{{ d.subdistrict_count }}</td>
+                  <td style="text-align:center">{{ d.village_count }}</td>
+                  <td style="text-align:center;font-weight:700">{{ d.household_count }}</td>
                   <td style="text-align:center;font-weight:700">{{ d.respondent_count }}</td>
                 </tr>
               </tbody>
