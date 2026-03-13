@@ -388,7 +388,7 @@
                     <td class="td-count td-same">{{ mobilityByCapitalByLevel(cap.slug, level).same }}</td>
                     <td class="td-count td-decreased">{{ mobilityByCapitalByLevel(cap.slug, level).decreased }}</td>
                   </template>
-                  <td style="text-align:right;font-weight:700">{{ capitalMobilityTotal(cap.slug) }}</td>
+                  <td style="text-align:right;font-weight:700">{{ mobilityTotal(cap.slug) }}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -399,7 +399,7 @@
                     <td class="td-count"><strong>{{ summaryMobilityLevelTotal(level, 'same') }}</strong></td>
                     <td class="td-count"><strong>{{ summaryMobilityLevelTotal(level, 'decreased') }}</strong></td>
                   </template>
-                  <td style="text-align:right"><strong>{{ summaryGrandMobilityTotal }}</strong></td>
+                  <td style="text-align:right"><strong>{{ summaryGrandTotal }}</strong></td>
                 </tr>
               </tfoot>
             </table>
@@ -418,7 +418,7 @@
                   <th style="text-align:right">ตำบล</th>
                   <th style="text-align:right">หมู่บ้าน</th>
                   <th style="text-align:right">ครัวเรือน</th>
-                  <th style="text-align:right">คน</th>
+                  <th style="text-align:right">ผู้ตอบ</th>
                 </tr>
               </thead>
               <tbody>
@@ -901,39 +901,66 @@ watch(() => route.fullPath, async () => {
 
 /* ── Capital Tabs ── */
 .capital-tabs {
-  display: flex;
-  gap: 0.375rem;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
   margin-bottom: 1.25rem;
   background: #fff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 0.5rem;
+  padding: 0.75rem 1rem;
   box-shadow: var(--shadow-sm);
+  width: 100%;
 }
 .capital-tab {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.875rem;
-  border-radius: 8px;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 600;
   font-family: 'Prompt', sans-serif;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  min-height: 38px;
+  transition: all 0.2s ease;
+  min-height: 50px;
   white-space: nowrap;
+  text-align: center;
 }
-.capital-tab i { font-size: 0.95rem; }
-.capital-tab:hover { background: var(--color-surface-alt); color: var(--color-text); }
+.capital-tab i { font-size: 1.1rem; }
+.capital-tab:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
 .capital-tab.active {
   background: linear-gradient(90deg, #0ea5e9, #38bdf8);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(14,165,233,0.3);
+  box-shadow: 0 4px 12px rgba(14,165,233,0.3);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 1024px) {
+  .capital-tabs {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .capital-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .capital-tabs {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Summary Table Borders ── */
