@@ -756,6 +756,7 @@ const summaryGrandTotal = computed(() =>
   capitals.value.reduce((sum, cap) => sum + capitalTotal(cap.slug), 0)
 )
 
+
 // Donut chart helpers
 function donutSegments(slug) {
   const counts = capitalPoverty(slug)
