@@ -85,7 +85,13 @@
           </div>
           <div class="form-group">
             <label>วันที่สำรวจ</label>
-            <input v-model="form.surveyed_at" type="date" />
+            <input 
+              v-model="displaySurveyedAt" 
+              type="text" 
+              placeholder="dd/mm/yyyy"
+              @input="updateSurveyedAt"
+              maxlength="10"
+            />
           </div>
           <div class="form-group">
             <label>ชื่อผู้สำรวจ</label>
@@ -153,7 +159,13 @@
             </div>
             <div class="form-group">
               <label>วันเกิด</label>
-              <input v-model="form.person_birthdate" type="date" />
+              <input 
+                v-model="displayBirthdate" 
+                type="text" 
+                placeholder="dd/mm/yyyy"
+                @input="updateBirthdate"
+                maxlength="10"
+              />
             </div>
             <div class="form-group" :class="{ 'has-error': errors.person_phone }">
               <label>หมายเลขโทรศัพท์</label>
@@ -1334,12 +1346,21 @@ function clearPersonFields() {
 }
 
 function autofillPerson(person) {
+  console.log('[DEBUG] person data:', person)
+
   form.value.person_title      = person.title      || ''
   form.value.person_first_name = person.first_name || ''
   form.value.person_last_name  = person.last_name  || ''
   form.value.person_citizen_id = person.citizen_id || ''
-  form.value.person_birthdate  = toDateInput(person.birthdate)
-  form.value.person_phone      = person.phone      || ''
+  
+  console.log('[DEBUG] birthdate raw:', person.birthdate)
+  
+  // ใช้ computed แทน manual set
+  form.value.person_birthdate = person.birthdate || null
+  console.log('[DEBUG] set form.person_birthdate to:', form.value.person_birthdate)
+  console.log('[DEBUG] displayBirthdate computed to:', displayBirthdate.value)
+
+  form.value.person_phone = person.phone || ''
   console.log('[Autofill] filled person:', person.first_name, person.last_name)
 }
 
@@ -1644,6 +1665,68 @@ onMounted(async () => {
     await loadExistingResponse(editingId.value)
   }
 })
+
+function formatDateInput(event, field) {
+  let value = event.target.value.replace(/\D/g, '')
+  if (value.length >= 2) value = value.substring(0,2) + '/' + value.substring(2)
+  if (value.length >= 5) value = value.substring(0,5) + '/' + value.substring(5,9)
+  form.value[field] = value
+}
+
+// Display format dd/mm/yyyy
+const displaySurveyedAt = computed({
+  get: () => {
+    if (!form.value.surveyed_at) return ''
+    const date = new Date(form.value.surveyed_at)
+    if (isNaN(date.getTime())) return ''
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  },
+  set: (value) => {
+    // Convert dd/mm/yyyy to yyyy-mm-dd
+    if (!value || value.length !== 10) return
+    const [day, month, year] = value.split('/')
+    if (day && month && year) {
+      form.value.surveyed_at = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+  }
+})
+
+const displayBirthdate = computed({
+  get: () => {
+    if (!form.value.person_birthdate) return ''
+    const date = new Date(form.value.person_birthdate)
+    if (isNaN(date.getTime())) return ''
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear() + 543 // แปลงเป็น พ.ศ.
+    return `${day}/${month}/${year}`
+  },
+  set: (value) => {
+    if (!value || value.length !== 10) return
+    const [day, month, year] = value.split('/')
+    if (day && month && year) {
+      const adYear = parseInt(year) - 543 // แปลงกลับเป็น ค.ศ.
+      form.value.person_birthdate = `${adYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+  }
+})
+
+function updateSurveyedAt(event) {
+  let value = event.target.value.replace(/\D/g, '')
+  if (value.length >= 2) value = value.substring(0,2) + '/' + value.substring(2)
+  if (value.length >= 5) value = value.substring(0,5) + '/' + value.substring(5,9)
+  displaySurveyedAt.value = value
+}
+
+function updateBirthdate(event) {
+  let value = event.target.value.replace(/\D/g, '')
+  if (value.length >= 2) value = value.substring(0,2) + '/' + value.substring(2)
+  if (value.length >= 5) value = value.substring(0,5) + '/' + value.substring(5,9)
+  displayBirthdate.value = value
+}
 </script>
 
 <style scoped>
@@ -2031,6 +2114,33 @@ onMounted(async () => {
 .slide-down-leave-active { transition: all 0.2s ease; }
 .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-8px); max-height: 0; overflow: hidden; }
 .slide-down-enter-to, .slide-down-leave-from { opacity: 1; transform: translateY(0); max-height: 2000px; }
+
+/* เพิ่มตรงนี้ */
+input[type="date"] {
+  position: relative;
+}
+
+input[type="date"]::-webkit-datetime-edit {
+  position: relative;
+}
+
+input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+input[type="date"]:before {
+  content: attr(placeholder) !important;
+  color: #aaa;
+  margin-right: 0.5em;
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+}
+
+input[type="date"]:valid:before {
+  display: none;
+}
 
 /* ─── Smart person dropdown ─────────────────────────────────────────────────── */
 .person-select-wrap {

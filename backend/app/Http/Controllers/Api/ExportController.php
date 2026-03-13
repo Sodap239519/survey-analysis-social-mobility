@@ -236,46 +236,123 @@ class ExportController extends Controller
 
         // Address headers first, then response-specific
         $headers = array_merge(self::ADDRESS_HEADERS, [
-            'period'          => 'ช่วงเวลา',
-            'survey_year'     => 'ปีสำรวจ',
-            'survey_round'    => 'รอบสำรวจ',
-            'surveyed_at'     => 'วันที่สำรวจ',
-            'surveyor_name'   => 'ชื่อผู้สำรวจ',
-            'model_name'      => 'โมเดล',
-            'score_human'     => 'ทุนมนุษย์ (คะแนน)',
-            'score_physical'  => 'ทุนกายภาพ (คะแนน)',
-            'score_financial' => 'ทุนการเงิน (คะแนน)',
-            'score_natural'   => 'ทุนธรรมชาติ (คะแนน)',
-            'score_social'    => 'ทุนสังคม (คะแนน)',
-            'score_aggregate' => 'คะแนนรวม (X)',
-            'poverty_level'   => 'ระดับ (1-4)',
-            'poverty_label'   => 'ระดับความเป็นอยู่',
+            'respondent_name'        => 'ชื่อผู้ตอบ',
+            'period'                 => 'ช่วงเวลา',
+            'survey_year'            => 'ปีสำรวจ',
+            'survey_round'           => 'รอบสำรวจ',
+            'surveyed_at'            => 'วันที่สำรวจ',
+            'surveyor_name'          => 'ชื่อผู้สำรวจ',
+            'model_name'             => 'โมเดล',
+            
+            // 🆕 ทุนมนุษย์
+            'baseline_human'         => 'ทุนมนุษย์ - BASELINE (X)',
+            'score_human'            => 'ทุนมนุษย์ - SURVEY (X)',
+            'human_diff'             => 'ทุนมนุษย์ - ผลต่าง',
+            'human_percent'          => 'ทุนมนุษย์ - เปอร์เซ็นต์',
+            'human_trend'            => 'ทุนมนุษย์ - แนวโน้ม',
+            
+            // 🆕 ทุนกายภาพ
+            'baseline_physical'      => 'ทุนกายภาพ - BASELINE (X)',
+            'score_physical'         => 'ทุนกายภาพ - SURVEY (X)',
+            'physical_diff'          => 'ทุนกายภาพ - ผลต่าง',
+            'physical_percent'       => 'ทุนกายภาพ - เปอร์เซ็นต์',
+            'physical_trend'         => 'ทุนกายภาพ - แนวโน้ม',
+            
+            // 🆕 ทุนการเงิน
+            'baseline_financial'     => 'ทุนการเงิน - BASELINE (X)',
+            'score_financial'        => 'ทุนการเงิน - SURVEY (X)',
+            'financial_diff'         => 'ทุนการเงิน - ผลต่าง',
+            'financial_percent'      => 'ทุนการเงิน - เปอร์เซ็นต์',
+            'financial_trend'        => 'ทุนการเงิน - แนวโน้ม',
+            
+            // 🆕 ทุนธรรมชาติ
+            'baseline_natural'       => 'ทุนธรรมชาติ - BASELINE (X)',
+            'score_natural'          => 'ทุนธรรมชาติ - SURVEY (X)',
+            'natural_diff'           => 'ทุนธร��มชาติ - ผลต่าง',
+            'natural_percent'        => 'ทุนธรรมชาติ - เปอร์เซ็นต์',
+            'natural_trend'          => 'ทุนธรรมชาติ - แนวโน้ม',
+            
+            // 🆕 ทุนสังคม
+            'baseline_social'        => 'ทุนสังคม - BASELINE (X)',
+            'score_social'           => 'ทุนสังคม - SURVEY (X)',
+            'social_diff'            => 'ทุนสังคม - ผลต่าง',
+            'social_percent'         => 'ทุนสังคม - เปอร์เซ็��ต์',
+            'social_trend'           => 'ทุนสังคม - แนวโน้ม',
+            
+            'score_aggregate'        => 'คะแนนรวม (X)',
+            'avg_score'              => 'คะแนนเฉลี่ย',
+            'poverty_level'          => 'ระดับ (1-4)',
+            'poverty_label'          => 'ระดับความเป็นอยู่',
         ]);
 
         $scoring = new ScoringService();
         $rows = $query->orderBy('id')->get()->map(function ($r) use ($scoring) {
             $h = $r->household;
+            $p = $r->person;
+            
+            // 🆕 คำนวณผลต่างและเปอร์เซ็นต์
+            $humanData = $this->calculateCapitalData($r->score_human, $h?->baseline_score_human);
+            $physicalData = $this->calculateCapitalData($r->score_physical, $h?->baseline_score_physical);
+            $financialData = $this->calculateCapitalData($r->score_financial, $h?->baseline_score_financial);
+            $naturalData = $this->calculateCapitalData($r->score_natural, $h?->baseline_score_natural);
+            $socialData = $this->calculateCapitalData($r->score_social, $h?->baseline_score_social);
+            
+            $avgScore = ($r->score_human + $r->score_physical + $r->score_financial + $r->score_natural + $r->score_social) / 5;
+            
             return [
-                'house_code'       => $h?->house_code,
-                'house_no'         => $h?->house_no,
-                'village_no'       => $h?->village_no,
-                'village_name'     => $h?->village_name,
-                'subdistrict_name' => $h?->subdistrict_name,
-                'district_name'    => $h?->district_name,
-                'period'           => $r->period,
-                'survey_year'      => $r->survey_year,
-                'survey_round'     => $r->survey_round,
-                'surveyed_at'      => $r->surveyed_at?->toDateString(),
-                'surveyor_name'    => $r->surveyor_name,
-                'model_name'       => $r->model_name,
-                'score_human'      => $r->score_human,
-                'score_physical'   => $r->score_physical,
-                'score_financial'  => $r->score_financial,
-                'score_natural'    => $r->score_natural,
-                'score_social'     => $r->score_social,
-                'score_aggregate'  => $r->score_aggregate,
-                'poverty_level'    => $r->poverty_level,
-                'poverty_label'    => $r->poverty_level ? $scoring->getPovertyLevelLabel((int) $r->poverty_level) : '',
+                'house_code'         => $h?->house_code,
+                'house_no'           => $h?->house_no,
+                'village_no'         => $h?->village_no,
+                'village_name'       => $h?->village_name,
+                'subdistrict_name'   => $h?->subdistrict_name,
+                'district_name'      => $h?->district_name,
+                'respondent_name'    => trim(($p?->title ?? '') . ' ' . ($p?->first_name ?? '') . ' ' . ($p?->last_name ?? '')),
+                'period'             => $r->period,
+                'survey_year'        => $r->survey_year,
+                'survey_round'       => $r->survey_round,
+                'surveyed_at'        => $r->surveyed_at?->toDateString(),
+                'surveyor_name'      => $r->surveyor_name,
+                'model_name'         => $r->model_name,
+
+                // 🆕 ทุนมนุษย์
+                'baseline_human'     => $humanData['baseline'],
+                'score_human'        => $humanData['survey'],
+                'human_diff'         => $humanData['diff'],
+                'human_percent'      => $humanData['percent'],
+                'human_trend'        => $humanData['trend'],
+
+                // 🆕 ทุนกายภาพ
+                'baseline_physical'  => $physicalData['baseline'],
+                'score_physical'     => $physicalData['survey'],
+                'physical_diff'      => $physicalData['diff'],
+                'physical_percent'   => $physicalData['percent'],
+                'physical_trend'     => $physicalData['trend'],
+
+                // 🆕 ทุนการเงิน
+                'baseline_financial' => $financialData['baseline'],
+                'score_financial'    => $financialData['survey'],
+                'financial_diff'     => $financialData['diff'],
+                'financial_percent'  => $financialData['percent'],
+                'financial_trend'    => $financialData['trend'],
+
+                // 🆕 ทุนธรรมชาติ
+                'baseline_natural'   => $naturalData['baseline'],
+                'score_natural'      => $naturalData['survey'],
+                'natural_diff'       => $naturalData['diff'],
+                'natural_percent'    => $naturalData['percent'],
+                'natural_trend'      => $naturalData['trend'],
+
+                // 🆕 ทุนสังคม
+                'baseline_social'    => $socialData['baseline'],
+                'score_social'       => $socialData['survey'],
+                'social_diff'        => $socialData['diff'],
+                'social_percent'     => $socialData['percent'],
+                'social_trend'       => $socialData['trend'],
+                
+                'score_aggregate'    => $r->score_aggregate,
+                'avg_score'          => round($avgScore, 2),
+                'poverty_level'      => $r->poverty_level,
+                'poverty_label'      => $r->poverty_level ? $scoring->getPovertyLevelLabel((int) $r->poverty_level) : '',
             ];
         })->toArray();
 
@@ -484,4 +561,72 @@ class ExportController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
+
+    /**
+     * คำนวณข้อมูลทุน: ผลต่าง, เปอร์เซ็นต์, แนวโน้ม (รูปแบบเหมือน frontend)
+     * แปลงคะแนน normalized (0-100) เป็น X scale (1.0-4.0)
+     */
+    private function calculateCapitalData(?float $currentScore, ?float $baselineScore): array
+    {
+        // 🆕 กรณีไม่มี Survey เลย
+        if ($currentScore === null) {
+            return [
+                'baseline' => $baselineScore !== null ? number_format($baselineScore, 2) : '—',
+                'survey' => '—',
+                'diff' => '—',
+                'percent' => '—',
+                'trend' => '—'
+            ];
+        }
+        
+        // 🆕 แปลงค่า currentScore จาก normalized (0-100) เป็น X scale (1.0-4.0)
+        $currentScoreX = 1.0 + ($currentScore / 100.0) * 3.0;
+        $surveyFormatted = number_format($currentScoreX, 2);
+        
+        // 🆕 กรณีมีแค่ Survey ไม่มี Baseline
+        if ($baselineScore === null) {
+            return [
+                'baseline' => '—',
+                'survey' => $surveyFormatted,
+                'diff' => '—',
+                'percent' => '—',
+                'trend' => 'ไม่มีการเปรียบเทียบ เนื่องจากไม่มี Baseline'
+            ];
+        }
+        
+        // 🆕 กรณีมีทั้ง Baseline และ Survey
+        $diff = $currentScoreX - $baselineScore;
+        $percent = $baselineScore > 0 ? ($diff / $baselineScore) * 100 : 0;
+        
+        // Format baseline และ survey เป็น 2 ทศนิยม
+        $baselineFormatted = number_format($baselineScore, 2);
+        
+        // Format ผลต่าง
+        $diffFormatted = $diff > 0 
+            ? '+' . number_format($diff, 2) 
+            : number_format($diff, 2);
+        
+        // Format เปอร์เซ็นต์
+        $percentFormatted = $percent > 0 
+            ? '(+' . number_format($percent, 1) . '%)' 
+            : '(' . number_format($percent, 1) . '%)';
+        
+        // กำหนดแนวโน้ม
+        if (abs($diff) < self::TREND_THRESHOLD_PCT) {
+            $trend = 'คงที่';
+        } elseif ($diff > 0) {
+            $trend = 'ดีขึ้น';
+        } else {
+            $trend = 'แย่ลง';
+        }
+        
+        return [
+            'baseline' => $baselineFormatted,
+            'survey' => $surveyFormatted,
+            'diff' => $diffFormatted,
+            'percent' => $percentFormatted,
+            'trend' => $trend
+        ];
+    }
+    
 }

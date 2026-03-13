@@ -358,6 +358,8 @@ class HumanCapitalSheetImport implements ToCollection
                 $searchKeys['is_head']    = $isHead;
             }
 
+            $birthdate = $this->parseBirthdate($this->col($data, $headerMap, 'วัน/เดือน/ปีเกิด'));
+
             $person = Person::firstOrCreate(
                 $searchKeys,
                 [
@@ -365,6 +367,7 @@ class HumanCapitalSheetImport implements ToCollection
                     'first_name' => $firstName,
                     'last_name'  => $lastName,
                     'citizen_id' => $citizenId,
+                    'birthdate'  => $birthdate,
                     'is_head'    => $isHead,
                 ]
             );
@@ -433,5 +436,28 @@ class HumanCapitalSheetImport implements ToCollection
     {
         if ($value === null || $value === '') return null;
         return (int) $value;
+    }
+
+    private function parseBirthdate(mixed $value): ?string
+    {
+        if ($value === null || $value === '') return null;
+        
+        $str = trim((string) $value);
+        
+        // ถ้าเป็น dd/mm/yyyy format
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $str, $matches)) {
+            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $month = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
+            $year = $matches[3];
+            return "{$year}-{$month}-{$day}";
+        }
+        
+        // ลองแปลง date format อื่นๆ
+        try {
+            $date = new \DateTime($str);
+            return $date->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

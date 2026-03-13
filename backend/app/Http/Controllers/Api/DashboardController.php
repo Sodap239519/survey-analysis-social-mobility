@@ -132,7 +132,7 @@ class DashboardController extends Controller
     {
         $capitals = [
             'human'     => 'score_human',
-            'physical'  => 'score_physical',
+            'physical'  => 'score_physical', 
             'financial' => 'score_financial',
             'natural'   => 'score_natural',
             'social'    => 'score_social',
@@ -142,21 +142,34 @@ class DashboardController extends Controller
 
         foreach ($capitals as $slug => $scoreCol) {
             $rows = (clone $query)->whereNotNull($scoreCol)->get([$scoreCol]);
-
+            
             $levels = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
+            $mobility = ['improved' => 0, 'same' => 0, 'decreased' => 0];
 
             foreach ($rows as $row) {
-                $normalized = (float) $row->{$scoreCol}; // already 0-100
-                // Convert to [1,4] scale for individual capital
+                $normalized = (float) $row->{$scoreCol}; // 0-100 score
+                // แปลงเป็น X scale (1.0-4.0) สำหรับแต่ละทุน
                 $x = 1.0 + ($normalized / 100.0) * 3.0;
-                $level = $this->povertyLevel($x);
+                $level = $this->getPovertyLevel($x);
                 $levels[$level]++;
             }
 
-            $result[$slug] = $levels;
+            $result[$slug] = [
+                'levels' => $levels,
+                'total' => array_sum($levels),
+                'mobility' => $mobility // เพิ่มใน method getMobilityByCapital
+            ];
         }
 
         return $result;
+    }
+
+    private function getPovertyLevel(float $score): int
+    {
+        if ($score < 1.75) return 1;
+        if ($score < 2.50) return 2; 
+        if ($score < 3.25) return 3;
+        return 4;
     }
 
     private function getOverallPovertyLevels($query): array
