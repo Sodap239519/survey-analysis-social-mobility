@@ -736,10 +736,29 @@ const selectedPersonId   = ref(null) // selected person id in dropdown
 const loadingPersons     = ref(false)
 const showPersonDropdown = computed(() => householdPersons.value.length > 1)
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+// Convert any ISO/MySQL datetime string (e.g. "2026-03-10 00:00:00" or
+// "2026-03-10T00:00:00.000Z") to the yyyy-mm-dd value required by
+// <input type="date">.  Returns '' when input is empty/invalid.
+function toDateInput(dateStr) {
+  if (!dateStr) return ''
+  // Already a plain date string like "2026-03-10"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr))) return dateStr
+  // Parse and extract the date portion only
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  return d.toISOString().slice(0, 10)
+}
+
+// Today's date as yyyy-mm-dd (for default survey date)
+function todayDateInput() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 // Form data
 const form = ref({
   house_code: '', model_name: '', period: 'after',
-  survey_year: 2568, survey_round: null, surveyed_at: '', surveyor_name: '',
+  survey_year: 2568, survey_round: null, surveyed_at: todayDateInput(), surveyor_name: '',
   person_title: '', person_first_name: '', person_last_name: '',
   person_citizen_id: '', person_birthdate: '', person_phone: '',
   house_no: '', village_no: '', subdistrict_name: '', district_name: '',
@@ -1319,7 +1338,7 @@ function autofillPerson(person) {
   form.value.person_first_name = person.first_name || ''
   form.value.person_last_name  = person.last_name  || ''
   form.value.person_citizen_id = person.citizen_id || ''
-  form.value.person_birthdate  = person.birthdate  || ''
+  form.value.person_birthdate  = toDateInput(person.birthdate)
   form.value.person_phone      = person.phone      || ''
   console.log('[Autofill] filled person:', person.first_name, person.last_name)
 }
@@ -1372,7 +1391,7 @@ async function loadExistingResponse(id) {
     form.value.period         = r.period || 'after'
     form.value.survey_year    = r.survey_year || 2568
     form.value.survey_round   = r.survey_round || null
-    form.value.surveyed_at    = r.surveyed_at || ''
+    form.value.surveyed_at    = toDateInput(r.surveyed_at)
     form.value.surveyor_name  = r.surveyor_name || ''
 
     if (r.person) {
@@ -1381,7 +1400,7 @@ async function loadExistingResponse(id) {
       form.value.person_last_name  = r.person.last_name || ''
       form.value.person_citizen_id = r.person.citizen_id || ''
       form.value.person_phone      = r.person.phone || ''
-      form.value.person_birthdate  = r.person.birthdate || ''
+      form.value.person_birthdate  = toDateInput(r.person.birthdate)
     }
 
     if (r.household) {
