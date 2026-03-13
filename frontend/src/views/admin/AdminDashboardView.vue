@@ -243,6 +243,12 @@
               <div class="mobility-label">แย่ลง</div>
               <div class="mobility-pct" v-if="mobilityGrandTotal > 0">{{ mobilityPct(store.data.mobility.decreased, mobilityGrandTotal) }}%</div>
             </div>
+            <div class="mobility-pill no-baseline">
+              <i class="fi fi-rr-question mobility-icon"></i>
+              <div class="mobility-count">{{ store.data.mobility.no_baseline || 0 }}</div>
+              <div class="mobility-label">ไม่มีการเปรียบเทียบ</div>
+              <div class="mobility-pct" v-if="mobilityGrandTotal > 0">{{ mobilityPct(store.data.mobility.no_baseline, mobilityGrandTotal) }}%</div>
+            </div>
           </div>
           <p class="text-muted text-sm mt-2">
             เปรียบเทียบ score รวมก่อนและหลังเข้าร่วมโครงการ
@@ -381,11 +387,17 @@
                   :style="{ width: mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) + '%' }"
                   :title="'แย่ลง: ' + capitalMobility(cap.slug).decreased"
                 ></div>
+                <div
+                  class="cap-mob-bar no-baseline"
+                  :style="{ width: mobilityPct(capitalMobility(cap.slug).no_baseline, mobilityTotal(cap.slug)) + '%' }"
+                  :title="'ไม่มีการเปรียบเทียบ: ' + (capitalMobility(cap.slug).no_baseline || 0)"
+                ></div>
               </div>
               <div class="cap-mob-counts">
                 <span class="cap-mob-count improved"><i class="fi fi-rr-arrow-trend-up"></i> {{ capitalMobility(cap.slug).improved }}</span>
                 <span class="cap-mob-count same"><i class="fi fi-rr-arrow-right"></i> {{ capitalMobility(cap.slug).same }}</span>
                 <span class="cap-mob-count decreased"><i class="fi fi-rr-arrow-trend-down"></i> {{ capitalMobility(cap.slug).decreased }}</span>
+                <span class="cap-mob-count no-baseline"><i class="fi fi-rr-question"></i> {{ capitalMobility(cap.slug).no_baseline || 0 }}</span>
               </div>
             </div>
           </div>
@@ -393,6 +405,7 @@
             <span class="cap-mob-legend-item improved"><span class="cap-mob-dot"></span>ดีขึ้น</span>
             <span class="cap-mob-legend-item same"><span class="cap-mob-dot"></span>คงที่</span>
             <span class="cap-mob-legend-item decreased"><span class="cap-mob-dot"></span>แย่ลง</span>
+            <span class="cap-mob-legend-item no-baseline"><span class="cap-mob-dot"></span>ไม่มีการเปรียบเทียบ</span>
           </div>
         </div>
 
@@ -585,6 +598,11 @@
                 <div class="mobility-count">{{ capitalMobility(cap.slug).decreased }}</div>
                 <div class="mobility-label">แย่ลง</div>
               </div>
+              <div class="mobility-pill no-baseline">
+                <i class="fi fi-rr-question mobility-icon"></i>
+                <div class="mobility-count">{{ capitalMobility(cap.slug).no_baseline || 0 }}</div>
+                <div class="mobility-label">ไม่มีการเปรียบเทียบ</div>
+              </div>
             </div>
             <!-- Enhanced stacked bar chart -->
             <div class="mob-stacked-wrap mt-3">
@@ -610,11 +628,19 @@
                     {{ mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) }}%
                   </span>
                 </div>
+                <div class="mob-seg no-baseline"
+                  :style="{ flex: capitalMobility(cap.slug).no_baseline || 0.01 }"
+                  :title="`ไม่มีการเปรียบเทียบ: ${capitalMobility(cap.slug).no_baseline || 0}`">
+                  <span v-if="mobilityPct(capitalMobility(cap.slug).no_baseline, mobilityTotal(cap.slug)) >= 10" class="mob-seg-pct">
+                    {{ mobilityPct(capitalMobility(cap.slug).no_baseline, mobilityTotal(cap.slug)) }}%
+                  </span>
+                </div>
               </div>
               <div class="mob-stacked-legend">
                 <span class="mob-stacked-legend-item improved"><i class="fi fi-rr-arrow-trend-up"></i> ดีขึ้น {{ mobilityPct(capitalMobility(cap.slug).improved, mobilityTotal(cap.slug)) }}%</span>
                 <span class="mob-stacked-legend-item same"><i class="fi fi-rr-arrow-right"></i> คงที่ {{ mobilityPct(capitalMobility(cap.slug).same, mobilityTotal(cap.slug)) }}%</span>
                 <span class="mob-stacked-legend-item decreased"><i class="fi fi-rr-arrow-trend-down"></i> แย่ลง {{ mobilityPct(capitalMobility(cap.slug).decreased, mobilityTotal(cap.slug)) }}%</span>
+                <span class="mob-stacked-legend-item no-baseline"><i class="fi fi-rr-question"></i> ไม่มีการเปรียบเทียบ {{ mobilityPct(capitalMobility(cap.slug).no_baseline, mobilityTotal(cap.slug)) }}%</span>
               </div>
             </div>
             <p class="text-muted text-sm mt-2">เปรียบเทียบ score ทุน{{ cap.nameTh }} ก่อนและหลังเข้าร่วมโครงการ</p>
@@ -741,19 +767,19 @@ const capitalAverages = computed(() => store.data?.capital_averages || { human: 
 const mobilityByCapital = computed(() => store.data?.mobility_by_capital || {})
 
 function capitalMobility(slug) {
-  return mobilityByCapital.value[slug] || { improved: 0, same: 0, decreased: 0 }
+  return mobilityByCapital.value[slug] || { improved: 0, same: 0, decreased: 0, no_baseline: 0 }
 }
 
 function mobilityTotal(slug) {
   const m = capitalMobility(slug)
-  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)
+  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0) + (m.no_baseline || 0)
 }
 
 // Grand total across ALL capitals (uses store.data.mobility — the overall aggregate,
 // not per-capital; distinct from mobilityTotal which operates on a single capital slug)
 const mobilityGrandTotal = computed(() => {
-  const m = store.data?.mobility || { improved: 0, same: 0, decreased: 0 }
-  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0)
+  const m = store.data?.mobility || { improved: 0, same: 0, decreased: 0, no_baseline: 0 }
+  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0) + (m.no_baseline || 0)
 })
 
 // Before/After comparison summary
@@ -1102,12 +1128,14 @@ watch(() => route.fullPath, async () => {
 .mob-seg.improved { background: #22c55e; }
 .mob-seg.same { background: #94a3b8; }
 .mob-seg.decreased { background: #ef4444; }
+.mob-seg.no-baseline { background: #f59e0b; }
 .mob-seg-pct { font-size: 0.72rem; font-weight: 700; color: #fff; white-space: nowrap; }
 .mob-stacked-legend { display: flex; gap: 0.625rem; flex-wrap: wrap; font-size: 0.72rem; }
 .mob-stacked-legend-item { display: flex; align-items: center; gap: 0.25rem; font-weight: 600; }
 .mob-stacked-legend-item.improved { color: #22c55e; }
 .mob-stacked-legend-item.same { color: #64748b; }
 .mob-stacked-legend-item.decreased { color: #ef4444; }
+.mob-stacked-legend-item.no-baseline { color: #f59e0b; }
 
 /* ── Mobility ── */
 .mobility-pills { display: flex; gap: 0.75rem; justify-content: space-around; flex-wrap: wrap; }
@@ -1115,10 +1143,12 @@ watch(() => route.fullPath, async () => {
 .mobility-pill.improved { background: rgba(34,197,94,0.1); border: 1.5px solid #22c55e; }
 .mobility-pill.same { background: rgba(100,116,139,0.08); border: 1.5px solid #94a3b8; }
 .mobility-pill.decreased { background: rgba(239,68,68,0.08); border: 1.5px solid #ef4444; }
+.mobility-pill.no-baseline { background: rgba(245,158,11,0.08); border: 1.5px solid #f59e0b; }
 .mobility-icon { font-size: 1.25rem; }
 .mobility-pill.improved .mobility-icon { color: #22c55e; }
 .mobility-pill.same .mobility-icon { color: #94a3b8; }
 .mobility-pill.decreased .mobility-icon { color: #ef4444; }
+.mobility-pill.no-baseline .mobility-icon { color: #f59e0b; }
 .mobility-count { font-size: 1.5rem; font-weight: 800; color: var(--color-text); }
 .mobility-label { font-size: 0.7rem; color: var(--color-text-muted); }
 
@@ -1151,18 +1181,21 @@ watch(() => route.fullPath, async () => {
 .cap-mob-bar.improved { background: #22c55e; }
 .cap-mob-bar.same { background: #94a3b8; }
 .cap-mob-bar.decreased { background: #ef4444; }
+.cap-mob-bar.no-baseline { background: #f59e0b; }
 .cap-mob-counts { display: flex; gap: 0.3rem; flex-shrink: 0; }
 .cap-mob-count { font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 4px; display: flex; align-items: center; gap: 2px; }
 .cap-mob-count i { font-size: 0.65rem; }
 .cap-mob-count.improved { color: #22c55e; background: rgba(34,197,94,0.1); }
 .cap-mob-count.same { color: #64748b; background: rgba(100,116,139,0.1); }
 .cap-mob-count.decreased { color: #ef4444; background: rgba(239,68,68,0.1); }
+.cap-mob-count.no-baseline { color: #f59e0b; background: rgba(245,158,11,0.1); }
 .cap-mob-legend { margin-top: 0.75rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .cap-mob-legend-item { font-size: 0.7rem; color: var(--color-text-muted); display: flex; align-items: center; gap: 4px; }
 .cap-mob-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .cap-mob-legend-item.improved .cap-mob-dot { background: #22c55e; }
 .cap-mob-legend-item.same .cap-mob-dot { background: #94a3b8; }
 .cap-mob-legend-item.decreased .cap-mob-dot { background: #ef4444; }
+.cap-mob-legend-item.no-baseline .cap-mob-dot { background: #f59e0b; }
 .mt-2 { margin-top: 0.5rem; }
 
 /* ── Summary Table with sub-columns ── */
