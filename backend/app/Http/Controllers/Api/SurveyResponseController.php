@@ -276,6 +276,16 @@ class SurveyResponseController extends Controller
             'model_name'    => $validated['model_name'] ?? null,
         ]);
 
+        if (isset($validated['answers']) && array_is_list($validated['answers'])) {
+            $normalized = [];
+            foreach ($validated['answers'] as $a) {
+                if (isset($a['question_id'])) {
+                    $normalized[$a['question_id']] = $a;
+                }
+            }
+            $validated['answers'] = $normalized;
+        }
+
         // Create answer records
         foreach ($validated['answers'] ?? [] as $questionId => $answerData) {
             $question = Question::find($questionId);
@@ -306,8 +316,16 @@ class SurveyResponseController extends Controller
         return response()->json($response->load(['answers.question']), 201);
     }
 
-    public function update(Request $request, SurveyResponse $surveyResponse): JsonResponse
+    public function update(Request $request, $id): JsonResponse
     {
+        // หา SurveyResponse manually
+        $surveyResponse = SurveyResponse::findOrFail($id);
+        
+        \Log::info('Manual Survey Response:', [
+            'id' => $surveyResponse->id,
+            'exists' => $surveyResponse->exists
+        ]);
+
         $validated = $request->validate([
             'household_data'                     => 'nullable|array',
             'household_data.house_no'            => 'nullable|string',
@@ -340,6 +358,11 @@ class SurveyResponseController extends Controller
             'detailed_answers.*.sub_answers'   => 'nullable|array',
         ]);
 
+        // Debug request answers
+    \Log::info('Request Answers:', $request->get('answers', []));
+    \Log::info('Validated Answers:', $validated['answers'] ?? []);
+
+
         // ── Update household data if provided ─────────────────────────────────
         $householdData = $validated['household_data'] ?? [];
         if (! empty($householdData) && $surveyResponse->household) {
@@ -355,6 +378,8 @@ class SurveyResponseController extends Controller
         $surveyResponse->update(collect($validated)->except(['household_data', 'person_data', 'answers', 'detailed_answers'])->toArray());
 
         foreach ($validated['answers'] ?? [] as $questionId => $answerData) {
+            $questionId = (int) $questionId;
+            
             Answer::updateOrCreate(
                 [
                     'survey_response_id' => $surveyResponse->id,
@@ -367,7 +392,6 @@ class SurveyResponseController extends Controller
                 ]
             );
         }
-
         // Update detailed answers (upsert by question_code)
         foreach ($validated['detailed_answers'] ?? [] as $detailData) {
             DetailedAnswer::updateOrCreate(

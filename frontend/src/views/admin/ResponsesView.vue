@@ -623,12 +623,12 @@ function formatDebtAnswers(debtData) {
     const canBorrow = debt.can_borrow || 'ไม่ได้'
     
     html += `
-      <div class="debt-item">
-        <strong>${getDebtTypeName(key)}</strong>: 
-        ${amount.toLocaleString()} บาท
-        ${payment !== 'ไม่มี' ? '<span class="text-danger">(ไม่เคยผิดนัด)</span>' : ''}
-        ${canBorrow === 'ได้' ? '<span class="text-success">(สามารถกู้เพิ่ม)</span>' : ''}
-      </div>
+    <div class="debt-item">
+      <strong>${getDebtTypeName(key)}</strong>: 
+      ${amount.toLocaleString()} บาท
+      ${payment !== 'ไม่มี' ? '<span class="text-success">(ไม่เคยผิดนัด)</span>' : '<span class="text-danger">(เคยผิดนัด)</span>'}
+      ${canBorrow === 'ได้' ? '<span class="text-success">(สามารถกู้เพิ่ม)</span>' : ''}
+    </div>
     `
   })
   
@@ -648,6 +648,49 @@ function getDebtTypeName(key) {
     '1.6': 'หนี้อื่นๆ'
   }
   return debtTypes[key] || `หนี้ ${key}`
+}
+
+// เพิ่มหลัง getDebtTypeName function
+function getIncomeSourceName(key) {
+  const incomeTypes = {
+    '1': 'รายได้จากการเกษตร',
+    '2': 'รายได้จากการค้าขาย',
+    '3': 'รายได้จากการรับจ้าง',
+    '4': 'รายได้จากธุรกิจส่วนตัว',
+    '5': 'รายได้จากการลงทุน',
+    '6': 'เงินช่วยเหลือจากรัฐ',
+    '7': 'รายได้อื่นๆ'
+  }
+  return incomeTypes[key] || `รายได้ ${key}`
+}
+
+function formatExpenseAnswers(expenseData) {
+  let html = '<div class="expense-summary">'
+  let totalExpense = 0
+  
+  Object.entries(expenseData).forEach(([key, expense]) => {
+    const amount = expense.amount || 0
+    totalExpense += amount
+    html += `<div class="expense-item"><strong>${getExpenseTypeName(key)}</strong>: ${amount.toLocaleString()} บาท/เดือน</div>`
+  })
+  
+  html += `<div class="expense-total"><strong>รวมรายจ่าย: ${totalExpense.toLocaleString()} บาท/เดือน</strong></div>`
+  html += '</div>'
+  
+  return html
+}
+
+function getExpenseTypeName(key) {
+  const expenseTypes = {
+    '1': 'ค่าอาหาร',
+    '2': 'ค่าที่อยู่อาศัย',
+    '3': 'ค่าเดินทาง',
+    '4': 'ค่าการศึกษา',
+    '5': 'ค่าสาธารณูปโภค',
+    '6': 'ค่ารักษาพยาบาล',
+    '7': 'รายจ่ายอื่นๆ'
+  }
+  return expenseTypes[key] || `รายจ่าย ${key}`
 }
 
 function formatIncomeAnswers(incomeData) {
