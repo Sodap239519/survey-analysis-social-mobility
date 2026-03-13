@@ -290,46 +290,12 @@ class DashboardController extends Controller
 
     private function getMobilityByCapitalByLevel(?string $district, ?string $subdistrict, ?int $surveyYear): array
     {
-        $capitals = [
-            'human'     => 'score_human',
-            'physical'  => 'score_physical',
-            'financial' => 'score_financial',
-            'natural'   => 'score_natural',
-            'social'    => 'score_social',
-        ];
-
+        $capitals = ['human', 'physical', 'financial', 'natural', 'social'];
+        $compareLogic = new CompareHouseholdSurveyLogic();
         $result = [];
-
-        foreach ($capitals as $slug => $scoreCol) {
-            $beforeQuery = SurveyResponse::query()->where('period', 'before')->whereNotNull($scoreCol);
-            $afterQuery  = SurveyResponse::query()->where('period', 'after')->whereNotNull($scoreCol);
-
-            if ($surveyYear) {
-                $beforeQuery->where('survey_year', $surveyYear);
-                $afterQuery->where('survey_year', $surveyYear);
-            }
-
-            if ($district) {
-                $beforeQuery->whereHas('household', function ($q) use ($district) {
-                    $q->where('district_name', 'like', "%{$district}%");
-                });
-                $afterQuery->whereHas('household', function ($q) use ($district) {
-                    $q->where('district_name', 'like', "%{$district}%");
-                });
-            }
-
-            if ($subdistrict) {
-                $beforeQuery->whereHas('household', function ($q) use ($subdistrict) {
-                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
-                });
-                $afterQuery->whereHas('household', function ($q) use ($subdistrict) {
-                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
-                });
-            }
-
-            $beforeMap = $beforeQuery->pluck($scoreCol, 'household_id')->toArray();
-            $afterMap  = $afterQuery->pluck($scoreCol, 'household_id')->toArray();
-
+        
+        foreach ($capitals as $capital) {
+            // Initialize levels
             $levels = [
                 1 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
                 2 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
@@ -337,29 +303,46 @@ class DashboardController extends Controller
                 4 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
             ];
 
-            foreach ($afterMap as $householdId => $afterScore) {
-                if (!isset($beforeMap[$householdId])) {
-                    continue;
-                }
+            $query = Household::query();
 
-                // Map 0-100 score to 1-4 scale; thresholds at 1.75, 2.50, 3.25
-                $x = 1.0 + ((float) $afterScore / 100.0) * 3.0;
-                $level = $this->povertyLevel($x);
-
-                $diff = (float) $afterScore - (float) $beforeMap[$householdId];
-
-                // Use a small epsilon (0.01) to absorb floating-point rounding differences;
-                // scores that fall within this margin are considered unchanged ("same").
-                if ($diff > 0.01) {
-                    $levels[$level]['improved']++;
-                } elseif ($diff < -0.01) {
-                    $levels[$level]['decreased']++;
-                } else {
-                    $levels[$level]['same']++;
-                }
+            if ($district) {
+                $query->where('district_name', 'like', "%{$district}%");
             }
 
-            $result[$slug] = $levels;
+            if ($subdistrict) {
+                $query->where('subdistrict_name', 'like', "%{$subdistrict}%");
+            }
+
+            if ($surveyYear) {
+                $query->where('survey_year', $surveyYear);
+            }
+
+            $query->chunk(100, function ($households) use ($compareLogic, $surveyYear, $capital, &$levels) {
+                foreach ($households as $household) {
+                    $compareResult = $compareLogic->compare($household, $surveyYear, null);
+                    $capitalData = $compareResult['capitals'][$capital];
+
+                    // ตรวจสอบว่ามีข้อมูล both before and after
+                    if ($capitalData['before'] !== null && $capitalData['after'] !== null) {
+                        // แปลง after score (0-100) เป็น X scale (1-4) เพื่อหาระดับความยากจน
+                        $afterNormalized = $capitalData['after']; // already normalized 0-100 from CompareLogic
+                        $afterX = 1.0 + ($afterNormalized / 100.0) * 3.0;
+                        $level = $this->povertyLevel($afterX);
+
+                        // คำนวณ mobility
+                        $threshold = $capitalData['before'] * self::TREND_THRESHOLD_PCT;
+                        if ($capitalData['diff'] > $threshold) {
+                            $levels[$level]['improved']++;
+                        } elseif ($capitalData['diff'] < -$threshold) {
+                            $levels[$level]['decreased']++;
+                        } else {
+                            $levels[$level]['same']++;
+                        }
+                    }
+                }
+            });
+
+            $result[$capital] = $levels;
         }
 
         return $result;
@@ -377,14 +360,14 @@ class DashboardController extends Controller
         if ($district) {
             $responseQuery->whereHas('household', function ($q) use ($district) {
                 $q->where('district_name', 'like', "%{$district}%")
-                  ->orWhere('district_code', $district);
+                ->orWhere('district_code', $district);
             });
         }
 
         if ($subdistrict) {
             $responseQuery->whereHas('household', function ($q) use ($subdistrict) {
                 $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
-                  ->orWhere('subdistrict_code', $subdistrict);
+                ->orWhere('subdistrict_code', $subdistrict);
             });
         }
 
@@ -402,7 +385,21 @@ class DashboardController extends Controller
             ->groupBy('district_name', 'district_code')
             ->orderBy('district_name');
 
-        return $query->get()->toArray();
+        $results = $query->get()->toArray();
+
+        // 🆕 เพิ่มการนับจำนวนผู้ตอบแต่ละอำเภอ
+        foreach ($results as &$result) {
+            $responseCount = (clone $responseQuery)
+                ->whereHas('household', function ($q) use ($result) {
+                    $q->where('district_name', $result['district_name']);
+                })
+                ->distinct('person_id')
+                ->count('person_id');
+            
+            $result['respondent_count'] = $responseCount;
+        }
+
+        return $results;
     }
 
     private function povertyLevel(float $x): int

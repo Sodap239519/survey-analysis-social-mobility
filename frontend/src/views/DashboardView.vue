@@ -356,7 +356,7 @@
 
         <!-- Summary Table with sub-columns -->
         <div class="bento-summary card">
-          <h3 class="card-title"><i class="fi fi-rr-table"></i> ตารางสรุปจำนวนครัวเรือนตามทุนและระดับความยากจน</h3>
+          <h3 class="card-title"><i class="fi fi-rr-table"></i> ตารางสรุปการเปลี่ยนแปลงในแต่ละทุน</h3>
           <div class="table-wrap">
             <table class="summary-table">
               <thead>
@@ -388,7 +388,7 @@
                     <td class="td-count td-same">{{ mobilityByCapitalByLevel(cap.slug, level).same }}</td>
                     <td class="td-count td-decreased">{{ mobilityByCapitalByLevel(cap.slug, level).decreased }}</td>
                   </template>
-                  <td style="text-align:right;font-weight:700">{{ capitalTotal(cap.slug) }}</td>
+                  <td style="text-align:right;font-weight:700">{{ capitalMobilityTotal(cap.slug) }}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -399,7 +399,7 @@
                     <td class="td-count"><strong>{{ summaryMobilityLevelTotal(level, 'same') }}</strong></td>
                     <td class="td-count"><strong>{{ summaryMobilityLevelTotal(level, 'decreased') }}</strong></td>
                   </template>
-                  <td style="text-align:right"><strong>{{ summaryGrandTotal }}</strong></td>
+                  <td style="text-align:right"><strong>{{ summaryGrandMobilityTotal }}</strong></td>
                 </tr>
               </tfoot>
             </table>
@@ -418,6 +418,7 @@
                   <th style="text-align:right">ตำบล</th>
                   <th style="text-align:right">หมู่บ้าน</th>
                   <th style="text-align:right">ครัวเรือน</th>
+                  <th style="text-align:right">คน</th>
                 </tr>
               </thead>
               <tbody>
@@ -427,6 +428,7 @@
                   <td style="text-align:right">{{ d.subdistrict_count }}</td>
                   <td style="text-align:right">{{ d.village_count }}</td>
                   <td style="text-align:right;font-weight:700">{{ d.household_count }}</td>
+                  <td style="text-align:center;font-weight:700">{{ d.respondent_count }}</td>
                 </tr>
               </tbody>
             </table>
@@ -739,7 +741,7 @@ function povertyColor(level) {
   return colors[level] || '#94a3b8'
 }
 
-// Mobility by capital by level (for summary table sub-columns)
+// Mobility by capital by level (for summary table)
 const mobilityByCapitalByLevelData = computed(() => store.data?.mobility_by_capital_by_level || {})
 
 function mobilityByCapitalByLevel(slug, level) {
@@ -752,10 +754,19 @@ function summaryMobilityLevelTotal(level, key) {
   }, 0)
 }
 
-const summaryGrandTotal = computed(() =>
-  capitals.value.reduce((sum, cap) => sum + capitalTotal(cap.slug), 0)
-)
-
+// ✅ ใช้แค่ summaryGrandTotal ตัวเดียว - บวกตามแถวสรุป
+const summaryGrandTotal = computed(() => {
+  let total = 0
+  
+  // บวกจากแถวสรุป (level 1-4, แต่ละ level มี improved + same + decreased)
+  for (let level = 1; level <= 4; level++) {
+    total += summaryMobilityLevelTotal(level, 'improved')
+    total += summaryMobilityLevelTotal(level, 'same') 
+    total += summaryMobilityLevelTotal(level, 'decreased')
+  }
+  
+  return total
+})
 
 // Donut chart helpers
 function donutSegments(slug) {
@@ -923,6 +934,108 @@ watch(() => route.fullPath, async () => {
   background: linear-gradient(90deg, #0ea5e9, #38bdf8);
   color: #fff;
   box-shadow: 0 2px 8px rgba(14,165,233,0.3);
+}
+
+/* ── Summary Table Borders ── */
+.summary-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.summary-table th,
+.summary-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+}
+
+.summary-table thead th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.summary-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.summary-table tfoot tr {
+  background: #f1f5f9;
+  border-top: 2px solid #cbd5e1;
+}
+
+.summary-table tfoot td {
+  font-weight: 700;
+  border-top: 2px solid #cbd5e1;
+}
+
+/* Level group headers */
+.th-level-group {
+  border-left: 2px solid var(--color-border);
+  border-right: 2px solid var(--color-border);
+}
+
+/* Sub-headers */
+.th-sub {
+  font-size: 0.75rem;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.th-sub.improved {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.th-sub.same {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.05);
+}
+
+.th-sub.decreased {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+/* Table data cells */
+.td-count {
+  font-weight: 600;
+  min-width: 40px;
+}
+
+.td-improved {
+  background: rgba(22, 163, 74, 0.03);
+  color: #16a34a;
+}
+
+.td-same {
+  background: rgba(100, 116, 139, 0.03);
+  color: #64748b;
+}
+
+.td-decreased {
+  background: rgba(220, 38, 38, 0.03);
+  color: #dc2626;
+}
+
+/* Capital name column */
+.cap-table-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.cap-table-link i {
+  font-size: 0.9rem;
+}
+
+/* Summary footer */
+.summary-footer td {
+  background: #e2e8f0;
+  color: var(--color-text);
+  border-top: 3px solid #94a3b8;
 }
 
 /* ── Filters ── */

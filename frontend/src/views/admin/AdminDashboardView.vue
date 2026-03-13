@@ -411,7 +411,7 @@
 
         <!-- Summary Table with sub-columns -->
         <div class="bento-summary card">
-          <h3 class="card-title"><i class="fi fi-rr-table"></i> ตารางสรุปจำนวนครัวเรือนตามทุนและระดับความยากจน</h3>
+          <h3 class="card-title"><i class="fi fi-rr-table"></i> ตารางสรุปการเปลี่ยนแปลงในแต่ละทุน</h3>
           <div class="table-wrap">
             <table class="summary-table">
               <thead>
@@ -443,7 +443,7 @@
                     <td class="td-count td-same">{{ mobilityByCapitalByLevel(cap.slug, level).same }}</td>
                     <td class="td-count td-decreased">{{ mobilityByCapitalByLevel(cap.slug, level).decreased }}</td>
                   </template>
-                  <td style="text-align:right;font-weight:700">{{ capitalTotal(cap.slug) }}</td>
+                  <td style="text-align:right;font-weight:700">{{ summaryGrandTotal }}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -469,19 +469,19 @@
               <thead>
                 <tr>
                   <th>อำเภอ</th>
-                  <th>รหัส</th>
-                  <th style="text-align:right">ตำบล</th>
-                  <th style="text-align:right">หมู่บ้าน</th>
-                  <th style="text-align:right">ครัวเรือน</th>
+                  <th style="text-align:center">ตำบล</th>
+                  <th style="text-align:center">หมู่บ้าน</th>
+                  <th style="text-align:center">ครัวเรือน</th>
+                  <th style="text-align:center">คน</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="d in store.data.by_district" :key="d.district_code">
                   <td>{{ d.district_name || '—' }}</td>
-                  <td class="text-muted">{{ d.district_code }}</td>
-                  <td style="text-align:right">{{ d.subdistrict_count }}</td>
-                  <td style="text-align:right">{{ d.village_count }}</td>
-                  <td style="text-align:right;font-weight:700">{{ d.household_count }}</td>
+                  <td style="text-align:center">{{ d.subdistrict_count }}</td>
+                  <td style="text-align:center">{{ d.village_count }}</td>
+                  <td style="text-align:center;font-weight:700">{{ d.household_count }}</td>
+                  <td style="text-align:center;font-weight:700">{{ d.respondent_count }}</td>
                 </tr>
               </tbody>
             </table>
@@ -659,6 +659,7 @@
                   <th style="text-align:right">ตำบล</th>
                   <th style="text-align:right">หมู่บ้าน</th>
                   <th style="text-align:right">ครัวเรือน</th>
+                  <th style="text-align:center">คน</th>
                 </tr>
               </thead>
               <tbody>
@@ -668,6 +669,8 @@
                   <td style="text-align:right">{{ d.subdistrict_count }}</td>
                   <td style="text-align:right">{{ d.village_count }}</td>
                   <td style="text-align:right;font-weight:700">{{ d.household_count }}</td>
+                  <td style="text-align:center;font-weight:700">{{ d.respondent_count  || 0  }}</td>
+
                 </tr>
               </tbody>
             </table>
@@ -824,9 +827,19 @@ function summaryMobilityLevelTotal(level, key) {
   }, 0)
 }
 
-const summaryGrandTotal = computed(() =>
-  capitals.value.reduce((sum, cap) => sum + capitalTotal(cap.slug), 0)
-)
+// ✅ ใช้แค่ summaryGrandTotal ตัวเดียว - บวกตามแถวสรุป
+const summaryGrandTotal = computed(() => {
+  let total = 0
+  
+  // บวกจากแถวสรุป (level 1-4, แต่ละ level มี improved + same + decreased)
+  for (let level = 1; level <= 4; level++) {
+    total += summaryMobilityLevelTotal(level, 'improved')
+    total += summaryMobilityLevelTotal(level, 'same') 
+    total += summaryMobilityLevelTotal(level, 'decreased')
+  }
+  
+  return total
+})
 
 // Donut chart helpers
 function donutSegments(slug) {
@@ -953,42 +966,156 @@ watch(() => route.fullPath, async () => {
 
 /* ── Capital tabs ── */
 .capital-tabs {
-  display: flex;
-  gap: 0.375rem;
-  flex-wrap: wrap;
+  display: grid; /* เปลี่ยนจาก flex เป็น grid */
+  grid-template-columns: repeat(6, 1fr); /* 6 คอลัมน์เท่ากัน (ภาพรวม + 5 ทุน) */
+  gap: 0.5rem;
   margin-bottom: 1.25rem;
   background: #fff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 0.5rem;
+  padding: 0.75rem 1rem;
   box-shadow: var(--shadow-sm);
+  width: 100%; /* ใช้ความกว้างเต็ม */
 }
+
 .capital-tab {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.875rem;
-  border-radius: 8px;
+  justify-content: center; /* จัดกลาง */
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 600;
   font-family: 'Prompt', sans-serif;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  min-height: 38px;
+  transition: all 0.2s ease;
+  min-height: 50px;
   white-space: nowrap;
+  text-align: center;
 }
-.capital-tab i { font-size: 0.95rem; }
+
+.capital-tab i { 
+  font-size: 1.1rem;
+}
+
 .capital-tab:hover {
   background: var(--color-surface-alt);
   color: var(--color-text);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
 .capital-tab.active {
   background: linear-gradient(90deg, #0ea5e9, #38bdf8);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(14,165,233,0.3);
+  box-shadow: 0 4px 12px rgba(14,165,233,0.3);
+  transform: translateY(-1px);
+}
+
+/* ── Summary Table Borders ── */
+.summary-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.summary-table th,
+.summary-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+}
+
+.summary-table thead th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.summary-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.summary-table tfoot tr {
+  background: #f1f5f9;
+  border-top: 2px solid #cbd5e1;
+}
+
+.summary-table tfoot td {
+  font-weight: 700;
+  border-top: 2px solid #cbd5e1;
+}
+
+/* Level group headers */
+.th-level-group {
+  border-left: 2px solid var(--color-border);
+  border-right: 2px solid var(--color-border);
+}
+
+/* Sub-headers */
+.th-sub {
+  font-size: 0.75rem;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.th-sub.improved {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.th-sub.same {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.05);
+}
+
+.th-sub.decreased {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+/* Table data cells */
+.td-count {
+  font-weight: 600;
+  min-width: 40px;
+}
+
+.td-improved {
+  background: rgba(22, 163, 74, 0.03);
+  color: #16a34a;
+}
+
+.td-same {
+  background: rgba(100, 116, 139, 0.03);
+  color: #64748b;
+}
+
+.td-decreased {
+  background: rgba(220, 38, 38, 0.03);
+  color: #dc2626;
+}
+
+/* Capital name column */
+.cap-table-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.cap-table-link i {
+  font-size: 0.9rem;
+}
+
+/* Summary footer */
+.summary-footer td {
+  background: #e2e8f0;
+  color: var(--color-text);
+  border-top: 3px solid #94a3b8;
 }
 
 /* ── Filters ── */
@@ -1271,5 +1398,45 @@ watch(() => route.fullPath, async () => {
   .cap-mob-counts { flex-direction: column; gap: 0.15rem; }
   .cap-detail-grid { grid-template-columns: 1fr; }
   .cap-detail-grid .bento-mobility { grid-column: span 1; }
+}
+@media (max-width: 1024px) {
+  .capital-tabs {
+    grid-template-columns: repeat(3, 1fr); /* 3 คอลัมน์ในหน้าจอกลาง */
+    gap: 0.375rem;
+  }
+  
+  .capital-tab {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 45px;
+  }
+}
+
+@media (max-width: 768px) {
+  .capital-tabs {
+    grid-template-columns: repeat(2, 1fr); /* 2 คอลัมน์ในหน้าจอเล็ก */
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+  
+  .capital-tab {
+    font-size: 0.8rem;
+    padding: 0.5rem;
+    min-height: 40px;
+  }
+  
+  .capital-tab i {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .capital-tabs {
+    grid-template-columns: 1fr; /* 1 คอลัมน์ในหน้าจอมือถือ */
+  }
+  
+  .capital-tab {
+    justify-content: flex-start;
+  }
 }
 </style>
