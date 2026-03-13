@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Household;
 use App\Models\SurveyResponse;
+use App\Services\CompareHouseholdSurveyLogic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,6 +21,14 @@ use Illuminate\Http\Request;
  */
 class DashboardController extends Controller
 {
+    /**
+     * Threshold used for ดีขึ้น / คงที่ / แย่ลง classification in mobility metrics.
+     * avg_diff > avg_before * TREND_THRESHOLD_PCT  => ดีขึ้น
+     * avg_diff < -avg_before * TREND_THRESHOLD_PCT => แย่ลง
+     * otherwise => คงที่
+     */
+    private const TREND_THRESHOLD_PCT = 0.05;
+
     public function index(Request $request): JsonResponse
     {
         $district    = $request->query('district');
@@ -171,124 +180,108 @@ class DashboardController extends Controller
 
     private function getMobilityCounts(?string $district, ?string $subdistrict, ?int $surveyYear = null): array
     {
-        // Compare before vs after for households that have both periods
-        $beforeQuery = SurveyResponse::query()->where('period', 'before')
-            ->whereNotNull('score_aggregate');
+        $compareLogic = new CompareHouseholdSurveyLogic();
 
-        $afterQuery = SurveyResponse::query()->where('period', 'after')
-            ->whereNotNull('score_aggregate');
-
-        if ($surveyYear) {
-            $beforeQuery->where('survey_year', $surveyYear);
-            $afterQuery->where('survey_year', $surveyYear);
-        }
+        $query = Household::query();
 
         if ($district) {
-            $filter = function ($q) use ($district) {
-                $q->whereHas('household', function ($hq) use ($district) {
-                    $hq->where('district_name', 'like', "%{$district}%");
-                });
-            };
-            $beforeQuery->where($filter);
-            $afterQuery->where($filter);
+            $query->where('district_name', 'like', "%{$district}%");
         }
 
-        $beforeMap = $beforeQuery->pluck('score_aggregate', 'household_id')->toArray();
-        $afterMap  = $afterQuery->pluck('score_aggregate', 'household_id')->toArray();
-
-        $improved  = 0;
-        $same      = 0;
-        $decreased = 0;
-
-        foreach ($afterMap as $householdId => $afterScore) {
-            if (!isset($beforeMap[$householdId])) {
-                continue;
-            }
-
-            $diff = $afterScore - $beforeMap[$householdId];
-
-            if ($diff > 0.01) {
-                $improved++;
-            } elseif ($diff < -0.01) {
-                $decreased++;
-            } else {
-                $same++;
-            }
+        if ($subdistrict) {
+            $query->where('subdistrict_name', 'like', "%{$subdistrict}%");
         }
+
+        if ($surveyYear) {
+            $query->where('survey_year', $surveyYear);
+        }
+
+        $improved   = 0;
+        $same       = 0;
+        $decreased  = 0;
+        $noBaseline = 0;
+
+        $query->chunk(100, function ($households) use ($compareLogic, $surveyYear, &$improved, &$same, &$decreased, &$noBaseline) {
+            foreach ($households as $household) {
+                $result  = $compareLogic->compare($household, $surveyYear, null);
+                $summary = $result['summary'];
+
+                if ($summary['avg_before'] === null && $summary['avg_after'] !== null) {
+                    $noBaseline++;
+                } elseif ($summary['avg_before'] !== null && $summary['avg_after'] !== null) {
+                    $threshold = $summary['avg_before'] * self::TREND_THRESHOLD_PCT;
+                    if ($summary['avg_diff'] > $threshold) {
+                        $improved++;
+                    } elseif ($summary['avg_diff'] < -$threshold) {
+                        $decreased++;
+                    } else {
+                        $same++;
+                    }
+                }
+            }
+        });
 
         return [
-            'improved'  => $improved,
-            'same'      => $same,
-            'decreased' => $decreased,
+            'improved'    => $improved,
+            'same'        => $same,
+            'decreased'   => $decreased,
+            'no_baseline' => $noBaseline,
+            'total'       => $improved + $same + $decreased + $noBaseline,
         ];
     }
 
     private function getMobilityByCapital(?string $district, ?string $subdistrict, ?int $surveyYear = null): array
     {
-        $capitals = [
-            'human'     => 'score_human',
-            'physical'  => 'score_physical',
-            'financial' => 'score_financial',
-            'natural'   => 'score_natural',
-            'social'    => 'score_social',
-        ];
+        $capitals     = ['human', 'physical', 'financial', 'natural', 'social'];
+        $compareLogic = new CompareHouseholdSurveyLogic();
+        $result       = [];
 
-        $result = [];
+        foreach ($capitals as $capital) {
+            $improved   = 0;
+            $same       = 0;
+            $decreased  = 0;
+            $noBaseline = 0;
 
-        foreach ($capitals as $slug => $scoreCol) {
-            $beforeQuery = SurveyResponse::query()->where('period', 'before')->whereNotNull($scoreCol);
-            $afterQuery  = SurveyResponse::query()->where('period', 'after')->whereNotNull($scoreCol);
-
-            if ($surveyYear) {
-                $beforeQuery->where('survey_year', $surveyYear);
-                $afterQuery->where('survey_year', $surveyYear);
-            }
+            $query = Household::query();
 
             if ($district) {
-                $beforeQuery->whereHas('household', function ($q) use ($district) {
-                    $q->where('district_name', 'like', "%{$district}%");
-                });
-                $afterQuery->whereHas('household', function ($q) use ($district) {
-                    $q->where('district_name', 'like', "%{$district}%");
-                });
+                $query->where('district_name', 'like', "%{$district}%");
             }
 
             if ($subdistrict) {
-                $beforeQuery->whereHas('household', function ($q) use ($subdistrict) {
-                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
-                });
-                $afterQuery->whereHas('household', function ($q) use ($subdistrict) {
-                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
-                });
+                $query->where('subdistrict_name', 'like', "%{$subdistrict}%");
             }
 
-            $beforeMap = $beforeQuery->pluck($scoreCol, 'household_id')->toArray();
-            $afterMap  = $afterQuery->pluck($scoreCol, 'household_id')->toArray();
-
-            $improved  = 0;
-            $same      = 0;
-            $decreased = 0;
-
-            foreach ($afterMap as $householdId => $afterScore) {
-                if (!isset($beforeMap[$householdId])) {
-                    continue;
-                }
-
-                $diff = (float) $afterScore - (float) $beforeMap[$householdId];
-
-                if ($diff > 0.01) {
-                    $improved++;
-                } elseif ($diff < -0.01) {
-                    $decreased++;
-                } else {
-                    $same++;
-                }
+            if ($surveyYear) {
+                $query->where('survey_year', $surveyYear);
             }
 
-            $result[$slug] = [
-                'improved'  => $improved,
-                'same'      => $same,
-                'decreased' => $decreased,
+            $query->chunk(100, function ($households) use ($compareLogic, $surveyYear, $capital, &$improved, &$same, &$decreased, &$noBaseline) {
+                foreach ($households as $household) {
+                    $compareResult = $compareLogic->compare($household, $surveyYear, null);
+                    $capitalData   = $compareResult['capitals'][$capital];
+
+                    if ($capitalData['before'] === null && $capitalData['after'] !== null) {
+                        $noBaseline++;
+                    } elseif ($capitalData['before'] !== null && $capitalData['after'] !== null) {
+                        $threshold = $capitalData['before'] * self::TREND_THRESHOLD_PCT;
+                        if ($capitalData['diff'] > $threshold) {
+                            $improved++;
+                        } elseif ($capitalData['diff'] < -$threshold) {
+                            $decreased++;
+                        } else {
+                            $same++;
+                        }
+                    }
+                }
+            });
+
+            $result[$capital] = [
+                'improved'    => $improved,
+                'same'        => $same,
+                'decreased'   => $decreased,
+                'no_baseline' => $noBaseline,
+                'total'       => $improved + $same + $decreased + $noBaseline,
             ];
         }
 
