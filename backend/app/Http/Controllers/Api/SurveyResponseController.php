@@ -250,6 +250,14 @@ class SurveyResponseController extends Controller
                     ['citizen_id' => $citizenId],
                     array_merge(['household_id' => $householdId], $personData)
                 );
+                // Update birthdate/phone if provided and not yet set on existing person
+                $updateFields = array_filter([
+                    'birthdate' => $personData['birthdate'] ?? null,
+                    'phone'     => $personData['phone']     ?? null,
+                ], fn ($v) => $v !== null && $v !== '');
+                if (! $person->wasRecentlyCreated && ! empty($updateFields)) {
+                    $person->update($updateFields);
+                }
                 $personId = $person->id;
             } elseif (! empty($personData['first_name']) || ! empty($personData['last_name'])) {
                 // No citizen_id: attempt to match by household + name to avoid duplicates.
@@ -261,6 +269,14 @@ class SurveyResponseController extends Controller
                     ],
                     $personData
                 );
+                // Update birthdate/phone if provided and not yet set on existing person
+                $updateFields = array_filter([
+                    'birthdate' => $personData['birthdate'] ?? null,
+                    'phone'     => $personData['phone']     ?? null,
+                ], fn ($v) => $v !== null && $v !== '');
+                if (! $person->wasRecentlyCreated && ! empty($updateFields)) {
+                    $person->update($updateFields);
+                }
                 $personId = $person->id;
             }
         }
