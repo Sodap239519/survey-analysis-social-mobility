@@ -438,12 +438,15 @@
                       <i class="fi" :class="cap.icon"></i> {{ cap.nameTh }}
                     </span>
                   </td>
+
                   <template v-for="level in 4" :key="'data-' + cap.slug + '-' + level">
                     <td class="td-count td-improved">{{ mobilityByCapitalByLevel(cap.slug, level).improved }}</td>
                     <td class="td-count td-same">{{ mobilityByCapitalByLevel(cap.slug, level).same }}</td>
                     <td class="td-count td-decreased">{{ mobilityByCapitalByLevel(cap.slug, level).decreased }}</td>
                   </template>
-                  <td style="text-align:right;font-weight:700">{{ summaryGrandTotal }}</td>
+
+                  <!-- ✅ รวมรายแถว -->
+                  <td style="text-align:right;font-weight:700">{{ summaryCapitalTotal(cap.slug) }}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -840,6 +843,15 @@ const summaryGrandTotal = computed(() => {
   
   return total
 })
+
+function summaryCapitalTotal(capSlug) {
+  let total = 0
+  for (let level = 1; level <= 4; level++) {
+    const x = mobilityByCapitalByLevel(capSlug, level)
+    total += (Number(x.improved) || 0) + (Number(x.same) || 0) + (Number(x.decreased) || 0)
+  }
+  return total
+}
 
 // Donut chart helpers
 function donutSegments(slug) {

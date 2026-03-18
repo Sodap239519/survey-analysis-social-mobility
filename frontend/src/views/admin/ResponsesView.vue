@@ -87,9 +87,9 @@
                   <td><span v-html="capitalCell(r, 'social')"></span></td>
                   <td>
                     <div class="flex gap-1">
-                      <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
-                      <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข">✏️</RouterLink>
-                      <button class="btn btn-danger btn-sm" @click="confirmDelete(r)" title="ลบ">🗑️</button>
+                      <button class="btn btn-secondary btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด"><i class="fi fi-rr-eye" style="color:#0d6efd;"></i></button>
+                      <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข"><i class="fi fi-rr-edit"></i></RouterLink>
+                      <button class="btn btn-secondary btn-sm" @click="confirmDelete(r)" title="ลบ"><i class="fi fi-rr-trash"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -144,9 +144,9 @@
                 <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
                 <td>
                   <div class="flex gap-1">
-                    <button class="btn btn-info btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด">👁️</button>
-                    <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข">✏️</RouterLink>
-                    <button class="btn btn-danger btn-sm" @click="confirmDelete(r)" title="ลบ">🗑️</button>
+                    <button class="btn btn-secondary btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด"><i class="fi fi-rr-eye" style="color:#0d6efd;"></i></button>
+                    <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข"><i class="fi fi-rr-edit" style="color:#FFD300;"></i></RouterLink>
+                    <button class="btn btn-secondary btn-sm" @click="confirmDelete(r)" title="ลบ"><i class="fi fi-rr-trash" style="color:#dc3545;"></i></button>
                   </div>
                 </td>
               </tr>
@@ -171,7 +171,7 @@
     <div v-if="showDetailModal" class="modal-backdrop" @click.self="showDetailModal = false">
       <div class="modal-box modal-box-wide">
         <div class="flex justify-between items-center mb-4">
-          <h3 style="font-size:1.1rem;font-weight:700">👁️ รายละเอียดการสำรวจ</h3>
+          <h3 style="font-size:1.1rem;font-weight:700">รายละเอียดการสำรวจ</h3>
           <div class="flex gap-2">
             <button class="btn btn-secondary btn-sm" @click="printDetail">🖨️ พิมพ์</button>
             <button class="btn btn-secondary btn-sm" @click="showDetailModal = false">✕ ปิด</button>
@@ -446,7 +446,7 @@ function statusIconClass(status) {
 }
 
 function statusIcon(status) {
-  const icons = { 'ดีขึ้น': '🟢', 'คงที่': '🟡', 'แย่ลง': '🔴' }
+  const icons = { 'ดีขึ้น': '<i class="fi fi-rr-arrow-small-up"></i>', 'คงที่': '<i class="fi fi-rr-horizontal-rule"></i>', 'แย่ลง': '<i class="fi fi-rr-arrow-small-down"></i>' }
   return icons[status] || ''
 }
 
@@ -519,7 +519,7 @@ function getQuestionText(questionCode) {
   const questionTexts = {
     // Q8: รายได้
     'Q8_income': 'Q8. รายได้รวมของครัวเรือน (บาท/เดือน)',
-    'Q8_income_sources': 'Q8. แหล่งรายได้หลักข���งครัวเรือน',
+    'Q8_income_sources': 'Q8. แหล่งรายได้หลักของครัวเรือน',
     
     // Q9: รายจ่าย  
     'Q9_expenses': 'Q9. รายจ่ายรวมของครัวเรือน (บาท/เดือน)',
