@@ -311,6 +311,12 @@ class BasicDataSheetImport implements ToCollection
 // ──────────────────────────────────────────────────────────────────────────────
 class HumanCapitalSheetImport implements ToCollection
 {
+    /** Minimum value that signals a Thai Buddhist Era (พ.ศ.) year. */
+    private const BE_YEAR_THRESHOLD = 2400;
+
+    /** Offset to convert Buddhist Era to Common Era (2495 BE = 1952 CE). */
+    private const BE_TO_CE_OFFSET = 543;
+
     public function __construct(private MultiSheetHouseholdImport $parent) {}
 
     public function collection(Collection $rows): void
@@ -358,7 +364,10 @@ class HumanCapitalSheetImport implements ToCollection
                 $searchKeys['is_head']    = $isHead;
             }
 
-            $birthdate = $this->parseBirthdate($this->col($data, $headerMap, 'วัน/เดือน/ปีเกิด'));
+            // Fallback chain: 'วัน/เดือน/ปีเกิด' first, then 'วัน/เดือน' (short header variant)
+            $birthdateRaw = $this->col($data, $headerMap, 'วัน/เดือน/ปีเกิด')
+                         ?? $this->col($data, $headerMap, 'วัน/เดือน');
+            $birthdate = $this->parseBirthdate($birthdateRaw);
 
             $person = Person::firstOrCreate(
                 $searchKeys,
@@ -371,6 +380,11 @@ class HumanCapitalSheetImport implements ToCollection
                     'is_head'    => $isHead,
                 ]
             );
+
+            // Update birthdate on existing persons that were imported without it
+            if (! $person->wasRecentlyCreated && $birthdate !== null && $person->birthdate === null) {
+                $person->update(['birthdate' => $birthdate]);
+            }
 
             if ($person->wasRecentlyCreated) {
                 $this->parent->personsImported++;
@@ -441,18 +455,31 @@ class HumanCapitalSheetImport implements ToCollection
     private function parseBirthdate(mixed $value): ?string
     {
         if ($value === null || $value === '') return null;
-        
+
         $str = trim((string) $value);
-        
-        // ถ้าเป็น dd/mm/yyyy format
+
+        // dd/mm/yyyy format (Excel cells exported as text – may be BE year)
         if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $str, $matches)) {
-            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $day   = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
             $month = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
-            $year = $matches[3];
-            return "{$year}-{$month}-{$day}";
+            $year  = (int) $matches[3];
+            // Convert Buddhist Era (พ.ศ.) to Common Era (ค.ศ.)
+            if ($year >= self::BE_YEAR_THRESHOLD) {
+                $year -= self::BE_TO_CE_OFFSET;
+            }
+            return sprintf('%04d-%s-%s', $year, $month, $day);
         }
-        
-        // ลองแปลง date format อื่นๆ
+
+        // yyyy-mm-dd already
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $str, $matches)) {
+            $year = (int) $matches[1];
+            if ($year >= self::BE_YEAR_THRESHOLD) {
+                $year -= self::BE_TO_CE_OFFSET;
+            }
+            return sprintf('%04d-%s-%s', $year, $matches[2], $matches[3]);
+        }
+
+        // Fallback: try PHP DateTime parsing
         try {
             $date = new \DateTime($str);
             return $date->format('Y-m-d');
