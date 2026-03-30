@@ -82,6 +82,67 @@ npm run dev
 - **Backend**: Laravel 11, PHP 8.3, SQLite/MySQL, Sanctum auth, Maatwebsite/Excel
 - **Frontend**: Vue 3, Vite, Vue Router 4, Pinia, Axios
 
+## Deployment on Plesk / Apache
+
+### Fixing 404 on Hard Refresh (SPA History Mode)
+
+The frontend uses Vue Router with **HTML5 History Mode** (`createWebHistory()`).  
+In this mode, the browser navigates to real URLs such as `/admin/responses/new`, but the
+server must always serve `index.html` for those paths because the routing is handled
+entirely client-side.
+
+Without extra configuration, refreshing the browser or navigating directly to a
+non-root URL returns **HTTP 404** from Apache/Plesk.
+
+#### Why this happens
+
+Apache looks for an actual file or directory matching the URL path.
+When no file exists at `/admin/responses/new`, it returns 404 instead of
+letting Vue Router handle the route.
+
+#### Fix: `.htaccess` rewrite rule
+
+The file `frontend/public/.htaccess` is included automatically in the Vite build
+output (`dist/`) and contains the following rules:
+
+```apache
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Do not rewrite requests for existing files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Do not rewrite API or storage requests (Laravel back-end)
+  RewriteRule ^api/ - [L]
+  RewriteRule ^storage/ - [L]
+
+  # Route all other requests to the SPA entry point
+  RewriteRule ^ index.html [L]
+</IfModule>
+```
+
+These rules ensure:
+- Static assets (JS, CSS, images) are served directly.
+- Laravel API routes under `/api/` and uploaded files under `/storage/` are **not**
+  rewritten (relevant when the Laravel back-end is deployed under the same domain).
+- Every other path falls back to `index.html` so Vue Router can handle it.
+
+#### Deploying on Plesk
+
+1. Build the frontend: `cd frontend && npm run build`
+2. Upload the contents of `frontend/dist/` to the Plesk document root (e.g.
+   `httpdocs/`).
+3. Make sure `mod_rewrite` is enabled in the Plesk domain settings
+   (*Apache & nginx Settings → Apache*).
+4. Verify that `.htaccess` files are allowed: `AllowOverride All` (or at least
+   `AllowOverride FileInfo`) must be set for the document root directory.
+
+If the API (Laravel) is hosted on a **separate subdomain** (e.g.
+`api.example.com`), the `RewriteRule ^api/` line is not needed but is harmless.
+
 ## Privacy Note
 
 Do not commit real PII data to this repository.
