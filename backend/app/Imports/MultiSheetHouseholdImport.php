@@ -456,7 +456,26 @@ class HumanCapitalSheetImport implements ToCollection
     {
         if ($value === null || $value === '') return null;
 
+        // Handle PhpSpreadsheet DateTime objects (Excel date cells read as objects)
+        if ($value instanceof \DateTimeInterface) {
+            return $this->applyBeConversion($value->format('Y-m-d'));
+        }
+
+        // Handle Excel numeric date serials (int or float, e.g. 45000.0)
+        // PhpSpreadsheet may return these for date-formatted cells.
+        // Intentionally exclude strings: numeric strings like "45000" should
+        // fall through to the string-parsing path below.
+        if (is_int($value) || is_float($value)) {
+            try {
+                $dt = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value);
+                return $this->applyBeConversion($dt->format('Y-m-d'));
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
         $str = trim((string) $value);
+        if ($str === '') return null;
 
         // dd/mm/yyyy format (Excel cells exported as text – may be BE year)
         if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $str, $matches)) {
@@ -482,9 +501,25 @@ class HumanCapitalSheetImport implements ToCollection
         // Fallback: try PHP DateTime parsing
         try {
             $date = new \DateTime($str);
-            return $date->format('Y-m-d');
+            return $this->applyBeConversion($date->format('Y-m-d'));
         } catch (\Exception $e) {
             return null;
         }
+    }
+
+    /**
+     * If the formatted date string has a year in Buddhist Era (>= 2400),
+     * subtract 543 to convert to Common Era and return the corrected string.
+     */
+    private function applyBeConversion(string $ymd): string
+    {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $ymd, $m)) {
+            $year = (int) $m[1];
+            if ($year >= self::BE_YEAR_THRESHOLD) {
+                $year -= self::BE_TO_CE_OFFSET;
+                return sprintf('%04d-%s-%s', $year, $m[2], $m[3]);
+            }
+        }
+        return $ymd;
     }
 }
