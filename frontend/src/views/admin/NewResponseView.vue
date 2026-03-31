@@ -144,6 +144,18 @@
             <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
           </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>ชื่อโมเดล</label>
+            <select v-model="form.model_name">
+              <option value="">เช่น โมเดลพริกจินดา</option>
+              <optgroup v-for="group in MODEL_CATEGORIES" :key="group.category" :label="group.category">
+                <option v-for="m in group.models" :key="m" :value="m">{{ m }}</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- ── Steps 1+: คำถามแต่ละทุน ─────────────────────────────────────────── -->
@@ -252,6 +264,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import api from '../../api'
+import { MODEL_CATEGORIES } from '../../constants/modelCategories'
 
 // ── Route / mode ──────────────────────────────────────────────────────────────
 const route  = useRoute()
@@ -289,6 +302,7 @@ const form = ref({
   survey_round:        '',
   surveyed_at:         '',
   surveyor_name:       '',
+  model_name:          '',
   answers:             {},
 })
 
@@ -317,7 +331,15 @@ function toDateInput(v) {
   if (!str) return ''
   // yyyy-mm-dd or ISO datetime (2025-03-10 or 2025-03-10T...)
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    return str.slice(0, 10)
+    const datePart = str.slice(0, 10)
+    const year = parseInt(datePart.slice(0, 4), 10)
+    if (year >= 2400) {
+      // Buddhist Era yyyy-mm-dd → subtract 543 to get CE
+      const ceYear = year - 543
+      if (ceYear < 1900 || ceYear > 2100) return ''
+      return `${ceYear}${datePart.slice(4)}`
+    }
+    return datePart
   }
   // dd/mm/yyyy – possibly BE year
   const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
@@ -533,6 +555,7 @@ async function loadExistingResponse(id) {
   form.value.survey_round   = r.survey_round     || ''
   form.value.surveyed_at    = r.surveyed_at      ? r.surveyed_at.slice(0, 10) : ''
   form.value.surveyor_name  = r.surveyor_name    || ''
+  form.value.model_name     = r.model_name       || ''
 
   // Fill answers
   const answersMap = {}
@@ -572,6 +595,7 @@ async function submit() {
     survey_round:  form.value.survey_round  || null,
     surveyed_at:   form.value.surveyed_at   || null,
     surveyor_name: form.value.surveyor_name || null,
+    model_name:    form.value.model_name    || null,
     answers:       form.value.answers,
   }
 

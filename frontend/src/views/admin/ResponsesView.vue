@@ -55,8 +55,15 @@
       <div class="form-group" style="min-width:130px">
         <label>&nbsp;</label>
         <label class="toggle-label">
-          <input type="checkbox" v-model="groupByHousehold" />
+          <input type="checkbox" v-model="groupByHousehold" @change="toggleGroupByHousehold" />
           <span>จัดกลุ่มตามบ้าน</span>
+        </label>
+      </div>
+      <div class="form-group" style="min-width:160px">
+        <label>&nbsp;</label>
+        <label class="toggle-label">
+          <input type="checkbox" v-model="groupByCategory" @change="toggleGroupByCategory" />
+          <span>จัดกลุ่มตามหมวดโมเดล</span>
         </label>
       </div>
     </div>
@@ -122,6 +129,57 @@
           </div>
         </div>
         <div v-if="!groupedRows.length" class="text-muted text-center mt-4">ไม่มีข้อมูล</div>
+      </div>
+
+      <!-- Grouped by model category view -->
+      <div v-else-if="groupByCategory">
+        <div v-for="section in groupedByCategory" :key="section.category" class="household-group mb-4">
+          <div class="household-group-header">
+            <span class="house-code-badge">📂 {{ section.category }}</span>
+            <span class="text-muted" style="font-size:0.85rem">{{ section.responses.length }} รายการ</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>รหัสบ้าน</th>
+                  <th>ชื่อผู้ตอบ</th>
+                  <th>ชื่อโมเดล</th>
+                  <th>ช่วงเวลา</th>
+                  <th>ปี/รอบ</th>
+                  <th><i class="fi fi-rr-user"></i> ทุนมนุษย์</th>
+                  <th><i class="fi fi-rr-home"></i> ทุนกายภาพ</th>
+                  <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
+                  <th><i class="fi fi-rr-leaf"></i> ทุนธรรมชาติ</th>
+                  <th><i class="fi fi-rr-users"></i> ทุนสังคม</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in section.responses" :key="r.id">
+                  <td><code class="house-code">{{ r.household?.house_code || '—' }}</code></td>
+                  <td>{{ personName(r) }}</td>
+                  <td class="text-muted" style="font-size:0.8rem">{{ r.model_name || '—' }}</td>
+                  <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
+                  <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
+                  <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
+                  <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
+                  <td>
+                    <div class="flex gap-1">
+                      <button class="btn btn-secondary btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด"><i class="fi fi-rr-eye" style="color:#0d6efd;"></i></button>
+                      <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข"><i class="fi fi-rr-edit" style="color:#FFD300;"></i></RouterLink>
+                      <button class="btn btn-secondary btn-sm" @click="confirmDelete(r)" title="ลบ"><i class="fi fi-rr-trash" style="color:#dc3545;"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div v-if="!groupedByCategory.length" class="text-muted text-center mt-4">ไม่มีข้อมูล</div>
       </div>
 
       <!-- Flat table view -->
@@ -354,6 +412,7 @@ const filterStatus = ref('')
 const filterCategory = ref('')
 const filterModelName = ref('')
 const groupByHousehold = ref(false)
+const groupByCategory = ref(false)
 let searchTimer = null
 const SEARCH_DEBOUNCE_MS = 400
 
@@ -819,6 +878,28 @@ const groupedRows = computed(() => {
   return Object.values(groups)
 })
 
+const groupedByCategory = computed(() => {
+  // Build lookup: model_name → category label
+  const categoryOf = {}
+  for (const g of MODEL_CATEGORIES) {
+    for (const m of g.models) categoryOf[m] = g.category
+  }
+
+  // Initialize sections in defined order + ไม่ระบุ
+  const sections = {}
+  for (const g of MODEL_CATEGORIES) {
+    sections[g.category] = { category: g.category, responses: [] }
+  }
+  sections['ไม่ระบุ'] = { category: 'ไม่ระบุ', responses: [] }
+
+  for (const r of filteredRows.value) {
+    const cat = r.model_name ? (categoryOf[r.model_name] || 'ไม่ระบุ') : 'ไม่ระบุ'
+    sections[cat].responses.push(r)
+  }
+
+  return Object.values(sections).filter(s => s.responses.length > 0)
+})
+
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 async function load() {
@@ -880,6 +961,14 @@ function printDetail() {
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
+
+function toggleGroupByHousehold() {
+  if (groupByHousehold.value) groupByCategory.value = false
+}
+
+function toggleGroupByCategory() {
+  if (groupByCategory.value) groupByHousehold.value = false
+}
 
 function confirmDelete(r) { deletingResponse.value = r; showDeleteConfirm.value = true }
 
