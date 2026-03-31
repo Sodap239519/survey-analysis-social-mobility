@@ -13,8 +13,20 @@
           </div>
         </div>
       </div>
-      <div class="expand-btn">
-        <i :class="expanded ? 'fi fi-rr-angle-up' : 'fi fi-rr-angle-down'"></i>
+      <div class="header-actions" @click.stop>
+        <button
+          v-if="item.has_file"
+          class="btn-download"
+          :disabled="downloading"
+          title="ดาวน์โหลดไฟล์ที่นำเข้า"
+          @click="downloadFile"
+        >
+          <i class="fi fi-rr-download icon-sm"></i>
+          {{ downloading ? '...' : 'ดาวน์โหลด' }}
+        </button>
+        <div class="expand-btn" @click="toggleExpanded">
+          <i :class="expanded ? 'fi fi-rr-angle-up' : 'fi fi-rr-angle-down'"></i>
+        </div>
       </div>
     </div>
 
@@ -27,6 +39,9 @@
         {{ item.processing_time }} วินาที
       </span>
     </div>
+
+    <!-- Download error message -->
+    <div v-if="downloadError" class="download-error">{{ downloadError }}</div>
 
     <!-- Sheet Details (Expandable) -->
     <div v-show="expanded" class="sheet-details">
@@ -70,6 +85,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import api from '../api'
 
 const props = defineProps({
   item: {
@@ -79,9 +95,39 @@ const props = defineProps({
 })
 
 const expanded = ref(false)
+const downloading = ref(false)
+const downloadError = ref('')
 
 function toggleExpanded() {
   expanded.value = !expanded.value
+}
+
+/**
+ * Authenticated file download: uses the axios instance so the Bearer token
+ * is included in the request headers, then triggers a browser save-as dialog.
+ */
+async function downloadFile() {
+  if (downloading.value) return
+  downloading.value = true
+  downloadError.value = ''
+  try {
+    const res = await api.get(`/import/history/${props.item.id}/download`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(res.data)
+    const a   = document.createElement('a')
+    a.href     = url
+    a.download = props.item.filename || `import-${props.item.id}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Import file download failed:', err)
+    downloadError.value = 'ดาวน์โหลดไม่สำเร็จ กรุณาลองอีกครั้ง'
+  } finally {
+    downloading.value = false
+  }
 }
 
 const sheetResults = computed(() => props.item.sheet_results || [])
@@ -190,6 +236,39 @@ function formatDate(dateString) {
   color: var(--color-text-muted, #94a3b8);
   font-size: 0.75rem;
   padding-top: 2px;
+}
+
+/* ── Header actions (download + expand) ── */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.375rem;
+  padding: 0.2rem 0.6rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-download:hover {
+  background: #dbeafe;
+}
+
+.download-error {
+  font-size: 0.8rem;
+  color: #dc2626;
+  margin-top: 0.25rem;
 }
 
 /* ── Import Status ── */

@@ -144,6 +144,17 @@
             <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
           </div>
         </div>
+
+        <!-- ชื่อโมเดล -->
+        <div class="form-group" style="max-width:480px">
+          <label>ชื่อโมเดล</label>
+          <select v-model="form.model_name">
+            <option value="">เช่น โมเดลพริกจินดา</option>
+            <optgroup v-for="group in MODEL_OPTIONS" :key="group.category" :label="group.category">
+              <option v-for="m in group.models" :key="m" :value="m">{{ m }}</option>
+            </optgroup>
+          </select>
+        </div>
       </div>
 
       <!-- ── Steps 1+: คำถามแต่ละทุน ─────────────────────────────────────────── -->
@@ -252,6 +263,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import api from '../../api'
+import { MODEL_CATEGORIES } from '../../constants/modelCategories'
 
 // ── Route / mode ──────────────────────────────────────────────────────────────
 const route  = useRoute()
@@ -284,6 +296,7 @@ const form = ref({
   person_citizen_id:   '',
   person_birthdate:    '',   // stored as CE yyyy-mm-dd
   person_phone:        '',
+  model_name:          '',
   period:              'after',
   survey_year:         new Date().getFullYear() + 543,
   survey_round:        '',
@@ -291,6 +304,10 @@ const form = ref({
   surveyor_name:       '',
   answers:             {},
 })
+
+// ── Model name options — imported from shared constants ───────────────────────
+// MODEL_CATEGORIES is imported above; alias for use in the template
+const MODEL_OPTIONS = MODEL_CATEGORIES
 
 // ── Step list (dynamic based on loaded capitals) ──────────────────────────────
 const allSteps = computed(() => {
@@ -304,10 +321,17 @@ const allSteps = computed(() => {
 /**
  * Normalize any date value to yyyy-mm-dd (CE) string, or '' on failure.
  * Handles:
- *   - Already yyyy-mm-dd or ISO datetime
+ *   - yyyy-mm-dd CE (1900–2099): used as-is
+ *   - yyyy-mm-dd BE (≥ 2400, e.g. 2490): subtract 543 → CE
+ *   - ISO datetime strings (2025-03-10T...)
  *   - dd/mm/yyyy (may be BE year ≥ 2400 → subtract 543)
  *   - Excel serial numbers → return '' (not crashing)
  *   - null / undefined / empty → ''
+ *
+ * The double-conversion bug (year 3033) happened because the API returned a
+ * BE year in yyyy-mm-dd format (e.g. "2490-06-15") which was stored verbatim
+ * as CE, then displayBirthdate added 543 again → 3033. This is now fixed by
+ * detecting BE years in the yyyy-mm-dd branch.
  */
 function toDateInput(v) {
   if (v === null || v === undefined || v === '') return ''
@@ -315,9 +339,15 @@ function toDateInput(v) {
   if (typeof v === 'number') return ''
   const str = String(v).trim()
   if (!str) return ''
-  // yyyy-mm-dd or ISO datetime (2025-03-10 or 2025-03-10T...)
+  // yyyy-mm-dd or ISO datetime (handles both CE and BE year prefix)
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    return str.slice(0, 10)
+    const datePart = str.slice(0, 10)
+    let y  = parseInt(datePart.slice(0, 4), 10)
+    const mo = datePart.slice(5, 7)
+    const d  = datePart.slice(8, 10)
+    if (y >= 2400) y -= 543   // BE → CE
+    if (y < 1900 || y > 2100) return ''
+    return `${y}-${mo}-${d}`
   }
   // dd/mm/yyyy – possibly BE year
   const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
@@ -533,6 +563,7 @@ async function loadExistingResponse(id) {
   form.value.survey_round   = r.survey_round     || ''
   form.value.surveyed_at    = r.surveyed_at      ? r.surveyed_at.slice(0, 10) : ''
   form.value.surveyor_name  = r.surveyor_name    || ''
+  form.value.model_name     = r.model_name       || ''
 
   // Fill answers
   const answersMap = {}
@@ -572,6 +603,7 @@ async function submit() {
     survey_round:  form.value.survey_round  || null,
     surveyed_at:   form.value.surveyed_at   || null,
     surveyor_name: form.value.surveyor_name || null,
+    model_name:    form.value.model_name    || null,
     answers:       form.value.answers,
   }
 
