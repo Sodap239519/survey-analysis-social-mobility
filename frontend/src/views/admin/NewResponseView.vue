@@ -12,26 +12,33 @@
     <div v-else-if="initError" class="error">{{ initError }}</div>
 
     <template v-else>
-      <!-- Step indicator -->
-      <div class="step-bar mb-6">
-        <div
-          v-for="(s, i) in allSteps"
-          :key="i"
-          class="step-item"
-          :class="{ active: step === i, done: step > i }"
-          @click="step > i && (step = i)"
-        >
-          <span class="step-num">{{ i + 1 }}</span>
-          <span class="step-label">{{ s.label }}</span>
+      <!-- Step indicator (กลับไปใช้รูปแบบเดิมแบบแถบแท็บ + progress bar) -->
+      <div class="steps-wrap mb-6">
+        <div class="steps-tabs">
+          <button
+            v-for="(s, i) in allSteps"
+            :key="i"
+            type="button"
+            class="step-tab"
+            :class="{ active: step === i, done: step > i }"
+            @click="step > i && (step = i)"
+          >
+            <span class="tab-icon">{{ stepIcon(i) }}</span>
+            <span class="tab-label">{{ s.label }}</span>
+          </button>
         </div>
+        <div class="steps-progress">
+          <div class="steps-progress-bar" :style="{ width: progressPercent + '%' }"></div>
+        </div>
+        <div class="steps-progress-text">ขั้นตอน {{ step + 1 }} / {{ allSteps.length }} — {{ progressPercent }}%</div>
       </div>
 
-      <!-- ── Step 0: ข้อมูลผู้ให้ข้อมูล ──────────────────────────────────────── -->
+      <!-- ── Step 0: ข้อมูลพื้นฐาน (จัด layout ให้เหมือนภาพ) ───────────────────────── -->
       <div v-show="step === 0" class="card">
-        <h3 class="section-title">📋 ข้อมูลผู้ให้ข้อมูล</h3>
+        <h3 class="section-title">🧾 ข้อมูลพื้นฐาน</h3>
 
-        <!-- รหัสบ้าน -->
-        <div class="form-row">
+        <!-- แถวบน: รหัสบ้าน / ชื่อโมเดล / ช่วงเวลา / ปีที่สำรวจ / ครั้งที่สำรวจ / วันที่สำรวจ / ชื่อผู้สำรวจ -->
+        <div class="form-grid top-grid">
           <div class="form-group">
             <label>รหัสบ้าน <span class="required">*</span></label>
             <div style="display:flex;gap:0.5rem">
@@ -40,7 +47,7 @@
                 placeholder="เช่น 30010017415"
                 @keyup.enter="onHouseCodeSearch"
               />
-              <button class="btn btn-secondary" @click="onHouseCodeSearch" :disabled="searchingHousehold">
+              <button class="btn btn-secondary" type="button" @click="onHouseCodeSearch" :disabled="searchingHousehold">
                 {{ searchingHousehold ? '...' : '🔍' }}
               </button>
             </div>
@@ -51,10 +58,52 @@
             </div>
             <div v-if="householdError" class="error-text mt-1">{{ householdError }}</div>
           </div>
+
+          <div class="form-group">
+            <label>ชื่อโมเดล</label>
+            <select v-model="form.model_name">
+              <option value="">เช่น โมเดลพริกจินดา</option>
+              <optgroup v-for="group in MODEL_OPTIONS" :key="group.category" :label="group.category">
+                <option v-for="m in group.models" :key="m" :value="m">{{ m }}</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>ช่วงเวลา <span class="required">*</span></label>
+            <select v-model="form.period">
+              <option value="after">หลังโครงการ</option>
+              <option value="before">ก่อนโครงการ</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>ปีที่สำรวจ (พ.ศ.)</label>
+            <input v-model.number="form.survey_year" type="number" min="2550" max="2600" placeholder="เช่น 2568" />
+          </div>
+
+          <div class="form-group">
+            <label>ครั้งที่สำรวจ</label>
+            <input v-model.number="form.survey_round" type="number" min="1" max="99" placeholder="-- เลือก --" />
+          </div>
+
+          <div class="form-group">
+            <label>วันที่สำรวจ</label>
+            <input v-model="form.surveyed_at" type="date" />
+          </div>
+
+          <div class="form-group">
+            <label>ชื่อผู้สำรวจ</label>
+            <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
+          </div>
         </div>
 
+        <hr class="section-divider" />
+
+        <h4 class="subsection-title">ข้อมูลผู้ให้ข้อมูล</h4>
+
         <!-- เลือกบุคคลจาก dropdown (ถ้ามีข้อมูลในระบบ) -->
-        <div v-if="householdPersons.length" class="form-group">
+        <div v-if="householdPersons.length" class="form-group" style="max-width:420px">
           <label>เลือกบุคคล (จากข้อมูล Baseline)</label>
           <select v-model="selectedPersonId" @change="onPersonSelect">
             <option value="">-- กรอกข้อมูลใหม่ --</option>
@@ -65,12 +114,12 @@
           </select>
         </div>
 
-        <!-- ข้อมูลส่วนตัว -->
-        <div class="form-row">
-          <div class="form-group" style="max-width:120px">
+        <!-- แถวข้อมูลผู้ให้ข้อมูล -->
+        <div class="form-grid person-grid">
+          <div class="form-group">
             <label>คำนำหน้า</label>
             <select v-model="form.person_title">
-              <option value="">—</option>
+              <option value="">-- เลือก --</option>
               <option>นาย</option>
               <option>นาง</option>
               <option>นางสาว</option>
@@ -78,82 +127,46 @@
               <option>เด็กหญิง</option>
             </select>
           </div>
+
           <div class="form-group">
             <label>ชื่อ</label>
             <input v-model="form.person_first_name" placeholder="ชื่อ" />
           </div>
+
           <div class="form-group">
             <label>นามสกุล</label>
             <input v-model="form.person_last_name" placeholder="นามสกุล" />
           </div>
-        </div>
 
-        <div class="form-row">
           <div class="form-group">
-            <label>หมายเลขบัตรประชาชน</label>
-            <input v-model="form.person_citizen_id" placeholder="13 หลัก" maxlength="20" />
+            <label>หมายเลขบัตรประชาชน (13 หลัก)</label>
+            <input v-model="form.person_citizen_id" placeholder="เช่น 1303005244708" maxlength="20" />
           </div>
-          <div class="form-group">
-            <label>เบอร์โทรศัพท์</label>
-            <input v-model="form.person_phone" placeholder="0xx-xxxxxxx" />
-          </div>
-        </div>
 
-        <!-- วันเกิด -->
-        <div class="form-group" style="max-width:380px">
-          <label>วันเกิด</label>
-          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-            <input
-              type="date"
-              :value="form.person_birthdate"
-              @change="updateBirthdate"
-              style="max-width:200px"
-            />
-            <span v-if="displayBirthdate" class="thai-date-display">
-              📅 {{ displayBirthdate }}
-            </span>
+          <div class="form-group">
+            <label>วันเกิด (พ.ศ.)</label>
+            <div class="birthdate-wrap">
+              <input
+                type="date"
+                :value="form.person_birthdate"
+                @change="updateBirthdate"
+                class="birthdate-input"
+              />
+              <input
+                v-if="displayBirthdate"
+                class="birthdate-be"
+                :value="displayBirthdate"
+                readonly
+                tabindex="-1"
+              />
+              <span v-else class="birthdate-hint">dd/mm/yyyy</span>
+            </div>
           </div>
-        </div>
 
-        <!-- ช่วงเวลา/ปีสำรวจ -->
-        <div class="form-row">
           <div class="form-group">
-            <label>ช่วงเวลา <span class="required">*</span></label>
-            <select v-model="form.period">
-              <option value="after">หลังโครงการ</option>
-              <option value="before">ก่อนโครงการ</option>
-            </select>
+            <label>หมายเลขโทรศัพท์</label>
+            <input v-model="form.person_phone" placeholder="เช่น 0812345678" />
           </div>
-          <div class="form-group">
-            <label>ปี พ.ศ.</label>
-            <input v-model.number="form.survey_year" type="number" min="2550" max="2600" placeholder="เช่น 2568" />
-          </div>
-          <div class="form-group">
-            <label>รอบสำรวจ</label>
-            <input v-model.number="form.survey_round" type="number" min="1" max="99" placeholder="เช่น 1" />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>วันที่สำรวจ</label>
-            <input v-model="form.surveyed_at" type="date" />
-          </div>
-          <div class="form-group">
-            <label>ผู้สำรวจ</label>
-            <input v-model="form.surveyor_name" placeholder="ชื่อผู้สำรวจ" />
-          </div>
-        </div>
-
-        <!-- ชื่อโมเดล -->
-        <div class="form-group" style="max-width:480px">
-          <label>ชื่อโมเดล</label>
-          <select v-model="form.model_name">
-            <option value="">เช่น โมเดลพริกจินดา</option>
-            <optgroup v-for="group in MODEL_OPTIONS" :key="group.category" :label="group.category">
-              <option v-for="m in group.models" :key="m" :value="m">{{ m }}</option>
-            </optgroup>
-          </select>
         </div>
       </div>
 
@@ -192,10 +205,7 @@
             </label>
             <!-- Text input for choices that require it -->
             <div v-if="q.meta?.choice_text_required" class="mt-2">
-              <div
-                v-for="cidStr in q.meta.choice_text_required"
-                :key="cidStr"
-              >
+              <div v-for="cidStr in q.meta.choice_text_required" :key="cidStr">
                 <div v-if="isChoiceKeySelected(q, cidStr)">
                   <label style="font-size:0.8rem">รายละเอียดเพิ่มเติม</label>
                   <input
@@ -232,13 +242,14 @@
 
       <!-- Navigation -->
       <div class="flex justify-between mt-6">
-        <button v-if="step > 0" class="btn btn-secondary" @click="step--">← ก่อนหน้า</button>
+        <button v-if="step > 0" class="btn btn-secondary" type="button" @click="step--">← ก่อนหน้า</button>
         <div v-else></div>
 
         <div class="flex gap-2">
           <button
             v-if="step < allSteps.length - 1"
             class="btn btn-primary"
+            type="button"
             @click="step++"
           >
             ถัดไป →
@@ -246,6 +257,7 @@
           <button
             v-else
             class="btn btn-primary"
+            type="button"
             :disabled="submitting"
             @click="submit"
           >
@@ -306,15 +318,27 @@ const form = ref({
 })
 
 // ── Model name options — imported from shared constants ───────────────────────
-// MODEL_CATEGORIES is imported above; alias for use in the template
 const MODEL_OPTIONS = MODEL_CATEGORIES
 
 // ── Step list (dynamic based on loaded capitals) ──────────────────────────────
 const allSteps = computed(() => {
-  const steps = [{ label: 'ข้อมูลผู้ให้ข้อมูล' }]
+  const steps = [{ label: 'ข้อมูลพื้นฐาน' }]
   capitals.value.forEach(c => steps.push({ label: c.name_th }))
   return steps
 })
+
+const progressPercent = computed(() => {
+  const total = allSteps.value.length || 1
+  const idx = Math.min(Math.max(step.value, 0), total - 1)
+  return Math.round(((idx + 1) / total) * 100)
+})
+
+function stepIcon(i) {
+  if (i === 0) return '📄'
+  const c = capitals.value[i - 1]
+  if (!c) return '⭐'
+  return capitalIcon(c.slug)
+}
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -327,11 +351,6 @@ const allSteps = computed(() => {
  *   - dd/mm/yyyy (may be BE year ≥ 2400 → subtract 543)
  *   - Excel serial numbers → return '' (not crashing)
  *   - null / undefined / empty → ''
- *
- * The double-conversion bug (year 3033) happened because the API returned a
- * BE year in yyyy-mm-dd format (e.g. "2490-06-15") which was stored verbatim
- * as CE, then displayBirthdate added 543 again → 3033. This is now fixed by
- * detecting BE years in the yyyy-mm-dd branch.
  */
 function toDateInput(v) {
   if (v === null || v === undefined || v === '') return ''
@@ -350,7 +369,7 @@ function toDateInput(v) {
     return `${y}-${mo}-${d}`
   }
   // dd/mm/yyyy – possibly BE year
-  const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  const m = str.match(/^(\\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (m) {
     let y = parseInt(m[3], 10)
     const mo = m[2].padStart(2, '0')
@@ -368,9 +387,7 @@ function toDateInput(v) {
   return ''
 }
 
-/**
- * Display CE yyyy-mm-dd as Thai Buddhist Era dd/mm/yyyy for the read-only label.
- */
+/** Display CE yyyy-mm-dd as Thai Buddhist Era dd/mm/yyyy for the read-only BE field. */
 const displayBirthdate = computed(() => {
   const v = form.value.person_birthdate
   if (!v) return ''
@@ -383,18 +400,12 @@ const displayBirthdate = computed(() => {
   return `${d}/${mo}/${y + 543}`
 })
 
-/** Called when the native date input value changes. */
 function updateBirthdate(e) {
   form.value.person_birthdate = e.target.value || ''
 }
 
 // ── Autofill ──────────────────────────────────────────────────────────────────
 
-/**
- * Autofill form fields from a person object returned by GET /persons.
- * Uses a fallback chain for the birthdate field name to be resilient against
- * different API field name variations.
- */
 function autofillPerson(person) {
   if (!person) return
   form.value.person_id          = person.id    || null
@@ -404,7 +415,6 @@ function autofillPerson(person) {
   form.value.person_citizen_id  = person.citizen_id   || ''
   form.value.person_phone       = person.phone        || ''
 
-  // Fallback chain: try multiple possible field names for birthdate
   const rawBirthdate =
     person.birthdate      ??
     person.birth_date     ??
@@ -416,7 +426,6 @@ function autofillPerson(person) {
   form.value.person_birthdate = toDateInput(rawBirthdate)
 }
 
-/** Clear person-related fields when the dropdown is reset to "กรอกข้อมูลใหม่". */
 function clearPersonFields() {
   form.value.person_id          = null
   form.value.person_title       = ''
@@ -426,8 +435,6 @@ function clearPersonFields() {
   form.value.person_birthdate   = ''
   form.value.person_phone       = ''
 }
-
-// ── Person select handler ──────────────────────────────────────────────────────
 
 function onPersonSelect() {
   const personId = selectedPersonId.value
@@ -453,7 +460,6 @@ async function onHouseCodeSearch() {
   clearPersonFields()
 
   try {
-    // Search for household
     const hhRes = await api.get('/households', { params: { search: code, per_page: 5 } })
     const hh = hhRes.data?.data?.find(h => h.house_code === code)
     if (hh) {
@@ -462,11 +468,10 @@ async function onHouseCodeSearch() {
     } else {
       householdError.value  = 'ไม่พบรหัสบ้านนี้ในระบบ (จะสร้างใหม่อัตโนมัติเมื่อบันทึก)'
     }
-    // Load persons for this house_code (with birthdate from baseline)
+
     const pRes = await api.get('/persons', { params: { house_code: code, per_page: 200 } })
     householdPersons.value = pRes.data?.data || []
 
-    // Auto-select if only one person
     if (householdPersons.value.length === 1) {
       selectedPersonId.value = String(householdPersons.value[0].id)
       autofillPerson(householdPersons.value[0])
@@ -527,7 +532,7 @@ function capitalIcon(slug) {
     natural:  '🌿',
     social:   '🤝',
   }
-  return icons[slug] || '📊'
+  return icons[slug] || '⭐'
 }
 
 // ── Load questions (capitals) ─────────────────────────────────────────────────
@@ -547,25 +552,21 @@ async function loadExistingResponse(id) {
   form.value.household_id     = r.household_id
   form.value.person_id        = r.person_id || null
 
-  // Fill household info
   if (r.household) {
     householdFound.value = r.household
   }
 
-  // Fill person info
   if (r.person) {
     autofillPerson(r.person)
   }
 
-  // Survey meta
   form.value.period         = r.period          || 'after'
-  form.value.survey_year    = r.survey_year      || ''
+  form.value.survey_year    = r.survey_year      || '''
   form.value.survey_round   = r.survey_round     || ''
   form.value.surveyed_at    = r.surveyed_at      ? r.surveyed_at.slice(0, 10) : ''
   form.value.surveyor_name  = r.surveyor_name    || ''
   form.value.model_name     = r.model_name       || ''
 
-  // Fill answers
   const answersMap = {}
   for (const ans of r.answers || []) {
     answersMap[ans.question_id] = {
@@ -576,7 +577,6 @@ async function loadExistingResponse(id) {
   }
   form.value.answers = answersMap
 
-  // Load persons for this house_code (to enable person dropdown)
   if (form.value.house_code) {
     try {
       const pRes = await api.get('/persons', { params: { house_code: form.value.house_code, per_page: 200 } })
@@ -607,17 +607,14 @@ async function submit() {
     answers:       form.value.answers,
   }
 
-  // Household
   if (form.value.household_id) {
     payload.household_id = form.value.household_id
   } else {
     payload.house_code = form.value.house_code.trim()
   }
 
-  // Person
   if (form.value.person_id) {
     payload.person_id = form.value.person_id
-    // Always send person_data so the backend can update birthdate if it was null
     payload.person_data = buildPersonData()
   } else if (form.value.person_first_name || form.value.person_citizen_id) {
     payload.person_data = buildPersonData()
@@ -675,38 +672,54 @@ onMounted(async () => {
 <style scoped>
 .required { color: #ef4444; }
 
-.step-bar {
+/* ── Tabs + progress (style ให้ใกล้เคียงภาพเดิม) ─────────────────────────── */
+.steps-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+.steps-tabs {
   display: flex;
-  gap: 0.25rem;
+  gap: 0.5rem;
   overflow-x: auto;
   padding-bottom: 0.25rem;
 }
-.step-item {
-  display: flex;
-  flex-direction: column;
+.step-tab {
+  display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  opacity: 0.75;
   cursor: default;
-  opacity: 0.45;
-  min-width: 70px;
-  text-align: center;
+  white-space: nowrap;
 }
-.step-item.done  { opacity: 0.7; cursor: pointer; }
-.step-item.active { opacity: 1; }
-.step-num {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+.step-tab.done { cursor: pointer; opacity: 0.9; }
+.step-tab.active {
+  opacity: 1;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+.tab-icon { font-size: 1rem; }
+.tab-label { font-size: 0.85rem; font-weight: 700; }
+
+.steps-progress {
+  width: 100%;
+  height: 8px;
   background: var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 700;
+  border-radius: 999px;
+  overflow: hidden;
 }
-.step-item.active .step-num { background: var(--color-primary); color: #fff; }
-.step-item.done .step-num   { background: #22c55e; color: #fff; }
-.step-label { font-size: 0.7rem; color: var(--color-text-muted); line-height: 1.2; }
+.steps-progress-bar {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.steps-progress-text {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-align: right;
+}
 
 .section-title {
   font-size: 1rem;
@@ -715,24 +728,56 @@ onMounted(async () => {
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--color-border);
 }
-
-.form-row {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
+.subsection-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  margin: 0 0 0.75rem 0;
 }
-.form-row .form-group { flex: 1; min-width: 160px; }
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1rem 0;
+}
+
+/* ── Layout แบบ grid ให้ใกล้เคียงภาพเดิม ─────────────────────────────────── */
+.form-grid {
+  display: grid;
+  gap: 0.75rem 1rem;
+}
+.top-grid {
+  grid-template-columns: repeat(7, minmax(140px, 1fr));
+}
+.person-grid {
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .top-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+  .person-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+}
+@media (max-width: 720px) {
+  .top-grid { grid-template-columns: 1fr; }
+  .person-grid { grid-template-columns: 1fr; }
+}
+
+.form-group { display: flex; flex-direction: column; gap: 0.35rem; }
 
 .hint-text  { font-size: 0.8rem; color: var(--color-text-muted); }
 .error-text { font-size: 0.8rem; color: #ef4444; }
 
-.thai-date-display {
-  font-size: 0.9rem;
-  color: var(--color-primary);
-  font-weight: 600;
-  white-space: nowrap;
+.birthdate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
+.birthdate-input { max-width: 200px; }
+.birthdate-be {
+  max-width: 140px;
+  background: color-mix(in srgb, var(--color-surface) 70%, #0000);
+}
+.birthdate-hint { font-size: 0.8rem; color: var(--color-text-muted); }
 
 .question-block {
   border: 1px solid var(--color-border);
