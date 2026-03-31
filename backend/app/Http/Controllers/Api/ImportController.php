@@ -10,6 +10,7 @@ use App\Models\ImportLog;
 use App\Models\SurveyResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ImportController extends Controller
@@ -25,6 +26,9 @@ class ImportController extends Controller
         $fileSizeMb = round($request->file('file')->getSize() / 1024 / 1024, 2);
         $startTime = microtime(true);
 
+        // Store the uploaded file securely (private disk, not publicly accessible)
+        $storagePath = $request->file('file')->store('imports', 'local');
+
         // Use the multi-sheet importer for XLSX files; fall back to the legacy
         // single-sheet CSV importer for .csv files.
         $import = ($extension === 'xlsx' || $extension === 'xls')
@@ -34,6 +38,11 @@ class ImportController extends Controller
         try {
             Excel::import($import, $request->file('file'));
         } catch (\Throwable $e) {
+            // Clean up stored file on failure
+            if ($storagePath) {
+                Storage::disk('local')->delete($storagePath);
+            }
+
             \Illuminate\Support\Facades\Log::error('Import failed', [
                 'file'  => $filename,
                 'error' => $e->getMessage(),
@@ -53,6 +62,7 @@ class ImportController extends Controller
         ImportLog::create([
             'user_id'         => $request->user()?->id,
             'filename'        => $filename,
+            'storage_path'    => $storagePath,
             'imported_count'  => $import->imported,
             'exists_count'    => $import->exists,
             'skipped_count'   => $import->skipped,
@@ -128,13 +138,14 @@ class ImportController extends Controller
         $log = ImportLog::with('user:id,name')->findOrFail($id);
 
         return response()->json([
-            'id'             => $log->id,
-            'filename'       => $log->filename,
-            'imported_count' => $log->imported_count,
-            'exists_count'   => $log->exists_count,
-            'skipped_count'  => $log->skipped_count,
-            'imported_by'    => $log->user?->name ?? 'ระบบ',
-            'imported_at'    => $log->created_at?->toDateTimeString(),
+            'id'              => $log->id,
+            'filename'        => $log->filename,
+            'has_file'        => $log->storage_path && Storage::disk('local')->exists($log->storage_path),
+            'imported_count'  => $log->imported_count,
+            'exists_count'    => $log->exists_count,
+            'skipped_count'   => $log->skipped_count,
+            'imported_by'     => $log->user?->name ?? 'ระบบ',
+            'imported_at'     => $log->created_at?->toDateTimeString(),
         ]);
     }
 
@@ -148,6 +159,7 @@ class ImportController extends Controller
             ->map(fn ($log) => [
                 'id'              => $log->id,
                 'filename'        => $log->filename,
+                'has_file'        => $log->storage_path && Storage::disk('local')->exists($log->storage_path),
                 'imported_count'  => $log->imported_count,
                 'exists_count'    => $log->exists_count,
                 'skipped_count'   => $log->skipped_count,
@@ -159,6 +171,23 @@ class ImportController extends Controller
             ]);
 
         return response()->json($logs);
+    }
+
+    /**
+     * Securely download the original imported file for a given import log.
+     * Only authenticated admin users may access this endpoint.
+     */
+    public function download(int $id, Request $request)
+    {
+        $log = ImportLog::findOrFail($id);
+
+        if (!$log->storage_path || !Storage::disk('local')->exists($log->storage_path)) {
+            return response()->json(['message' => 'ไม่พบไฟล์ที่นำเข้า'], 404);
+        }
+
+        $fullPath = Storage::disk('local')->path($log->storage_path);
+
+        return response()->download($fullPath, $log->filename);
     }
 
     public function stats(): JsonResponse
@@ -229,3 +258,4 @@ class ImportController extends Controller
         ]);
     }
 }
+

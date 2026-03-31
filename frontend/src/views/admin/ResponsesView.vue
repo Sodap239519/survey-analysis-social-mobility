@@ -39,6 +39,20 @@
         </select>
       </div>
       <div class="form-group" style="min-width:130px">
+        <label>หมวดโมเดล</label>
+        <select v-model="filterCategory" @change="filterModelName = ''">
+          <option value="">ทุกหมวด</option>
+          <option v-for="g in MODEL_CATEGORIES" :key="g.category" :value="g.category">{{ g.category }}</option>
+        </select>
+      </div>
+      <div v-if="filterCategory" class="form-group" style="min-width:200px">
+        <label>ชื่อโมเดล</label>
+        <select v-model="filterModelName">
+          <option value="">ทุกโมเดล</option>
+          <option v-for="m in modelsForCategory" :key="m" :value="m">{{ m }}</option>
+        </select>
+      </div>
+      <div class="form-group" style="min-width:130px">
         <label>&nbsp;</label>
         <label class="toggle-label">
           <input type="checkbox" v-model="groupByHousehold" />
@@ -112,8 +126,8 @@
 
       <!-- Flat table view -->
       <div v-else>
-        <div v-if="filterStatus" class="text-muted text-sm mb-2">
-          ⚠️ กรองสถานะ "{{ filterStatus }}" แสดงเฉพาะหน้านี้ ({{ filteredRows.length }} จาก {{ responses.data?.length }} รายการ)
+        <div v-if="filterStatus || filterCategory || filterModelName" class="text-muted text-sm mb-2">
+          ⚠️ กรองแสดงเฉพาะหน้านี้ ({{ filteredRows.length }} จาก {{ responses.data?.length }} รายการ)
         </div>
         <div class="table-wrap">
           <table>
@@ -328,6 +342,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api'
 import { useAvailableYears } from '../../composables/useAvailableYears'
+import { MODEL_CATEGORIES } from '../../constants/modelCategories'
 
 const responses = ref({ data: [], total: 0, last_page: 1 })
 const loading = ref(false)
@@ -336,9 +351,17 @@ const page = ref(1)
 const filterPeriod = ref('')
 const filterSearch = ref('')
 const filterStatus = ref('')
+const filterCategory = ref('')
+const filterModelName = ref('')
 const groupByHousehold = ref(false)
 let searchTimer = null
 const SEARCH_DEBOUNCE_MS = 400
+
+/** Derived list of model names for the selected category dropdown. */
+const modelsForCategory = computed(() => {
+  if (!filterCategory.value) return []
+  return MODEL_CATEGORIES.find(g => g.category === filterCategory.value)?.models || []
+})
 
 const { availableYears, selectedYear: filterYear, loadYears } = useAvailableYears()
 
@@ -754,9 +777,18 @@ function formatThaiDate(dateString) {
 // ── Filtered / grouped rows ──────────────────────────────────────────────────
 
 const filteredRows = computed(() => {
-  const data = responses.value.data || []
-  if (!filterStatus.value) return data
-  return data.filter(r => r.overall_status === filterStatus.value)
+  let data = responses.value.data || []
+  if (filterStatus.value) {
+    data = data.filter(r => r.overall_status === filterStatus.value)
+  }
+  if (filterCategory.value) {
+    const categoryModels = MODEL_CATEGORIES.find(g => g.category === filterCategory.value)?.models || []
+    data = data.filter(r => categoryModels.includes(r.model_name))
+  }
+  if (filterModelName.value) {
+    data = data.filter(r => r.model_name === filterModelName.value)
+  }
+  return data
 })
 
 const groupedRows = computed(() => {
