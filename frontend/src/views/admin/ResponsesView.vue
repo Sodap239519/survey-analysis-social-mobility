@@ -30,6 +30,16 @@
         </select>
       </div>
       <div class="form-group" style="min-width:140px">
+        <label>ประเภทโมเดล</label>
+        <select v-model="filterModelCategory" @change="load">
+          <option value="">ทุกประเภท</option>
+          <option value="LC">LC</option>
+          <option value="PPVC">PPVC</option>
+          <option value="SSN">SSN</option>
+          <option value="ABI">ABI</option>
+        </select>
+      </div>
+      <div class="form-group" style="min-width:140px">
         <label>สถานะการเปลี่ยนแปลง</label>
         <select v-model="filterStatus">
           <option value="">ทุกสถานะ</option>
@@ -336,6 +346,7 @@ const page = ref(1)
 const filterPeriod = ref('')
 const filterSearch = ref('')
 const filterStatus = ref('')
+const filterModelCategory = ref('')
 const groupByHousehold = ref(false)
 let searchTimer = null
 const SEARCH_DEBOUNCE_MS = 400
@@ -797,6 +808,7 @@ async function load() {
     if (filterYear.value) params.survey_year = filterYear.value
     if (filterPeriod.value) params.period = filterPeriod.value
     if (filterSearch.value.trim()) params.search = filterSearch.value.trim()
+    if (filterModelCategory.value) params.model_category = filterModelCategory.value
     const res = await api.get('/responses', { params })
     responses.value = res.data
   } catch (e) {

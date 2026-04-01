@@ -48,6 +48,19 @@ class SurveyResponseController extends Controller
             });
         }
 
+        if ($request->filled('model_category')) {
+            $categoryModels = [
+                'LC'   => ['โมเดลไข่ผำ แก้จน', 'โมเดลกล้าไม้แก้จน', 'โมเดลผักยกแคร่สร้างสุข', 'โมเดล Korat Handy Care', 'โมเดลผักไร้ดิน กินปลอดภัย'],
+                'PPVC' => ['โมเดลมหัศจรรย์ไข่ผำ', 'โมเดลมะขามป้อม', 'โมเดล Veggies to Value ผักคุณค่า พายั่งยืน'],
+                'SSN'  => ['กองทุนแก้จน', 'ตะไคร้ดี ลดหนี้ชุมชน/ผักเขียว เหนี่ยวทรัพย์'],
+                'ABI'  => ['โมเดลพริกจินดา'],
+            ];
+            $category = $request->string('model_category')->upper()->toString();
+            if (isset($categoryModels[$category])) {
+                $query->whereIn('model_name', $categoryModels[$category]);
+            }
+        }
+
         $paginated = $query->paginate($request->integer('per_page', 20));
 
         // Append comparison data (household is already eager-loaded; no N+1)
