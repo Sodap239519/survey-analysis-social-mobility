@@ -10,6 +10,7 @@ use App\Models\ImportLog;
 use App\Models\SurveyResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ImportController extends Controller
@@ -24,6 +25,9 @@ class ImportController extends Controller
         $extension = strtolower($request->file('file')->getClientOriginalExtension());
         $fileSizeMb = round($request->file('file')->getSize() / 1024 / 1024, 2);
         $startTime = microtime(true);
+
+        // Store the uploaded file so it can be downloaded later
+        $storedPath = $request->file('file')->store('imports', 'local');
 
         // Use the multi-sheet importer for XLSX files; fall back to the legacy
         // single-sheet CSV importer for .csv files.
@@ -53,6 +57,7 @@ class ImportController extends Controller
         ImportLog::create([
             'user_id'         => $request->user()?->id,
             'filename'        => $filename,
+            'file_path'       => $storedPath,
             'imported_count'  => $import->imported,
             'exists_count'    => $import->exists,
             'skipped_count'   => $import->skipped,
@@ -148,6 +153,7 @@ class ImportController extends Controller
             ->map(fn ($log) => [
                 'id'              => $log->id,
                 'filename'        => $log->filename,
+                'has_file'        => $log->file_path && Storage::disk('local')->exists($log->file_path),
                 'imported_count'  => $log->imported_count,
                 'exists_count'    => $log->exists_count,
                 'skipped_count'   => $log->skipped_count,
@@ -159,6 +165,17 @@ class ImportController extends Controller
             ]);
 
         return response()->json($logs);
+    }
+
+    public function download(int $id)
+    {
+        $log = ImportLog::findOrFail($id);
+
+        if (!$log->file_path || !Storage::disk('local')->exists($log->file_path)) {
+            return response()->json(['message' => 'ไม่พบไฟล์'], 404);
+        }
+
+        return Storage::disk('local')->download($log->file_path, $log->filename);
     }
 
     public function stats(): JsonResponse

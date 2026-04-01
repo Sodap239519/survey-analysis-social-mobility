@@ -61,7 +61,28 @@
           <!-- Model name -->
           <div class="form-group">
             <label>ชื่อโมเดล</label>
-            <input v-model="form.model_name" placeholder="เช่น รุ่นที่ 1 / Model A" />
+            <select v-model="form.model_name">
+              <option value="">-- เลือกโมเดล (เช่น โมเดลพริกจินดา) --</option>
+              <optgroup label="LC">
+                <option value="โมเดลไข่ผำ แก้จน">โมเดลไข่ผำ แก้จน</option>
+                <option value="โมเดลกล้าไม้แก้จน">โมเดลกล้าไม้แก้จน</option>
+                <option value="โมเดลผักยกแคร่สร้างสุข">โมเดลผักยกแคร่สร้างสุข</option>
+                <option value="โมเดล Korat Handy Care">โมเดล Korat Handy Care</option>
+                <option value="โมเดลผักไร้ดิน กินปลอดภัย">โมเดลผักไร้ดิน กินปลอดภัย</option>
+              </optgroup>
+              <optgroup label="PPVC">
+                <option value="โมเดลมหัศจรรย์ไข่ผำ">โมเดลมหัศจรรย์ไข่ผำ</option>
+                <option value="โมเดลมะขามป้อม">โมเดลมะขามป้อม</option>
+                <option value="โมเดล Veggies to Value ผักคุณค่า พายั่งยืน">โมเดล Veggies to Value ผักคุณค่า พายั่งยืน</option>
+              </optgroup>
+              <optgroup label="SSN">
+                <option value="กองทุนแก้จน">กองทุนแก้จน</option>
+                <option value="ตะไคร้ดี ลดหนี้ชุมชน/ผักเขียว เหนี่ยวทรัพย์">ตะไคร้ดี ลดหนี้ชุมชน/ผักเขียว เหนี่ยวทรัพย์</option>
+              </optgroup>
+              <optgroup label="ABI">
+                <option value="โมเดลพริกจินดา">โมเดลพริกจินดา</option>
+              </optgroup>
+            </select>
           </div>
           <!-- Survey meta -->
           <div class="form-group" :class="{ 'has-error': errors.period }">
@@ -162,7 +183,7 @@
               <input 
                 v-model="displayBirthdate" 
                 type="text" 
-                placeholder="dd/mm/yyyy"
+                placeholder="วว/ดด/ปปปป (พ.ศ.)"
                 @input="updateBirthdate"
                 maxlength="10"
               />
@@ -1354,9 +1375,15 @@ function autofillPerson(person) {
   form.value.person_citizen_id = person.citizen_id || ''
   
   console.log('[DEBUG] birthdate raw:', person.birthdate)
-  
-  // ใช้ computed แทน manual set
-  form.value.person_birthdate = person.birthdate || null
+
+  const rawBirth =
+    person.birthdate ??
+    person.birth_date ??
+    person.date_of_birth ??
+    ''
+
+  // normalize to yyyy-mm-dd (computed displayBirthdate จะไปแปลงเป็น พ.ศ. ให้อีกที)
+  form.value.person_birthdate = rawBirth ? String(rawBirth).split('T')[0] : ''
   console.log('[DEBUG] set form.person_birthdate to:', form.value.person_birthdate)
   console.log('[DEBUG] displayBirthdate computed to:', displayBirthdate.value)
 
@@ -1697,12 +1724,14 @@ const displaySurveyedAt = computed({
 const displayBirthdate = computed({
   get: () => {
     if (!form.value.person_birthdate) return ''
-    const date = new Date(form.value.person_birthdate)
-    if (isNaN(date.getTime())) return ''
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear() + 543 // แปลงเป็น พ.ศ.
-    return `${day}/${month}/${year}`
+    // Parse date string manually to avoid UTC-timezone shift (YYYY-MM-DD → local)
+    const raw = String(form.value.person_birthdate).split('T')[0]
+    const parts = raw.split('-')
+    if (parts.length !== 3) return ''
+    const [ceYear, month, day] = parts.map(Number)
+    if (!ceYear || !month || !day) return ''
+    const beYear = ceYear + 543 // แปลงเป็น พ.ศ.
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${beYear}`
   },
   set: (value) => {
     if (!value || value.length !== 10) return

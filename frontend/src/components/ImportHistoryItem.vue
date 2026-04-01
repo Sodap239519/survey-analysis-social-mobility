@@ -13,8 +13,20 @@
           </div>
         </div>
       </div>
-      <div class="expand-btn">
-        <i :class="expanded ? 'fi fi-rr-angle-up' : 'fi fi-rr-angle-down'"></i>
+      <div class="header-actions" @click.stop>
+        <button
+          v-if="item.has_file"
+          class="btn-download"
+          :disabled="downloading"
+          @click="downloadFile"
+          title="ดาวน์โหลดไฟล์ที่นำเข้า"
+        >
+          <i class="fi fi-rr-download icon-sm"></i>
+          <span>{{ downloading ? '...' : 'ดาวน์โหลด' }}</span>
+        </button>
+        <div class="expand-btn">
+          <i :class="expanded ? 'fi fi-rr-angle-up' : 'fi fi-rr-angle-down'"></i>
+        </div>
       </div>
     </div>
 
@@ -70,6 +82,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import api from '../api'
 
 const props = defineProps({
   item: {
@@ -79,9 +92,33 @@ const props = defineProps({
 })
 
 const expanded = ref(false)
+const downloading = ref(false)
 
 function toggleExpanded() {
   expanded.value = !expanded.value
+}
+
+async function downloadFile() {
+  if (downloading.value) return
+  downloading.value = true
+  try {
+    const res = await api.get(`/import/history/${props.item.id}/download`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = props.item.filename || `import_${props.item.id}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('[ImportHistoryItem] Download failed:', err)
+    alert('ไม่สามารถดาวน์โหลดไฟล์ได้')
+  } finally {
+    downloading.value = false
+  }
 }
 
 const sheetResults = computed(() => props.item.sheet_results || [])
@@ -190,6 +227,39 @@ function formatDate(dateString) {
   color: var(--color-text-muted, #94a3b8);
   font-size: 0.75rem;
   padding-top: 2px;
+}
+
+/* ── Download button ── */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.btn-download:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.btn-download:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* ── Import Status ── */
