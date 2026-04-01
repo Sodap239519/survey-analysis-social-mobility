@@ -39,31 +39,10 @@
         </select>
       </div>
       <div class="form-group" style="min-width:130px">
-        <label>หมวดโมเดล</label>
-        <select v-model="filterCategory" @change="filterModelName = ''">
-          <option value="">ทุกหมวด</option>
-          <option v-for="g in MODEL_CATEGORIES" :key="g.category" :value="g.category">{{ g.category }}</option>
-        </select>
-      </div>
-      <div v-if="filterCategory" class="form-group" style="min-width:200px">
-        <label>ชื่อโมเดล</label>
-        <select v-model="filterModelName">
-          <option value="">ทุกโมเดล</option>
-          <option v-for="m in modelsForCategory" :key="m" :value="m">{{ m }}</option>
-        </select>
-      </div>
-      <div class="form-group" style="min-width:130px">
         <label>&nbsp;</label>
         <label class="toggle-label">
-          <input type="checkbox" v-model="groupByHousehold" @change="toggleGroupByHousehold" />
+          <input type="checkbox" v-model="groupByHousehold" />
           <span>จัดกลุ่มตามบ้าน</span>
-        </label>
-      </div>
-      <div class="form-group" style="min-width:160px">
-        <label>&nbsp;</label>
-        <label class="toggle-label">
-          <input type="checkbox" v-model="groupByCategory" @change="toggleGroupByCategory" />
-          <span>จัดกลุ่มตามหมวดโมเดล</span>
         </label>
       </div>
     </div>
@@ -131,61 +110,10 @@
         <div v-if="!groupedRows.length" class="text-muted text-center mt-4">ไม่มีข้อมูล</div>
       </div>
 
-      <!-- Grouped by model category view -->
-      <div v-else-if="groupByCategory">
-        <div v-for="section in groupedByCategory" :key="section.category" class="household-group mb-4">
-          <div class="household-group-header">
-            <span class="house-code-badge">📂 {{ section.category }}</span>
-            <span class="text-muted" style="font-size:0.85rem">{{ section.responses.length }} รายการ</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>รหัสบ้าน</th>
-                  <th>ชื่อผู้ตอบ</th>
-                  <th>ชื่อโมเดล</th>
-                  <th>ช่วงเวลา</th>
-                  <th>ปี/รอบ</th>
-                  <th><i class="fi fi-rr-user"></i> ทุนมนุษย์</th>
-                  <th><i class="fi fi-rr-home"></i> ทุนกายภาพ</th>
-                  <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
-                  <th><i class="fi fi-rr-leaf"></i> ทุนธรรมชาติ</th>
-                  <th><i class="fi fi-rr-users"></i> ทุนสังคม</th>
-                  <th>จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in section.responses" :key="r.id">
-                  <td><code class="house-code">{{ r.household?.house_code || '—' }}</code></td>
-                  <td>{{ personName(r) }}</td>
-                  <td class="text-muted" style="font-size:0.8rem">{{ r.model_name || '—' }}</td>
-                  <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
-                  <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
-                  <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
-                  <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
-                  <td>
-                    <div class="flex gap-1">
-                      <button class="btn btn-secondary btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด"><i class="fi fi-rr-eye" style="color:#0d6efd;"></i></button>
-                      <RouterLink :to="`/admin/responses/${r.id}/edit`" class="btn btn-secondary btn-sm" title="แก้ไข"><i class="fi fi-rr-edit" style="color:#FFD300;"></i></RouterLink>
-                      <button class="btn btn-secondary btn-sm" @click="confirmDelete(r)" title="ลบ"><i class="fi fi-rr-trash" style="color:#dc3545;"></i></button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div v-if="!groupedByCategory.length" class="text-muted text-center mt-4">ไม่มีข้อมูล</div>
-      </div>
-
       <!-- Flat table view -->
       <div v-else>
-        <div v-if="filterStatus || filterCategory || filterModelName" class="text-muted text-sm mb-2">
-          ⚠️ กรองแสดงเฉพาะหน้านี้ ({{ filteredRows.length }} จาก {{ responses.data?.length }} รายการ)
+        <div v-if="filterStatus" class="text-muted text-sm mb-2">
+          ⚠️ กรองสถานะ "{{ filterStatus }}" แสดงเฉพาะหน้านี้ ({{ filteredRows.length }} จาก {{ responses.data?.length }} รายการ)
         </div>
         <div class="table-wrap">
           <table>
@@ -400,7 +328,6 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api'
 import { useAvailableYears } from '../../composables/useAvailableYears'
-import { MODEL_CATEGORIES } from '../../constants/modelCategories'
 
 const responses = ref({ data: [], total: 0, last_page: 1 })
 const loading = ref(false)
@@ -409,18 +336,9 @@ const page = ref(1)
 const filterPeriod = ref('')
 const filterSearch = ref('')
 const filterStatus = ref('')
-const filterCategory = ref('')
-const filterModelName = ref('')
 const groupByHousehold = ref(false)
-const groupByCategory = ref(false)
 let searchTimer = null
 const SEARCH_DEBOUNCE_MS = 400
-
-/** Derived list of model names for the selected category dropdown. */
-const modelsForCategory = computed(() => {
-  if (!filterCategory.value) return []
-  return MODEL_CATEGORIES.find(g => g.category === filterCategory.value)?.models || []
-})
 
 const { availableYears, selectedYear: filterYear, loadYears } = useAvailableYears()
 
@@ -836,18 +754,9 @@ function formatThaiDate(dateString) {
 // ── Filtered / grouped rows ──────────────────────────────────────────────────
 
 const filteredRows = computed(() => {
-  let data = responses.value.data || []
-  if (filterStatus.value) {
-    data = data.filter(r => r.overall_status === filterStatus.value)
-  }
-  if (filterCategory.value) {
-    const categoryModels = MODEL_CATEGORIES.find(g => g.category === filterCategory.value)?.models || []
-    data = data.filter(r => categoryModels.includes(r.model_name))
-  }
-  if (filterModelName.value) {
-    data = data.filter(r => r.model_name === filterModelName.value)
-  }
-  return data
+  const data = responses.value.data || []
+  if (!filterStatus.value) return data
+  return data.filter(r => r.overall_status === filterStatus.value)
 })
 
 const groupedRows = computed(() => {
@@ -876,28 +785,6 @@ const groupedRows = computed(() => {
   }
 
   return Object.values(groups)
-})
-
-const groupedByCategory = computed(() => {
-  // Build lookup: model_name → category label
-  const categoryOf = {}
-  for (const g of MODEL_CATEGORIES) {
-    for (const m of g.models) categoryOf[m] = g.category
-  }
-
-  // Initialize sections in defined order + ไม่ระบุ
-  const sections = {}
-  for (const g of MODEL_CATEGORIES) {
-    sections[g.category] = { category: g.category, responses: [] }
-  }
-  sections['ไม่ระบุ'] = { category: 'ไม่ระบุ', responses: [] }
-
-  for (const r of filteredRows.value) {
-    const cat = r.model_name ? (categoryOf[r.model_name] || 'ไม่ระบุ') : 'ไม่ระบุ'
-    sections[cat].responses.push(r)
-  }
-
-  return Object.values(sections).filter(s => s.responses.length > 0)
 })
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -961,14 +848,6 @@ function printDetail() {
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
-
-function toggleGroupByHousehold() {
-  if (groupByHousehold.value) groupByCategory.value = false
-}
-
-function toggleGroupByCategory() {
-  if (groupByCategory.value) groupByHousehold.value = false
-}
 
 function confirmDelete(r) { deletingResponse.value = r; showDeleteConfirm.value = true }
 
