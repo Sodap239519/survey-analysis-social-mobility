@@ -113,7 +113,8 @@ async function downloadFile() {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-  } catch {
+  } catch (err) {
+    console.error('[ImportHistoryItem] Download failed:', err)
     alert('ไม่สามารถดาวน์โหลดไฟล์ได้')
   } finally {
     downloading.value = false
