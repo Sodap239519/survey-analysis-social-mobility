@@ -1375,9 +1375,15 @@ function autofillPerson(person) {
   form.value.person_citizen_id = person.citizen_id || ''
   
   console.log('[DEBUG] birthdate raw:', person.birthdate)
-  
-  // ใช้ computed แทน manual set
-  form.value.person_birthdate = person.birthdate || null
+
+  const rawBirth =
+    person.birthdate ??
+    person.birth_date ??
+    person.date_of_birth ??
+    ''
+
+  // normalize to yyyy-mm-dd (computed displayBirthdate จะไปแปลงเป็น พ.ศ. ให้อีกที)
+  form.value.person_birthdate = rawBirth ? String(rawBirth).split('T')[0] : ''
   console.log('[DEBUG] set form.person_birthdate to:', form.value.person_birthdate)
   console.log('[DEBUG] displayBirthdate computed to:', displayBirthdate.value)
 
