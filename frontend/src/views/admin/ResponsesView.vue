@@ -33,21 +33,26 @@
         <label>ชื่อโมเดล</label>
         <select v-model="filterModelName" @change="load">
           <option value="">ทุกโมเดล</option>
-
-          <option value="โมเดลไข่ผำ แก้จน">โมเดลไข่ผำ แก้จน</option>
-          <option value="โมเดลกล้าไม้แก้จน">โมเดลกล้าไม้แก้จน</option>
-          <option value="โมเดลผักยกแคร่สร้างสุข">โมเดลผักยกแคร่สร้างสุข</option>
-          <option value="โมเดล Korat Handy Care">โมเดล Korat Handy Care</option>
-          <option value="โมเดลผักไร้ดิน กินปลอดภัย">โมเดลผักไร้ดิน กินปลอดภัย</option>
-
-          <option value="โมเดลมหัศจรรย์ไข่ผำ">โมเดลมหัศจรรย์ไข่ผำ</option>
-          <option value="โมเดลมะขามป้อม">โมเดลมะขามป้อม</option>
-          <option value="โมเดล Veggies to Value ผักคุณค่า พายั่งยืน">โมเดล Veggies to Value ผักคุณค่า พายั่งยืน</option>
-
-          <option value="กองทุนแก้จน">กองทุนแก้จน</option>
-          <option value="ตะไคร้ดี ลดหนี้ชุมชน/ผักเขียว เหนี่ยวทรัพย์">ตะไคร้ดี ลดหนี้ชุมชน/ผักเขียว เหนี่ยวทรัพย์</option>
-
-          <option value="โมเดลพริกจินดา">โมเดลพริกจินดา</option>
+            <optgroup label="Local Content">
+            <option value="โมเดลไข่ผำ แก้จน">โมเดลไข่ผำ แก้จน</option>
+            <option value="โมเดลกล้าไม้แก้จน">โมเดลกล้าไม้แก้จน</option>
+            <option value="โมเดลผักยกแคร่สร้างสุข">โมเดลผักยกแคร่สร้างสุข</option>
+            <option value="โมเดล Korat Handy Care">โมเดล Korat Handy Care</option>
+            <option value="โมเดลผักไร้ดิน กินปลอดภัย">โมเดลผักไร้ดิน กินปลอดภัย</option>
+            </optgroup>
+            <optgroup label="Pro-poor Value Chain">
+            <option value="โมเดลมหัศจรรย์ไข่ผำ">โมเดลมหัศจรรย์ไข่ผำ</option>
+            <option value="โมเดลมะขามป้อม">โมเดลมะขามป้อม</option>
+            <option value="โมเดล Veggies to Value ผักคุณค่า พายั่งยืน">โมเดล Veggies to Value ผักคุณค่า พายั่งยืน</option>
+            </optgroup>
+            <optgroup label="Social Safety Net">
+              <option value="กองทุนแก้จน">กองทุนแก้จน</option>
+              <option value="ตะไคร้ดี ลดหนี้ชุมชน">ตะไคร้ดี ลดหนี้ชุมชน</option>
+              <option value="ผักเขียว เหนี่ยวทรัพย์">ผักเขียว เหนี่ยวทรัพย์</option>
+            </optgroup>
+            <optgroup label="Area Based Indrustries">
+              <option value="โมเดลพริกจินดา">โมเดลพริกจินดา</option>
+            </optgroup>
         </select>
       </div>
       <div class="form-group" style="min-width:140px">
