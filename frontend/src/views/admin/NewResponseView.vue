@@ -77,7 +77,8 @@
               </optgroup>
               <optgroup label="SSN">
                 <option value="กองทุนแก้จน">กองทุนแก้จน</option>
-                <option value="ตะไคร้ดี ลดหนี้ชุมชน/ผักเขียว เหนี่ยวทรัพย์">ตะไคร้ดี ลดหนี้ชุมชน/ผักเขียว เหนี่ยวทรัพย์</option>
+                <option value="ตะไคร้ดี ลดหนี้ชุมชน">ตะไคร้ดี ลดหนี้ชุมชน</option>
+                <option value="ผักเขียว เหนี่ยวทรัพย์">ผักเขียว เหนี่ยวทรัพย์</option>
               </optgroup>
               <optgroup label="ABI">
                 <option value="โมเดลพริกจินดา">โมเดลพริกจินดา</option>
