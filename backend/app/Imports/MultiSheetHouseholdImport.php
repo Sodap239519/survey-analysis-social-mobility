@@ -369,21 +369,39 @@ class HumanCapitalSheetImport implements ToCollection
                          ?? $this->col($data, $headerMap, 'วัน/เดือน');
             $birthdate = $this->parseBirthdate($birthdateRaw);
 
+            // Column AQ: baseline average monthly income (รายได้เฉลี่ย บาท/เดือน)
+            $incomeRaw = $this->col($data, $headerMap, 'รายได้เฉลี่ย (บาท/เดือน)');
+            $baselineIncome = $this->parseIncome($incomeRaw);
+
             $person = Person::firstOrCreate(
                 $searchKeys,
                 [
-                    'title'      => $title,
-                    'first_name' => $firstName,
-                    'last_name'  => $lastName,
-                    'citizen_id' => $citizenId,
-                    'birthdate'  => $birthdate,
-                    'is_head'    => $isHead,
+                    'title'                   => $title,
+                    'first_name'              => $firstName,
+                    'last_name'               => $lastName,
+                    'citizen_id'              => $citizenId,
+                    'birthdate'               => $birthdate,
+                    'is_head'                 => $isHead,
+                    'baseline_income_monthly' => $baselineIncome,
                 ]
             );
 
-            // Update birthdate on existing persons that were imported without it
-            if (! $person->wasRecentlyCreated && $birthdate !== null && $person->birthdate === null) {
-                $person->update(['birthdate' => $birthdate]);
+            // Update fields on existing persons when the DB value is null but
+            // the incoming value is not null (non-destructive catch-up on re-import).
+            if (! $person->wasRecentlyCreated) {
+                $updates = [];
+
+                if ($birthdate !== null && $person->birthdate === null) {
+                    $updates['birthdate'] = $birthdate;
+                }
+
+                if ($baselineIncome !== null && $person->baseline_income_monthly === null) {
+                    $updates['baseline_income_monthly'] = $baselineIncome;
+                }
+
+                if (! empty($updates)) {
+                    $person->update($updates);
+                }
             }
 
             if ($person->wasRecentlyCreated) {
@@ -450,6 +468,32 @@ class HumanCapitalSheetImport implements ToCollection
     {
         if ($value === null || $value === '') return null;
         return (int) $value;
+    }
+
+    /**
+     * Parse an income value from the Excel cell.
+     *
+     * Handles formats like:
+     *   "1,500"   → 1500
+     *   "1500"    → 1500
+     *   "-"       → null  (dash means no income / not applicable)
+     *   ""        → null
+     *   null      → null
+     */
+    private function parseIncome(mixed $value): ?int
+    {
+        if ($value === null || $value === '') return null;
+
+        $str = trim((string) $value);
+        if ($str === '' || $str === '-') return null;
+
+        // Remove thousands separators (comma) and any whitespace
+        $clean = str_replace([',', ' '], '', $str);
+
+        if (! is_numeric($clean)) return null;
+
+        $int = (int) round((float) $clean);
+        return $int >= 0 ? $int : null;
     }
 
     private function parseBirthdate(mixed $value): ?string
