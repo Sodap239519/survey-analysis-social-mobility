@@ -54,6 +54,32 @@
           <option value="before">ก่อนโครงการ</option>
         </select>
       </div>
+      <div class="form-group" style="flex:2;min-width:180px">
+        <label>โมเดลแก้จน</label>
+        <select v-model="filters.model_name" @change="load">
+          <option value="">ทุกโมเดล</option>
+          <optgroup label="Local Content">
+            <option value="โมเดลไข่ผำ แก้จน">โมเดลไข่ผำ แก้จน</option>
+            <option value="โมเดลกล้าไม้แก้จน">โมเดลกล้าไม้แก้จน</option>
+            <option value="โมเดลผักยกแคร่สร้างสุข">โมเดลผักยกแคร่สร้างสุข</option>
+            <option value="โมเดล Korat Handy Care">โมเดล Korat Handy Care</option>
+            <option value="โมเดลผักไร้ดิน กินปลอดภัย">โมเดลผักไร้ดิน กินปลอดภัย</option>
+          </optgroup>
+          <optgroup label="Pro-poor Value Chain">
+            <option value="โมเดลมหัศจรรย์ไข่ผำ">โมเดลมหัศจรรย์ไข่ผำ</option>
+            <option value="โมเดลมะขามป้อม">โมเดลมะขามป้อม</option>
+            <option value="โมเดล Veggies to Value ผักคุณค่า พายั่งยืน">โมเดล Veggies to Value ผักคุณค่า พายั่งยืน</option>
+          </optgroup>
+          <optgroup label="Social Safety Net">
+            <option value="กองทุนแก้จน">กองทุนแก้จน</option>
+            <option value="ตะไคร้ดี ลดหนี้ชุมชน">ตะไคร้ดี ลดหนี้ชุมชน</option>
+            <option value="ผักเขียว เหนี่ยวทรัพย์">ผักเขียว เหนี่ยวทรัพย์</option>
+          </optgroup>
+          <optgroup label="Area Based Industries">
+            <option value="โมเดลพริกจินดา">โมเดลพริกจินดา</option>
+          </optgroup>
+        </select>
+      </div>
       <div class="form-group">
       <button class="btn btn-primary" style="margin-top:1.5rem;flex-shrink:0" @click="load">
         <i class="fi fi-rr-refresh"></i> รีเฟรช
@@ -97,15 +123,22 @@
             <div class="stat-mini-label">จำนวนครัวเรือน</div>
           </div>
         </div>
+        <div class="stat-mini card">
+          <div class="stat-mini-icon"><i class="fi fi-rr-user"></i></div>
+          <div class="stat-mini-body">
+            <div class="stat-mini-value">{{ (store.data.total_respondents || 0).toLocaleString() }}</div>
+            <div class="stat-mini-label">จำนวนคน</div>
+          </div>
+        </div>
       </div>
 
       <div class="bento-grid">
         <!-- Stat Cards -->
         <div class="bento-stat card">
-          <div class="stat-icon-wrap" style="--ic:#0ea5e9"><i class="fi fi-rr-home"></i></div>
-          <div class="stat-label">จำนวนรหัสบ้าน</div>
-          <div class="stat-value">{{ store.data.total_house_codes.toLocaleString() }}</div>
-          <div class="stat-sub">ครัวเรือนที่มีการสำรวจ</div>
+          <div class="stat-icon-wrap" style="--ic:#0ea5e9"><i class="fi fi-rr-layers"></i></div>
+          <div class="stat-label">จำนวนโมเดล</div>
+          <div class="stat-value">{{ (store.data.total_models || 0).toLocaleString() }}</div>
+          <div class="stat-sub">โมเดลแก้จนที่ไม่ซ้ำกัน</div>
         </div>
         <div class="bento-stat card">
           <div class="stat-icon-wrap" style="--ic:#6366f1"><i class="fi fi-rr-user"></i></div>
@@ -234,26 +267,30 @@
           <div class="mobility-pills">
             <div class="mobility-pill improved">
               <i class="fi fi-rr-arrow-trend-up mobility-icon"></i>
-              <div class="mobility-count">{{ store.data.mobility.improved }}</div>
+              <div class="mobility-count">{{ mobilityPeople.improved }}</div>
               <div class="mobility-label">ดีขึ้น</div>
+              <div class="mobility-pct" v-if="mobilityPeopleTotal > 0">{{ mobilityPct(mobilityPeople.improved, mobilityPeopleTotal) }}%</div>
             </div>
             <div class="mobility-pill same">
               <i class="fi fi-rr-arrow-right mobility-icon"></i>
-              <div class="mobility-count">{{ store.data.mobility.same }}</div>
+              <div class="mobility-count">{{ mobilityPeople.same }}</div>
               <div class="mobility-label">คงที่</div>
+              <div class="mobility-pct" v-if="mobilityPeopleTotal > 0">{{ mobilityPct(mobilityPeople.same, mobilityPeopleTotal) }}%</div>
             </div>
             <div class="mobility-pill decreased">
               <i class="fi fi-rr-arrow-trend-down mobility-icon"></i>
-              <div class="mobility-count">{{ store.data.mobility.decreased }}</div>
+              <div class="mobility-count">{{ mobilityPeople.decreased }}</div>
               <div class="mobility-label">แย่ลง</div>
+              <div class="mobility-pct" v-if="mobilityPeopleTotal > 0">{{ mobilityPct(mobilityPeople.decreased, mobilityPeopleTotal) }}%</div>
             </div>
             <div class="mobility-pill no-baseline">
               <i class="fi fi-rr-question mobility-icon"></i>
-              <div class="mobility-count">{{ store.data.mobility.no_baseline || 0 }}</div>
+              <div class="mobility-count">{{ mobilityPeople.no_baseline || 0 }}</div>
               <div class="mobility-label">ไม่มีการเปรียบเทียบ</div>
+              <div class="mobility-pct" v-if="mobilityPeopleTotal > 0">{{ mobilityPct(mobilityPeople.no_baseline, mobilityPeopleTotal) }}%</div>
             </div>
           </div>
-          <p class="text-muted text-sm mt-2">เปรียบเทียบ score รวมก่อนและหลังเข้าร่วมโครงการ</p>
+          <p class="text-muted text-sm mt-2">เปรียบเทียบ score รวมก่อนและหลังเข้าร่วมโครงการ (นับจำนวน คน)</p>
         </div>
 
         <!-- Capital Cards with Donut Charts -->
@@ -405,6 +442,43 @@
                   <td style="text-align:right"><strong>{{ summaryGrandTotal }}</strong></td>
                 </tr>
               </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Model breakdown table -->
+        <div class="bento-district card" v-if="store.data.by_model?.length">
+          <h3 class="card-title"><i class="fi fi-rr-layers"></i> สรุปการสำรวจตามโมเดลแก้จน</h3>
+          <div class="table-wrap">
+            <table class="summary-table">
+              <thead>
+                <tr>
+                  <th rowspan="2">โมเดลแก้จน</th>
+                  <th v-for="level in 4" :key="level" colspan="3" class="th-level-group" :style="{ background: povertyColor(level) + '18', color: povertyColor(level) }">
+                    <span class="th-level-dot" :style="{ background: povertyColor(level) }"></span>
+                    {{ POVERTY_LEVEL_NAMES[level] }}
+                  </th>
+                  <th rowspan="2" style="text-align:right">รวม</th>
+                </tr>
+                <tr>
+                  <template v-for="level in 4" :key="'msub-' + level">
+                    <th class="th-sub improved">ดีขึ้น</th>
+                    <th class="th-sub same">คงที่</th>
+                    <th class="th-sub decreased">แย่ลง</th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in store.data.by_model" :key="m.model_name">
+                  <td>{{ m.model_name }}</td>
+                  <template v-for="level in 4" :key="'mrow-' + m.model_name + '-' + level">
+                    <td class="td-count td-improved">{{ modelCapLevelSum(m, level, 'improved') }}</td>
+                    <td class="td-count td-same">{{ modelCapLevelSum(m, level, 'same') }}</td>
+                    <td class="td-count td-decreased">{{ modelCapLevelSum(m, level, 'decreased') }}</td>
+                  </template>
+                  <td style="text-align:right;font-weight:700">{{ modelRowTotal(m) }}</td>
+                </tr>
+              </tbody>
             </table>
           </div>
         </div>
@@ -642,7 +716,7 @@ const auth = useAuthStore()
 const route = useRoute()
 
 const activeTab = ref('overview')
-const filters = ref({ survey_year: '', district: '', subdistrict: '', period: 'after' })
+const filters = ref({ survey_year: '', district: '', subdistrict: '', period: 'after', model_name: '' })
 
 const tabs = [
   { slug: 'overview',  nameTh: 'ภาพรวม',     icon: 'fi-rr-apps' },
@@ -778,6 +852,31 @@ function summaryCapitalTotal(capSlug) {
   return total
 }
 
+// People-based mobility
+const mobilityPeople = computed(() => store.data?.mobility_people || { improved: 0, same: 0, decreased: 0, no_baseline: 0 })
+const mobilityPeopleTotal = computed(() => {
+  const m = mobilityPeople.value
+  return (m.improved || 0) + (m.same || 0) + (m.decreased || 0) + (m.no_baseline || 0)
+})
+
+// Model breakdown table helpers
+function modelCapLevelSum(modelRow, level, key) {
+  const byCapital = modelRow.by_capital || {}
+  return capitals.value.reduce((sum, cap) => {
+    return sum + ((byCapital[cap.slug]?.[level]?.[key]) || 0)
+  }, 0)
+}
+
+function modelRowTotal(modelRow) {
+  let total = 0
+  for (let level = 1; level <= 4; level++) {
+    total += modelCapLevelSum(modelRow, level, 'improved')
+    total += modelCapLevelSum(modelRow, level, 'same')
+    total += modelCapLevelSum(modelRow, level, 'decreased')
+  }
+  return total
+}
+
 // Donut chart helpers
 function donutSegments(slug) {
   const counts = capitalPoverty(slug)
@@ -862,14 +961,12 @@ async function load() {
   if (filters.value.district) params.district = filters.value.district
   if (filters.value.subdistrict) params.subdistrict = filters.value.subdistrict
   if (filters.value.period) params.period = filters.value.period
+  if (filters.value.model_name) params.model_name = filters.value.model_name
   await store.fetch(params)
 }
 
 onMounted(async () => {
   await store.fetchYears()
-  if (store.years.length > 0) {
-    filters.value.survey_year = store.years[0]
-  }
   load()
 })
 
@@ -883,8 +980,7 @@ watch(() => route.fullPath, async () => {
 
 <style scoped>
 .dashboard-page {
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
   padding: 1.5rem;
 }
 
