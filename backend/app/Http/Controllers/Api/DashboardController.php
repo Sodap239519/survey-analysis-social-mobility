@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Answer;
 use App\Models\Household;
 use App\Models\Person;
+use App\Models\Question;
 use App\Models\SurveyResponse;
 use App\Services\CompareHouseholdSurveyLogic;
 use Illuminate\Http\JsonResponse;
@@ -118,6 +119,9 @@ class DashboardController extends Controller
         // Income averages: baseline (from Person) and survey (from Answer Q4/04)
         $incomeAverages = $this->getIncomeAverages(clone $responseQuery);
 
+        // Income breakdown per model
+        $incomeByModel = $this->getIncomeByModel(clone $responseQuery);
+
         return response()->json([
             'total_house_codes'    => $totalHouseCodes,
             'total_models'         => $totalModels,
@@ -139,6 +143,9 @@ class DashboardController extends Controller
             'by_model'                     => $byModel,
             'income_baseline_avg'          => $incomeAverages['baseline_avg'],
             'income_survey_avg'            => $incomeAverages['survey_avg'],
+            'income_baseline_count'        => $incomeAverages['baseline_count'],
+            'income_survey_count'          => $incomeAverages['survey_count'],
+            'income_by_model'              => $incomeByModel,
         ]);
     }
 
@@ -158,36 +165,84 @@ class DashboardController extends Controller
     /**
      * Compute average baseline income (from Person) and average survey income
      * (from Answer question_key Q4 or 04) for the filtered response set.
+     * Also returns counts of records with valid income data.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query  Filtered SurveyResponse query
-     * @return array{baseline_avg: float|null, survey_avg: float|null}
+     * @return array{baseline_avg: float|null, survey_avg: float|null, baseline_count: int, survey_count: int}
      */
     private function getIncomeAverages($query): array
     {
-        // Baseline income: average of persons.baseline_income_monthly
-        // for persons linked to the filtered responses
-        $responseIds = (clone $query)->whereNotNull('person_id')->pluck('person_id');
+        // Baseline income: average + count from persons.baseline_income_monthly
+        $personIds = (clone $query)->whereNotNull('person_id')->pluck('person_id');
 
-        $baselineAvg = $responseIds->isEmpty()
-            ? null
-            : Person::whereIn('id', $responseIds)
+        $baselineAvg   = null;
+        $baselineCount = 0;
+        if ($personIds->isNotEmpty()) {
+            $row = Person::whereIn('id', $personIds)
                 ->whereNotNull('baseline_income_monthly')
-                ->avg('baseline_income_monthly');
+                ->selectRaw('AVG(baseline_income_monthly) AS avg_val, COUNT(*) AS cnt')
+                ->first();
+            if ($row) {
+                $baselineAvg   = $row->avg_val !== null ? (float) $row->avg_val : null;
+                $baselineCount = (int) $row->cnt;
+            }
+        }
 
-        // Survey income: average of answers.value_numeric for question_key Q4 or 04
+        // Survey income: average + count from answers.value_numeric for question_key Q4/04
         $surveyResponseIds = (clone $query)->pluck('id');
 
-        $surveyAvg = $surveyResponseIds->isEmpty()
-            ? null
-            : Answer::whereIn('survey_response_id', $surveyResponseIds)
-                ->whereNotNull('value_numeric')
-                ->whereHas('question', fn ($q) => $q->whereIn('question_key', ['Q4', '04']))
-                ->avg('value_numeric');
+        $surveyAvg   = null;
+        $surveyCount = 0;
+        if ($surveyResponseIds->isNotEmpty()) {
+            $questionIds = Question::whereIn('question_key', ['Q4', '04'])->pluck('id');
+            if ($questionIds->isNotEmpty()) {
+                $row = Answer::whereIn('survey_response_id', $surveyResponseIds)
+                    ->whereNotNull('value_numeric')
+                    ->whereIn('question_id', $questionIds)
+                    ->selectRaw('AVG(value_numeric) AS avg_val, COUNT(*) AS cnt')
+                    ->first();
+                if ($row) {
+                    $surveyAvg   = $row->avg_val !== null ? (float) $row->avg_val : null;
+                    $surveyCount = (int) $row->cnt;
+                }
+            }
+        }
 
         return [
-            'baseline_avg' => $baselineAvg !== null ? round((float) $baselineAvg, 2) : null,
-            'survey_avg'   => $surveyAvg   !== null ? round((float) $surveyAvg,   2) : null,
+            'baseline_avg'   => $baselineAvg   !== null ? round($baselineAvg, 2) : null,
+            'survey_avg'     => $surveyAvg      !== null ? round($surveyAvg,   2) : null,
+            'baseline_count' => $baselineCount,
+            'survey_count'   => $surveyCount,
         ];
+    }
+
+    /**
+     * Compute income averages and counts broken down by model_name.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query  Filtered SurveyResponse query
+     */
+    private function getIncomeByModel($query): array
+    {
+        $modelNames = (clone $query)
+            ->whereNotNull('model_name')
+            ->distinct()
+            ->orderBy('model_name')
+            ->pluck('model_name');
+
+        $result = [];
+        foreach ($modelNames as $mName) {
+            $modelQuery   = (clone $query)->where('model_name', $mName);
+            $incomeData   = $this->getIncomeAverages($modelQuery);
+            $result[] = [
+                'model_name'     => $mName,
+                'baseline_avg'   => $incomeData['baseline_avg'],
+                'baseline_count' => $incomeData['baseline_count'],
+                'survey_avg'     => $incomeData['survey_avg'],
+                'survey_count'   => $incomeData['survey_count'],
+            ];
+        }
+
+        return $result;
     }
 
     private function getPovertyByCapital($query): array
