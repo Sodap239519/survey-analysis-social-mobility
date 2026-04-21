@@ -456,35 +456,66 @@ class HumanCapitalSheetImport implements ToCollection
     {
         if ($value === null || $value === '') return null;
 
+        // 0) Excel numeric date serial (cell formatted as Date)
+        // เช่น Excel เก็บเป็นตัวเลข serial ไม่ใช่ "4/4/2490"
+        if (is_numeric($value)) {
+            try {
+                $dt = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value);
+                return $dt->format('Y-m-d'); // เป็น ค.ศ. อยู่แล้ว
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
         $str = trim((string) $value);
+        if ($str === '') return null;
 
-        // dd/mm/yyyy format (Excel cells exported as text – may be BE year)
-        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $str, $matches)) {
-            $day   = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
-            $month = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
-            $year  = (int) $matches[3];
-            // Convert Buddhist Era (พ.ศ.) to Common Era (ค.ศ.)
+        // 1) yyyymmdd (e.g. 24930101 or 25220807) — may be BE year
+        if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $str, $m)) {
+            $year  = (int) $m[1];
+            $month = (int) $m[2];
+            $day   = (int) $m[3];
+
+            if ($year >= self::BE_YEAR_THRESHOLD) {
+                $year -= self::BE_TO_CE_OFFSET; // BE -> CE
+            }
+
+            if (!checkdate($month, $day, $year)) return null;
+
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
+        }
+
+        // 2) dd/mm/yyyy (e.g. 15/5/2513) — may be BE year
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $str, $m)) {
+            $day   = (int) $m[1];
+            $month = (int) $m[2];
+            $year  = (int) $m[3];
+
+            if ($year >= self::BE_YEAR_THRESHOLD) {
+                $year -= self::BE_TO_CE_OFFSET; // BE -> CE
+            }
+
+            if (!checkdate($month, $day, $year)) return null;
+
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
+        }
+
+        // 3) yyyy-mm-dd (already) — may be BE year
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $str, $m)) {
+            $year  = (int) $m[1];
+            $month = (int) $m[2];
+            $day   = (int) $m[3];
+
             if ($year >= self::BE_YEAR_THRESHOLD) {
                 $year -= self::BE_TO_CE_OFFSET;
             }
-            return sprintf('%04d-%s-%s', $year, $month, $day);
+
+            if (!checkdate($month, $day, $year)) return null;
+
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
         }
 
-        // yyyy-mm-dd already
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $str, $matches)) {
-            $year = (int) $matches[1];
-            if ($year >= self::BE_YEAR_THRESHOLD) {
-                $year -= self::BE_TO_CE_OFFSET;
-            }
-            return sprintf('%04d-%s-%s', $year, $matches[2], $matches[3]);
-        }
-
-        // Fallback: try PHP DateTime parsing
-        try {
-            $date = new \DateTime($str);
-            return $date->format('Y-m-d');
-        } catch (\Exception $e) {
-            return null;
-        }
+        // 4) ไม่เดา format อื่น ๆ เพื่อกัน parse เพี้ยน
+        return null;
     }
 }

@@ -45,6 +45,7 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/import/stats', [ImportController::class, 'stats']);
     Route::get('/import/history', [ImportController::class, 'history']);
     Route::get('/import/history/{id}', [ImportController::class, 'show']);
+    Route::get('/import/history/{id}/download', [ImportController::class, 'download']);
 
     // Export
     Route::get('/export/history', [ExportController::class, 'history']);

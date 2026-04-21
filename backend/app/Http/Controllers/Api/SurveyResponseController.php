@@ -48,6 +48,10 @@ class SurveyResponseController extends Controller
             });
         }
 
+        if ($request->filled('model_name')) {
+            $query->where('model_name', $request->string('model_name')->toString());
+        }
+
         $paginated = $query->paginate($request->integer('per_page', 20));
 
         // Append comparison data (household is already eager-loaded; no N+1)

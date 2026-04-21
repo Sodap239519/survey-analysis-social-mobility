@@ -29,6 +29,32 @@
           <option value="before">ก่อนโครงการ</option>
         </select>
       </div>
+      <div class="form-group" style="min-width:240px">
+        <label>ชื่อโมเดล</label>
+        <select v-model="filterModelName" @change="load">
+          <option value="">ทุกโมเดล</option>
+            <optgroup label="Local Content">
+            <option value="โมเดลไข่ผำ แก้จน">โมเดลไข่ผำ แก้จน</option>
+            <option value="โมเดลกล้าไม้แก้จน">โมเดลกล้าไม้แก้จน</option>
+            <option value="โมเดลผักยกแคร่สร้างสุข">โมเดลผักยกแคร่สร้างสุข</option>
+            <option value="โมเดล Korat Handy Care">โมเดล Korat Handy Care</option>
+            <option value="โมเดลผักไร้ดิน กินปลอดภัย">โมเดลผักไร้ดิน กินปลอดภัย</option>
+            </optgroup>
+            <optgroup label="Pro-poor Value Chain">
+            <option value="โมเดลมหัศจรรย์ไข่ผำ">โมเดลมหัศจรรย์ไข่ผำ</option>
+            <option value="โมเดลมะขามป้อม">โมเดลมะขามป้อม</option>
+            <option value="โมเดล Veggies to Value ผักคุณค่า พายั่งยืน">โมเดล Veggies to Value ผักคุณค่า พายั่งยืน</option>
+            </optgroup>
+            <optgroup label="Social Safety Net">
+              <option value="กองทุนแก้จน">กองทุนแก้จน</option>
+              <option value="ตะไคร้ดี ลดหนี้ชุมชน">ตะไคร้ดี ลดหนี้ชุมชน</option>
+              <option value="ผักเขียว เหนี่ยวทรัพย์">ผักเขียว เหนี่ยวทรัพย์</option>
+            </optgroup>
+            <optgroup label="Area Based Indrustries">
+              <option value="โมเดลพริกจินดา">โมเดลพริกจินดา</option>
+            </optgroup>
+        </select>
+      </div>
       <div class="form-group" style="min-width:140px">
         <label>สถานะการเปลี่ยนแปลง</label>
         <select v-model="filterStatus">
@@ -66,7 +92,7 @@
                 <tr>
                   <th>ชื่อผู้ตอบ</th>
                   <th>ช่วงเวลา</th>
-                  <th>ปี/รอบ</th>
+                  <th>โมเดล</th>
                   <th><i class="fi fi-rr-user"></i> ทุนมนุษย์</th>
                   <th><i class="fi fi-rr-home"></i> ทุนกายภาพ</th>
                   <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
@@ -79,7 +105,7 @@
                 <tr v-for="r in group.responses" :key="r.id">
                   <td>{{ personName(r) }}</td>
                   <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
-                  <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
+                  <td class="text-muted">{{ r.model_name || '—' }}</td>
                   <td><span v-html="capitalCell(r, 'human')"></span></td>
                   <td><span v-html="capitalCell(r, 'physical')"></span></td>
                   <td><span v-html="capitalCell(r, 'financial')"></span></td>
@@ -122,7 +148,7 @@
                 <th>รหัสบ้าน</th>
                 <th>ชื่อผู้ตอบ</th>
                 <th>ช่วงเวลา</th>
-                <th>ปี/รอบ</th>
+                <th>โมเดล</th>
                 <th><i class="fi fi-rr-user"></i> ทุนมนุษย์</th>
                 <th><i class="fi fi-rr-home"></i> ทุนกายภาพ</th>
                 <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
@@ -136,7 +162,7 @@
                 <td><code class="house-code">{{ r.household?.house_code || '—' }}</code></td>
                 <td>{{ personName(r) }}</td>
                 <td><span class="badge" :style="{background: r.period === 'after' ? '#0ea5e9' : '#64748b', color: '#fff'}">{{ periodLabel(r.period) }}</span></td>
-                <td class="text-muted">{{ r.survey_year || '—' }}{{ r.survey_round ? `/รอบ${r.survey_round}` : '' }}</td>
+                <td class="text-muted">{{ r.model_name || '—' }}</td>
                 <td><span v-html="capitalStatusCell(r, 'human')"></span></td>
                 <td><span v-html="capitalStatusCell(r, 'physical')"></span></td>
                 <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
@@ -336,6 +362,7 @@ const page = ref(1)
 const filterPeriod = ref('')
 const filterSearch = ref('')
 const filterStatus = ref('')
+const filterModelName = ref('')
 const groupByHousehold = ref(false)
 let searchTimer = null
 const SEARCH_DEBOUNCE_MS = 400
@@ -797,6 +824,7 @@ async function load() {
     if (filterYear.value) params.survey_year = filterYear.value
     if (filterPeriod.value) params.period = filterPeriod.value
     if (filterSearch.value.trim()) params.search = filterSearch.value.trim()
+    if (filterModelName.value) params.model_name = filterModelName.value
     const res = await api.get('/responses', { params })
     responses.value = res.data
   } catch (e) {
