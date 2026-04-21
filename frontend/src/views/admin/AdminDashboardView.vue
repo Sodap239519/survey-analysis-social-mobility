@@ -126,6 +126,60 @@
         </div>
       </div>
 
+      <!-- ── Income comparison row ── -->
+      <div class="income-row">
+        <!-- LEFT: two income cards -->
+        <div class="income-cards">
+          <div class="card income-card">
+            <div class="income-card-icon"><i class="fi fi-rr-wallet"></i></div>
+            <div class="income-card-body">
+              <div class="income-card-label">รายได้เดิม</div>
+              <div class="income-card-value">{{ money(store.data.income_baseline_avg) }}</div>
+              <div class="income-card-sub">บาท/เดือน (เฉลี่ย)</div>
+            </div>
+          </div>
+          <div class="card income-card">
+            <div class="income-card-icon" style="color:#0ea5e9"><i class="fi fi-rr-chart-line-up"></i></div>
+            <div class="income-card-body">
+              <div class="income-card-label">รายได้จากการสำรวจ</div>
+              <div class="income-card-value" style="color:#0ea5e9">{{ money(store.data.income_survey_avg) }}</div>
+              <div class="income-card-sub">บาท/เดือน (เฉลี่ย)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: line chart -->
+        <div class="card income-chart-card">
+          <h3 class="card-title"><i class="fi fi-rr-chart-line-up"></i> เปรียบเทียบรายได้เดิม vs รายได้จากการสำรวจ</h3>
+          <svg viewBox="0 0 460 180" class="income-svg" aria-label="Income comparison chart">
+            <!-- Y-axis -->
+            <line :x1="incomeChart.x0" :y1="incomeChart.axisY" :x2="incomeChart.x1" :y2="incomeChart.axisY" stroke="var(--color-border)" stroke-width="1"/>
+            <!-- Baseline line -->
+            <path :d="incomeChart.pathBaseline" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 3"/>
+            <!-- Survey line -->
+            <path :d="incomeChart.pathSurvey" fill="none" stroke="#0ea5e9" stroke-width="3" stroke-linecap="round"/>
+            <!-- Connect arrow -->
+            <path :d="incomeChart.pathConnect" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <!-- Dots -->
+            <circle :cx="incomeChart.x0" :cy="incomeChart.yBase" r="5" fill="#64748b"/>
+            <circle :cx="incomeChart.x1" :cy="incomeChart.ySurv" r="5" fill="#0ea5e9"/>
+            <!-- Labels -->
+            <text :x="incomeChart.x0 - 6" :y="incomeChart.yBase + 4" font-size="11" fill="#64748b" text-anchor="end">{{ incomeChart.baseLabel }}</text>
+            <text :x="incomeChart.x1 + 6" :y="incomeChart.ySurv + 4" font-size="11" fill="#0ea5e9" text-anchor="start">{{ incomeChart.survLabel }}</text>
+            <!-- Diff label -->
+            <text v-if="incomeChart.diffLabel" :x="incomeChart.x0 - 6" :y="Math.min(incomeChart.yBase, incomeChart.ySurv) - 8"
+              font-size="10" :fill="incomeChart.diffPositive ? '#22c55e' : '#ef4444'" text-anchor="end" font-weight="700">
+              {{ incomeChart.diffLabel }}
+            </text>
+            <!-- Legend -->
+            <rect x="10" y="12" width="16" height="3" fill="#64748b" rx="1"/>
+            <text x="30" y="18" font-size="10" fill="#64748b">รายได้เดิม</text>
+            <rect x="10" y="26" width="16" height="3" fill="#0ea5e9" rx="1"/>
+            <text x="30" y="32" font-size="10" fill="#0ea5e9">รายได้สำรวจ</text>
+          </svg>
+        </div>
+      </div>
+
       <div class="bento-grid">
         <div class="bento-stat card">
           <div class="stat-icon-wrap" style="--ic:#0ea5e9"><i class="fi fi-rr-layers"></i></div>
@@ -1026,6 +1080,50 @@ function radarGrid(pct) {
   }).join(' ')
 }
 
+// ─── Income comparison helpers ────────────────────────────────────────────
+function money(val) {
+  const n = Number(val)
+  if (!Number.isFinite(n)) return '—'
+  return n.toLocaleString('th-TH', { maximumFractionDigits: 0 })
+}
+
+const incomeChart = computed(() => {
+  const base = Number(store.data?.income_baseline_avg)
+  const surv = Number(store.data?.income_survey_avg)
+  const b = Number.isFinite(base) ? base : 0
+  const s = Number.isFinite(surv) ? surv : 0
+  const max = Math.max(b, s, 1)
+
+  const padL = 70, padR = 30, padT = 30, padB = 35
+  const svgW = 460, svgH = 180
+  const chartW = svgW - padL - padR
+  const chartH = svgH - padT - padB
+  const baseY = svgH - padB
+
+  const x0 = padL
+  const x1 = padL + chartW
+
+  const yBase = baseY - (b / max) * chartH
+  const ySurv = baseY - (s / max) * chartH
+
+  const diff = s - b
+  const diffSign = diff > 0 ? '+' : ''
+  const diffLabel = b > 0 ? `${diffSign}${((diff / b) * 100).toFixed(1)}%` : ''
+
+  return {
+    pathBaseline: `M ${x0} ${yBase} L ${x1} ${yBase}`,
+    pathSurvey:   `M ${x0} ${ySurv} L ${x1} ${ySurv}`,
+    pathConnect:  `M ${x0} ${yBase} L ${x0} ${ySurv}`,
+    x0, x1,
+    yBase, ySurv,
+    diffLabel,
+    diffPositive: diff >= 0,
+    baseLabel: money(b),
+    survLabel: money(s),
+    axisY: baseY,
+  }
+})
+
 async function load() {
   const params = {}
   if (filters.value.survey_year) params.survey_year = filters.value.survey_year
@@ -1241,7 +1339,7 @@ watch(() => route.fullPath, async () => {
 /* ── Geographic Stats Bar ── */
 .stats-bar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
   margin-bottom: 1rem;
 }
@@ -1330,6 +1428,60 @@ watch(() => route.fullPath, async () => {
   gap: 0.4rem;
 }
 .card-title i { color: var(--color-primary); }
+
+/* ── Income comparison row ── */
+.income-row {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.income-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+.income-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+.income-card-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+.income-card-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.income-card-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  line-height: 1.1;
+}
+.income-card-sub {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+}
+.income-chart-card {
+  padding: 1rem 1.25rem;
+}
+.income-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-top: 0.5rem;
+}
+@media (max-width: 900px) {
+  .income-row { grid-template-columns: 1fr; }
+}
 
 /* ── Poverty bars ── */
 .poverty-bars { display: flex; flex-direction: column; gap: 0.6rem; }
