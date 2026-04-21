@@ -118,6 +118,9 @@ class DashboardController extends Controller
         // Income averages: baseline (from Person) and survey (from Answer Q4/04)
         $incomeAverages = $this->getIncomeAverages(clone $responseQuery);
 
+        // Income breakdown per model
+        $incomeByModel = $this->getIncomeByModel(clone $responseQuery);
+
         return response()->json([
             'total_house_codes'    => $totalHouseCodes,
             'total_models'         => $totalModels,
@@ -139,6 +142,9 @@ class DashboardController extends Controller
             'by_model'                     => $byModel,
             'income_baseline_avg'          => $incomeAverages['baseline_avg'],
             'income_survey_avg'            => $incomeAverages['survey_avg'],
+            'income_baseline_count'        => $incomeAverages['baseline_count'],
+            'income_survey_count'          => $incomeAverages['survey_count'],
+            'income_by_model'              => $incomeByModel,
         ]);
     }
 
@@ -158,36 +164,73 @@ class DashboardController extends Controller
     /**
      * Compute average baseline income (from Person) and average survey income
      * (from Answer question_key Q4 or 04) for the filtered response set.
+     * Also returns counts of records with valid income data.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query  Filtered SurveyResponse query
-     * @return array{baseline_avg: float|null, survey_avg: float|null}
+     * @return array{baseline_avg: float|null, survey_avg: float|null, baseline_count: int, survey_count: int}
      */
     private function getIncomeAverages($query): array
     {
         // Baseline income: average of persons.baseline_income_monthly
         // for persons linked to the filtered responses
-        $responseIds = (clone $query)->whereNotNull('person_id')->pluck('person_id');
+        $personIds = (clone $query)->whereNotNull('person_id')->pluck('person_id');
 
-        $baselineAvg = $responseIds->isEmpty()
-            ? null
-            : Person::whereIn('id', $responseIds)
-                ->whereNotNull('baseline_income_monthly')
-                ->avg('baseline_income_monthly');
+        $baselineAvg   = null;
+        $baselineCount = 0;
+        if ($personIds->isNotEmpty()) {
+            $baselineQuery = Person::whereIn('id', $personIds)->whereNotNull('baseline_income_monthly');
+            $baselineAvg   = $baselineQuery->avg('baseline_income_monthly');
+            $baselineCount = $baselineQuery->count();
+        }
 
         // Survey income: average of answers.value_numeric for question_key Q4 or 04
         $surveyResponseIds = (clone $query)->pluck('id');
 
-        $surveyAvg = $surveyResponseIds->isEmpty()
-            ? null
-            : Answer::whereIn('survey_response_id', $surveyResponseIds)
+        $surveyAvg   = null;
+        $surveyCount = 0;
+        if ($surveyResponseIds->isNotEmpty()) {
+            $surveyQuery = Answer::whereIn('survey_response_id', $surveyResponseIds)
                 ->whereNotNull('value_numeric')
-                ->whereHas('question', fn ($q) => $q->whereIn('question_key', ['Q4', '04']))
-                ->avg('value_numeric');
+                ->whereHas('question', fn ($q) => $q->whereIn('question_key', ['Q4', '04']));
+            $surveyAvg   = $surveyQuery->avg('value_numeric');
+            $surveyCount = $surveyQuery->count();
+        }
 
         return [
-            'baseline_avg' => $baselineAvg !== null ? round((float) $baselineAvg, 2) : null,
-            'survey_avg'   => $surveyAvg   !== null ? round((float) $surveyAvg,   2) : null,
+            'baseline_avg'   => $baselineAvg   !== null ? round((float) $baselineAvg, 2) : null,
+            'survey_avg'     => $surveyAvg      !== null ? round((float) $surveyAvg,   2) : null,
+            'baseline_count' => $baselineCount,
+            'survey_count'   => $surveyCount,
         ];
+    }
+
+    /**
+     * Compute income averages and counts broken down by model_name.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query  Filtered SurveyResponse query
+     */
+    private function getIncomeByModel($query): array
+    {
+        $modelNames = (clone $query)
+            ->whereNotNull('model_name')
+            ->distinct()
+            ->orderBy('model_name')
+            ->pluck('model_name');
+
+        $result = [];
+        foreach ($modelNames as $mName) {
+            $modelQuery   = (clone $query)->where('model_name', $mName);
+            $incomeData   = $this->getIncomeAverages($modelQuery);
+            $result[] = [
+                'model_name'     => $mName,
+                'baseline_avg'   => $incomeData['baseline_avg'],
+                'baseline_count' => $incomeData['baseline_count'],
+                'survey_avg'     => $incomeData['survey_avg'],
+                'survey_count'   => $incomeData['survey_count'],
+            ];
+        }
+
+        return $result;
     }
 
     private function getPovertyByCapital($query): array
