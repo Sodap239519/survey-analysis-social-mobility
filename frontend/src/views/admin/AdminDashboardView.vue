@@ -170,8 +170,9 @@
           <div class="income-chart-scroll">
             <svg v-if="incomeModelChart.hasData"
               :viewBox="`0 0 ${incomeModelChart.svgW} ${incomeModelChart.svgH}`"
-              :width="incomeModelChart.svgW" :height="incomeModelChart.svgH"
-              class="income-model-svg" aria-label="Income by model chart">
+              preserveAspectRatio="xMinYMin meet"
+              class="income-model-svg"
+              aria-label="Income by model chart">
               <g v-for="(t, ti) in incomeModelChart.ticks" :key="'yt-' + ti">
                 <line :x1="incomeModelChart.padL" :y1="t.y.toFixed(1)"
                   :x2="incomeModelChart.svgW - incomeModelChart.padR" :y2="t.y.toFixed(1)"
@@ -858,8 +859,9 @@
             <div class="income-chart-scroll">
               <svg v-if="incomeModelChart.hasData"
                 :viewBox="`0 0 ${incomeModelChart.svgW} ${incomeModelChart.svgH}`"
-                :width="incomeModelChart.svgW" :height="incomeModelChart.svgH"
-                class="income-model-svg" aria-label="Income by model chart">
+                preserveAspectRatio="xMinYMin meet"
+                class="income-model-svg"
+                aria-label="Income by model chart">
                 <g v-for="(t, ti) in incomeModelChart.ticks" :key="'cyt-' + ti">
                   <line :x1="incomeModelChart.padL" :y1="t.y.toFixed(1)"
                     :x2="incomeModelChart.svgW - incomeModelChart.padR" :y2="t.y.toFixed(1)"
@@ -1727,6 +1729,9 @@ watch(() => route.fullPath, async () => {
 .income-model-svg {
   display: block;
   overflow: visible;
+  width: 100%;
+  height: 400px;
+  max-width: 100%;
 }
 .income-dot { cursor: pointer; }
 .income-dot circle { transition: r 0.15s ease, opacity 0.15s ease; }
