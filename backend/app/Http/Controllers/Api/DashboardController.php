@@ -635,6 +635,10 @@ class DashboardController extends Controller
         $noBaseline = 0;
 
         $query->with(['surveyResponses' => function ($q) use ($surveyYear) {
+            // Load after-period respondents to count people per household.
+            // We use only 'after' responses because mobility classification
+            // (improved/same/decreased) is determined by the after-period score,
+            // and we want to count the people whose situation we are describing.
             $q->where('period', 'after')->whereNotNull('person_id');
             if ($surveyYear) {
                 $q->where('survey_year', $surveyYear);
@@ -644,10 +648,10 @@ class DashboardController extends Controller
                 $result  = $compareLogic->compare($household, $surveyYear, null);
                 $summary = $result['summary'];
 
-                $personCount = $household->surveyResponses->unique('person_id')->count();
-                if ($personCount < 1) {
-                    $personCount = 1;
-                }
+                // Count distinct respondents in the after period; default to 1
+                // for households that have no linked person records, so that
+                // every household contributes at least one count.
+                $personCount = max(1, $household->surveyResponses->unique('person_id')->count());
 
                 if ($summary['avg_before'] === null && $summary['avg_after'] !== null) {
                     $noBaseline += $personCount;
