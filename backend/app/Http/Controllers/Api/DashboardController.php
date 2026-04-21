@@ -35,6 +35,7 @@ class DashboardController extends Controller
         $subdistrict = $request->query('subdistrict');
         $period      = $request->query('period', 'after');
         $surveyYear  = $request->query('survey_year') ? (int) $request->query('survey_year') : null;
+        $modelName   = $request->query('model_name');
 
         // จำนวนรหัสบ้านที่มีการสำรวจ (DISTINCT house_code from responses only)
         $totalHouseCodes = SurveyResponse::query()
@@ -63,6 +64,10 @@ class DashboardController extends Controller
             });
         }
 
+        if ($modelName) {
+            $responseQuery->where('model_name', $modelName);
+        }
+
         // จำนวนผู้ตอบ (distinct person_id, or household_id if no person)
         $totalRespondents = (clone $responseQuery)
             ->whereNotNull('person_id')
@@ -71,33 +76,46 @@ class DashboardController extends Controller
 
         $totalResponses = (clone $responseQuery)->count();
 
+        // จำนวนโมเดลที่ไม่ซ้ำกัน (distinct model_name from filtered responses)
+        $totalModels = (clone $responseQuery)
+            ->whereNotNull('model_name')
+            ->distinct('model_name')
+            ->count('model_name');
+
         // Poverty level distribution per capital
         $povertyByCapital = $this->getPovertyByCapital(clone $responseQuery);
 
-        // Mobility counts (before vs after)
-        $mobility = $this->getMobilityCounts($district, $subdistrict, $surveyYear);
+        // Mobility counts (before vs after) – household-based
+        $mobility = $this->getMobilityCounts($district, $subdistrict, $surveyYear, $modelName);
+
+        // Mobility counts – people-based (respondents per mobility category)
+        $mobilityPeople = $this->getMobilityPeopleCounts($district, $subdistrict, $surveyYear, $modelName);
 
         // Per-capital mobility counts (before vs after for each capital)
-        $mobilityByCapital = $this->getMobilityByCapital($district, $subdistrict, $surveyYear);
-        $mobilityByCapitalByLevel = $this->getMobilityByCapitalByLevel($district, $subdistrict, $surveyYear);
+        $mobilityByCapital = $this->getMobilityByCapital($district, $subdistrict, $surveyYear, $modelName);
+        $mobilityByCapitalByLevel = $this->getMobilityByCapitalByLevel($district, $subdistrict, $surveyYear, $modelName);
 
         // District/subdistrict breakdown
-        $byDistrict = $this->getByDistrict($period, $district, $subdistrict, $surveyYear);
+        $byDistrict = $this->getByDistrict($period, $district, $subdistrict, $surveyYear, $modelName);
+
+        // Model breakdown (by_model: per model, mobility by capital level)
+        $byModel = $this->getByModel($period, $district, $subdistrict, $surveyYear, $modelName);
 
         // Summary poverty levels across all responses
         $overallPoverty = $this->getOverallPovertyLevels(clone $responseQuery);
 
         // Geographic totals (districts, subdistricts, villages, households)
-        $geoTotals = $this->getGeographicTotals($period, $district, $subdistrict, $surveyYear);
+        $geoTotals = $this->getGeographicTotals($period, $district, $subdistrict, $surveyYear, $modelName);
 
         // Average scores per capital (for Radar Chart)
         $capitalAverages = $this->getCapitalAverages(clone $responseQuery);
 
         // Before/After comparison summary (for paired households)
-        $comparisonSummary = $this->getComparisonSummary($district, $subdistrict, $surveyYear);
+        $comparisonSummary = $this->getComparisonSummary($district, $subdistrict, $surveyYear, $modelName);
 
         return response()->json([
             'total_house_codes'    => $totalHouseCodes,
+            'total_models'         => $totalModels,
             'total_respondents'    => $totalRespondents,
             'total_responses'      => $totalResponses,
             'total_districts'      => $geoTotals['districts'],
@@ -108,10 +126,12 @@ class DashboardController extends Controller
             'poverty_by_capital'   => $povertyByCapital,
             'overall_poverty'      => $overallPoverty,
             'mobility'             => $mobility,
+            'mobility_people'      => $mobilityPeople,
             'mobility_by_capital'          => $mobilityByCapital,
             'mobility_by_capital_by_level' => $mobilityByCapitalByLevel,
             'comparison_summary'           => $comparisonSummary,
             'by_district'                  => $byDistrict,
+            'by_model'                     => $byModel,
         ]);
     }
 
@@ -178,7 +198,7 @@ class DashboardController extends Controller
         return $levels;
     }
 
-    private function getMobilityCounts(?string $district, ?string $subdistrict, ?int $surveyYear = null): array
+    private function getMobilityCounts(?string $district, ?string $subdistrict, ?int $surveyYear = null, ?string $modelName = null): array
     {
         $compareLogic = new CompareHouseholdSurveyLogic();
 
@@ -194,6 +214,12 @@ class DashboardController extends Controller
 
         if ($surveyYear) {
             $query->where('survey_year', $surveyYear);
+        }
+
+        if ($modelName) {
+            $query->whereHas('surveyResponses', function ($q) use ($modelName) {
+                $q->where('model_name', $modelName);
+            });
         }
 
         $improved   = 0;
@@ -230,7 +256,7 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getMobilityByCapital(?string $district, ?string $subdistrict, ?int $surveyYear = null): array
+    private function getMobilityByCapital(?string $district, ?string $subdistrict, ?int $surveyYear = null, ?string $modelName = null): array
     {
         $capitals     = ['human', 'physical', 'financial', 'natural', 'social'];
         $compareLogic = new CompareHouseholdSurveyLogic();
@@ -254,6 +280,12 @@ class DashboardController extends Controller
 
             if ($surveyYear) {
                 $query->where('survey_year', $surveyYear);
+            }
+
+            if ($modelName) {
+                $query->whereHas('surveyResponses', function ($q) use ($modelName) {
+                    $q->where('model_name', $modelName);
+                });
             }
 
             $query->chunk(100, function ($households) use ($compareLogic, $surveyYear, $capital, &$improved, &$same, &$decreased, &$noBaseline) {
@@ -288,7 +320,7 @@ class DashboardController extends Controller
         return $result;
     }
 
-    private function getMobilityByCapitalByLevel(?string $district, ?string $subdistrict, ?int $surveyYear): array
+    private function getMobilityByCapitalByLevel(?string $district, ?string $subdistrict, ?int $surveyYear, ?string $modelName = null): array
     {
         $capitals = ['human', 'physical', 'financial', 'natural', 'social'];
         $compareLogic = new CompareHouseholdSurveyLogic();
@@ -315,6 +347,12 @@ class DashboardController extends Controller
 
             if ($surveyYear) {
                 $query->where('survey_year', $surveyYear);
+            }
+
+            if ($modelName) {
+                $query->whereHas('surveyResponses', function ($q) use ($modelName) {
+                    $q->where('model_name', $modelName);
+                });
             }
 
             $query->chunk(100, function ($households) use ($compareLogic, $surveyYear, $capital, &$levels) {
@@ -348,7 +386,7 @@ class DashboardController extends Controller
         return $result;
     }
 
-    private function getByDistrict(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear = null): array
+    private function getByDistrict(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear = null, ?string $modelName = null): array
     {
         // Only count households that have survey responses (exclude import-only households)
         $responseQuery = SurveyResponse::query()->where('period', $period);
@@ -369,6 +407,10 @@ class DashboardController extends Controller
                 $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
                 ->orWhere('subdistrict_code', $subdistrict);
             });
+        }
+
+        if ($modelName) {
+            $responseQuery->where('model_name', $modelName);
         }
 
         $householdIds = (clone $responseQuery)->distinct()->pluck('household_id');
@@ -410,7 +452,7 @@ class DashboardController extends Controller
         return 4;
     }
 
-    private function getGeographicTotals(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear): array
+    private function getGeographicTotals(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear, ?string $modelName = null): array
     {
         // Only count households that have survey responses (exclude import-only households)
         $responseQuery = SurveyResponse::query()->where('period', $period);
@@ -431,6 +473,10 @@ class DashboardController extends Controller
                 $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
                   ->orWhere('subdistrict_code', $subdistrict);
             });
+        }
+
+        if ($modelName) {
+            $responseQuery->where('model_name', $modelName);
         }
 
         $householdIds = (clone $responseQuery)->distinct()->pluck('household_id');
@@ -475,7 +521,7 @@ class DashboardController extends Controller
      * Get before/after comparison summary for paired households.
      * Returns average scores for both periods and the diff.
      */
-    private function getComparisonSummary(?string $district, ?string $subdistrict, ?int $surveyYear): array
+    private function getComparisonSummary(?string $district, ?string $subdistrict, ?int $surveyYear, ?string $modelName = null): array
     {
         $capitals = [
             'human'     => 'score_human',
@@ -507,6 +553,11 @@ class DashboardController extends Controller
                     $hq->where('subdistrict_name', 'like', "%{$subdistrict}%");
                 });
             }
+        }
+
+        if ($modelName) {
+            $beforeQuery->where('model_name', $modelName);
+            $afterQuery->where('model_name', $modelName);
         }
 
         // Collect paired scores for both periods
@@ -548,5 +599,175 @@ class DashboardController extends Controller
             'after_avg'    => $afterAvg,
             'diff'         => $diff,
         ];
+    }
+
+    /**
+     * People-based mobility counts: count distinct respondents per mobility category.
+     * For each household that improved/same/decreased, count its after-period respondents.
+     */
+    private function getMobilityPeopleCounts(?string $district, ?string $subdistrict, ?int $surveyYear = null, ?string $modelName = null): array
+    {
+        $compareLogic = new CompareHouseholdSurveyLogic();
+
+        $query = Household::query();
+
+        if ($district) {
+            $query->where('district_name', 'like', "%{$district}%");
+        }
+
+        if ($subdistrict) {
+            $query->where('subdistrict_name', 'like', "%{$subdistrict}%");
+        }
+
+        if ($surveyYear) {
+            $query->where('survey_year', $surveyYear);
+        }
+
+        if ($modelName) {
+            $query->whereHas('surveyResponses', function ($q) use ($modelName) {
+                $q->where('model_name', $modelName);
+            });
+        }
+
+        $improved   = 0;
+        $same       = 0;
+        $decreased  = 0;
+        $noBaseline = 0;
+
+        $query->with(['surveyResponses' => function ($q) use ($surveyYear) {
+            $q->where('period', 'after')->whereNotNull('person_id');
+            if ($surveyYear) {
+                $q->where('survey_year', $surveyYear);
+            }
+        }])->chunk(100, function ($households) use ($compareLogic, $surveyYear, &$improved, &$same, &$decreased, &$noBaseline) {
+            foreach ($households as $household) {
+                $result  = $compareLogic->compare($household, $surveyYear, null);
+                $summary = $result['summary'];
+
+                $personCount = $household->surveyResponses->unique('person_id')->count();
+                if ($personCount < 1) {
+                    $personCount = 1;
+                }
+
+                if ($summary['avg_before'] === null && $summary['avg_after'] !== null) {
+                    $noBaseline += $personCount;
+                } elseif ($summary['avg_before'] !== null && $summary['avg_after'] !== null) {
+                    $threshold = $summary['avg_before'] * self::TREND_THRESHOLD_PCT;
+                    if ($summary['avg_diff'] > $threshold) {
+                        $improved += $personCount;
+                    } elseif ($summary['avg_diff'] < -$threshold) {
+                        $decreased += $personCount;
+                    } else {
+                        $same += $personCount;
+                    }
+                }
+            }
+        });
+
+        return [
+            'improved'    => $improved,
+            'same'        => $same,
+            'decreased'   => $decreased,
+            'no_baseline' => $noBaseline,
+            'total'       => $improved + $same + $decreased + $noBaseline,
+        ];
+    }
+
+    /**
+     * Breakdown by model_name: for each model, show mobility by capital level
+     * using the same header structure as the summary table.
+     */
+    private function getByModel(string $period, ?string $district, ?string $subdistrict, ?int $surveyYear = null, ?string $modelName = null): array
+    {
+        $compareLogic = new CompareHouseholdSurveyLogic();
+        $capitals     = ['human', 'physical', 'financial', 'natural', 'social'];
+
+        // Get distinct model names from after responses
+        $modelQuery = SurveyResponse::query()->where('period', $period)->whereNotNull('model_name');
+
+        if ($surveyYear) {
+            $modelQuery->where('survey_year', $surveyYear);
+        }
+
+        if ($district) {
+            $modelQuery->whereHas('household', function ($q) use ($district) {
+                $q->where('district_name', 'like', "%{$district}%");
+            });
+        }
+
+        if ($subdistrict) {
+            $modelQuery->whereHas('household', function ($q) use ($subdistrict) {
+                $q->where('subdistrict_name', 'like', "%{$subdistrict}%");
+            });
+        }
+
+        if ($modelName) {
+            $modelQuery->where('model_name', $modelName);
+        }
+
+        $modelNames = $modelQuery->distinct()->pluck('model_name')->sort()->values()->toArray();
+
+        $result = [];
+
+        foreach ($modelNames as $mName) {
+            // Mobility by capital by level for this model
+            $byLevel = [];
+            foreach ($capitals as $capital) {
+                $levels = [
+                    1 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+                    2 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+                    3 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+                    4 => ['improved' => 0, 'same' => 0, 'decreased' => 0],
+                ];
+
+                $householdIds = SurveyResponse::query()
+                    ->where('model_name', $mName)
+                    ->distinct()
+                    ->pluck('household_id');
+
+                $hQuery = Household::query()->whereIn('id', $householdIds);
+
+                if ($district) {
+                    $hQuery->where('district_name', 'like', "%{$district}%");
+                }
+
+                if ($subdistrict) {
+                    $hQuery->where('subdistrict_name', 'like', "%{$subdistrict}%");
+                }
+
+                if ($surveyYear) {
+                    $hQuery->where('survey_year', $surveyYear);
+                }
+
+                $hQuery->chunk(100, function ($households) use ($compareLogic, $surveyYear, $capital, &$levels) {
+                    foreach ($households as $household) {
+                        $compareResult = $compareLogic->compare($household, $surveyYear, null);
+                        $capitalData   = $compareResult['capitals'][$capital];
+
+                        if ($capitalData['before'] !== null && $capitalData['after'] !== null) {
+                            $afterX  = 1.0 + ($capitalData['after'] / 100.0) * 3.0;
+                            $level   = $this->povertyLevel($afterX);
+                            $threshold = $capitalData['before'] * self::TREND_THRESHOLD_PCT;
+                            if ($capitalData['diff'] > $threshold) {
+                                $levels[$level]['improved']++;
+                            } elseif ($capitalData['diff'] < -$threshold) {
+                                $levels[$level]['decreased']++;
+                            } else {
+                                $levels[$level]['same']++;
+                            }
+                        }
+                    }
+                });
+
+                $byLevel[$capital] = $levels;
+            }
+
+            $result[] = [
+                'model_name' => $mName,
+                'by_capital' => $byLevel,
+            ];
+        }
+
+        return $result;
     }
 }
