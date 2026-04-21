@@ -1261,7 +1261,7 @@ const incomeModelChart = computed(() => {
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawMax)))
   const yMax = Math.ceil(rawMax / magnitude) * magnitude || 1
 
-  const xOf = (i) => models.length === 1
+  const xOf = (i) => models.length <= 1
     ? padL + chartW / 2
     : padL + (i / (models.length - 1)) * chartW
   const yOf = (val) => baseY - ((val || 0) / yMax) * chartH

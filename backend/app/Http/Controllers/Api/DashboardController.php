@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Answer;
 use App\Models\Household;
 use App\Models\Person;
+use App\Models\Question;
 use App\Models\SurveyResponse;
 use App\Services\CompareHouseholdSurveyLogic;
 use Illuminate\Http\JsonResponse;
@@ -171,34 +172,45 @@ class DashboardController extends Controller
      */
     private function getIncomeAverages($query): array
     {
-        // Baseline income: average of persons.baseline_income_monthly
-        // for persons linked to the filtered responses
+        // Baseline income: average + count from persons.baseline_income_monthly
         $personIds = (clone $query)->whereNotNull('person_id')->pluck('person_id');
 
         $baselineAvg   = null;
         $baselineCount = 0;
         if ($personIds->isNotEmpty()) {
-            $baselineQuery = Person::whereIn('id', $personIds)->whereNotNull('baseline_income_monthly');
-            $baselineAvg   = $baselineQuery->avg('baseline_income_monthly');
-            $baselineCount = $baselineQuery->count();
+            $row = Person::whereIn('id', $personIds)
+                ->whereNotNull('baseline_income_monthly')
+                ->selectRaw('AVG(baseline_income_monthly) AS avg_val, COUNT(*) AS cnt')
+                ->first();
+            if ($row) {
+                $baselineAvg   = $row->avg_val !== null ? (float) $row->avg_val : null;
+                $baselineCount = (int) $row->cnt;
+            }
         }
 
-        // Survey income: average of answers.value_numeric for question_key Q4 or 04
+        // Survey income: average + count from answers.value_numeric for question_key Q4/04
         $surveyResponseIds = (clone $query)->pluck('id');
 
         $surveyAvg   = null;
         $surveyCount = 0;
         if ($surveyResponseIds->isNotEmpty()) {
-            $surveyQuery = Answer::whereIn('survey_response_id', $surveyResponseIds)
-                ->whereNotNull('value_numeric')
-                ->whereHas('question', fn ($q) => $q->whereIn('question_key', ['Q4', '04']));
-            $surveyAvg   = $surveyQuery->avg('value_numeric');
-            $surveyCount = $surveyQuery->count();
+            $questionIds = Question::whereIn('question_key', ['Q4', '04'])->pluck('id');
+            if ($questionIds->isNotEmpty()) {
+                $row = Answer::whereIn('survey_response_id', $surveyResponseIds)
+                    ->whereNotNull('value_numeric')
+                    ->whereIn('question_id', $questionIds)
+                    ->selectRaw('AVG(value_numeric) AS avg_val, COUNT(*) AS cnt')
+                    ->first();
+                if ($row) {
+                    $surveyAvg   = $row->avg_val !== null ? (float) $row->avg_val : null;
+                    $surveyCount = (int) $row->cnt;
+                }
+            }
         }
 
         return [
-            'baseline_avg'   => $baselineAvg   !== null ? round((float) $baselineAvg, 2) : null,
-            'survey_avg'     => $surveyAvg      !== null ? round((float) $surveyAvg,   2) : null,
+            'baseline_avg'   => $baselineAvg   !== null ? round($baselineAvg, 2) : null,
+            'survey_avg'     => $surveyAvg      !== null ? round($surveyAvg,   2) : null,
             'baseline_count' => $baselineCount,
             'survey_count'   => $surveyCount,
         ];
