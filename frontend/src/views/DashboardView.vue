@@ -193,8 +193,18 @@
               <path :d="incomeModelChart.surveyPath" fill="none" stroke="#0ea5e9" stroke-width="2.5"
                 stroke-linecap="round" stroke-linejoin="round"/>
               <g v-for="(p, pi) in incomeModelChart.pts" :key="'dots-' + pi">
-                <circle :cx="p.x.toFixed(1)" :cy="p.yBase.toFixed(1)" r="5" fill="#fff" stroke="#64748b" stroke-width="2"/>
-                <circle :cx="p.x.toFixed(1)" :cy="p.ySurv.toFixed(1)" r="5" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
+                <g class="income-dot">
+                  <title>{{ p.baseFull }}</title>
+                  <circle :cx="p.x.toFixed(1)" :cy="p.yBase.toFixed(1)" r="6" fill="#fff" stroke="#64748b" stroke-width="2"/>
+                </g>
+                <g class="income-dot">
+                  <title>{{ p.survFull }}</title>
+                  <circle :cx="p.x.toFixed(1)" :cy="p.ySurv.toFixed(1)" r="6" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
+                </g>
+                <text :x="p.x.toFixed(1)" :y="p.baseLabelY.toFixed(1)"
+                  text-anchor="middle" font-size="9" font-weight="700" fill="#64748b" font-family="Prompt, sans-serif">{{ p.baseLabel }}</text>
+                <text :x="p.x.toFixed(1)" :y="p.survLabelY.toFixed(1)"
+                  text-anchor="middle" font-size="9" font-weight="700" fill="#0284c7" font-family="Prompt, sans-serif">{{ p.survLabel }}</text>
               </g>
               <text v-for="(p, pi) in incomeModelChart.pts" :key="'xl-' + pi"
                 :x="p.x.toFixed(1)" :y="(incomeModelChart.baseY + 14).toFixed(1)"
@@ -202,12 +212,17 @@
                 :transform="`rotate(-40, ${p.x.toFixed(1)}, ${(incomeModelChart.baseY + 14).toFixed(1)})`">
                 {{ p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name }}
               </text>
-              <line x1="10" y1="18" x2="26" y2="18" stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 4"/>
-              <circle cx="18" cy="18" r="4" fill="#fff" stroke="#64748b" stroke-width="2"/>
-              <text x="30" y="22" font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้เดิม</text>
-              <line x1="10" y1="34" x2="26" y2="34" stroke="#0ea5e9" stroke-width="2.5"/>
-              <circle cx="18" cy="34" r="4" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
-              <text x="30" y="38" font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้สำรวจ</text>
+              <!-- Legend top center -->
+              <line :x1="incomeModelChart.legendX.toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 18).toFixed(1)" y2="20"
+                stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 4"/>
+              <circle :cx="(incomeModelChart.legendX + 9).toFixed(1)" cy="20" r="4" fill="#fff" stroke="#64748b" stroke-width="2"/>
+              <text :x="(incomeModelChart.legendX + 24).toFixed(1)" y="24"
+                font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้เดิม</text>
+              <line :x1="(incomeModelChart.legendX + 99).toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 117).toFixed(1)" y2="20"
+                stroke="#0ea5e9" stroke-width="2.5"/>
+              <circle :cx="(incomeModelChart.legendX + 108).toFixed(1)" cy="20" r="4" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
+              <text :x="(incomeModelChart.legendX + 123).toFixed(1)" y="24"
+                font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้สำรวจ</text>
             </svg>
             <p v-else class="text-muted text-sm" style="padding:1rem 0">ยังไม่มีข้อมูลรายได้ตามโมเดล</p>
           </div>
@@ -809,8 +824,18 @@
                 <path :d="incomeModelChart.surveyPath" fill="none" stroke="#0ea5e9" stroke-width="2.5"
                   stroke-linecap="round" stroke-linejoin="round"/>
                 <g v-for="(p, pi) in incomeModelChart.pts" :key="'cdots-' + pi">
-                  <circle :cx="p.x.toFixed(1)" :cy="p.yBase.toFixed(1)" r="5" fill="#fff" stroke="#64748b" stroke-width="2"/>
-                  <circle :cx="p.x.toFixed(1)" :cy="p.ySurv.toFixed(1)" r="5" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
+                  <g class="income-dot">
+                    <title>{{ p.baseFull }}</title>
+                    <circle :cx="p.x.toFixed(1)" :cy="p.yBase.toFixed(1)" r="6" fill="#fff" stroke="#64748b" stroke-width="2"/>
+                  </g>
+                  <g class="income-dot">
+                    <title>{{ p.survFull }}</title>
+                    <circle :cx="p.x.toFixed(1)" :cy="p.ySurv.toFixed(1)" r="6" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
+                  </g>
+                  <text :x="p.x.toFixed(1)" :y="p.baseLabelY.toFixed(1)"
+                    text-anchor="middle" font-size="9" font-weight="700" fill="#64748b" font-family="Prompt, sans-serif">{{ p.baseLabel }}</text>
+                  <text :x="p.x.toFixed(1)" :y="p.survLabelY.toFixed(1)"
+                    text-anchor="middle" font-size="9" font-weight="700" fill="#0284c7" font-family="Prompt, sans-serif">{{ p.survLabel }}</text>
                 </g>
                 <text v-for="(p, pi) in incomeModelChart.pts" :key="'cxl-' + pi"
                   :x="p.x.toFixed(1)" :y="(incomeModelChart.baseY + 14).toFixed(1)"
@@ -818,12 +843,17 @@
                   :transform="`rotate(-40, ${p.x.toFixed(1)}, ${(incomeModelChart.baseY + 14).toFixed(1)})`">
                   {{ p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name }}
                 </text>
-                <line x1="10" y1="18" x2="26" y2="18" stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 4"/>
-                <circle cx="18" cy="18" r="4" fill="#fff" stroke="#64748b" stroke-width="2"/>
-                <text x="30" y="22" font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้เดิม</text>
-                <line x1="10" y1="34" x2="26" y2="34" stroke="#0ea5e9" stroke-width="2.5"/>
-                <circle cx="18" cy="34" r="4" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
-                <text x="30" y="38" font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้สำรวจ</text>
+                <!-- Legend top center -->
+                <line :x1="incomeModelChart.legendX.toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 18).toFixed(1)" y2="20"
+                  stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 4"/>
+                <circle :cx="(incomeModelChart.legendX + 9).toFixed(1)" cy="20" r="4" fill="#fff" stroke="#64748b" stroke-width="2"/>
+                <text :x="(incomeModelChart.legendX + 24).toFixed(1)" y="24"
+                  font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้เดิม</text>
+                <line :x1="(incomeModelChart.legendX + 99).toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 117).toFixed(1)" y2="20"
+                  stroke="#0ea5e9" stroke-width="2.5"/>
+                <circle :cx="(incomeModelChart.legendX + 108).toFixed(1)" cy="20" r="4" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
+                <text :x="(incomeModelChart.legendX + 123).toFixed(1)" y="24"
+                  font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้สำรวจ</text>
               </svg>
               <p v-else class="text-muted text-sm" style="padding:1rem 0">ยังไม่มีข้อมูลรายได้ตามโมเดล</p>
             </div>
@@ -1177,10 +1207,10 @@ const incomeDiffPctLabel = computed(() => {
 
 const incomeModelChart = computed(() => {
   const models = store.data?.income_by_model || []
-  const padL = 70, padR = 20, padT = 28, padB = 70
+  const padL = 70, padR = 20, padT = 52, padB = 70
   const colW = models.length > 1 ? Math.max(80, Math.min(130, 900 / models.length)) : 160
   const svgW = Math.max(padL + padR + colW * Math.max(models.length, 1), 420)
-  const svgH = 220
+  const svgH = 244
   const chartW = svgW - padL - padR
   const chartH = svgH - padT - padB
   const baseY = svgH - padB
@@ -1195,12 +1225,33 @@ const incomeModelChart = computed(() => {
     : padL + (i / (models.length - 1)) * chartW
   const yOf = (val) => baseY - ((val || 0) / yMax) * chartH
 
-  const pts = models.map((m, i) => ({
-    x: xOf(i),
-    yBase: yOf(m.baseline_avg),
-    ySurv: yOf(m.survey_avg),
-    name: m.model_name,
-  }))
+  const fmtVal = (v) => {
+    if (!v) return '0'
+    if (v >= 1000) return `${(v / 1000).toFixed(1)}k`
+    return String(Math.round(v))
+  }
+
+  const pts = models.map((m, i) => {
+    const x = xOf(i)
+    const yBase = yOf(m.baseline_avg)
+    const ySurv = yOf(m.survey_avg)
+    const gap = yBase - ySurv
+    // Label collision avoidance: when the two lines are close, offset labels to different sides
+    const MIN_LABEL_GAP = 26    // px gap threshold before labels are considered "close"
+    const LABEL_OFFSET_FAR = 14 // default offset above a dot
+    const LABEL_OFFSET_CLOSE = 8   // tight offset used for the lower label when lines are close
+    const LABEL_OFFSET_STACKED = 22 // larger offset used for the upper label when lines are close
+    return {
+      x, yBase, ySurv,
+      name: m.model_name,
+      baseLabel: fmtVal(m.baseline_avg),
+      survLabel: fmtVal(m.survey_avg),
+      baseFull: `รายได้เดิม: ${(m.baseline_avg || 0).toLocaleString()} บาท/เดือน`,
+      survFull: `รายได้สำรวจ: ${(m.survey_avg || 0).toLocaleString()} บาท/เดือน`,
+      baseLabelY: gap > 0 && gap < MIN_LABEL_GAP ? yBase - LABEL_OFFSET_CLOSE : yBase - LABEL_OFFSET_FAR,
+      survLabelY: gap > 0 && gap < MIN_LABEL_GAP ? ySurv - LABEL_OFFSET_STACKED : (gap <= 0 && gap > -MIN_LABEL_GAP ? ySurv - LABEL_OFFSET_CLOSE : ySurv - LABEL_OFFSET_FAR),
+    }
+  })
 
   const baselinePath = pts.length
     ? `M ${pts.map(p => `${p.x.toFixed(1)},${p.yBase.toFixed(1)}`).join(' L ')}`
@@ -1218,9 +1269,12 @@ const incomeModelChart = computed(() => {
     }
   })
 
+  const legendX = svgW / 2 - 99
+
   return {
     pts, baselinePath, surveyPath, ticks,
     svgW, svgH, baseY, chartH, padL, padR, padB,
+    legendX,
     hasData: models.length > 0,
   }
 })
@@ -1606,11 +1660,12 @@ watch(() => route.fullPath, async () => {
   display: block;
   overflow: visible;
 }
+.income-dot { cursor: pointer; }
+.income-dot circle { transition: r 0.15s ease, opacity 0.15s ease; }
+.income-dot:hover circle { opacity: 0.8; }
 @media (max-width: 900px) {
   .income-row { grid-template-columns: 1fr; }
 }
-
-/* ── Poverty bars ── */
 .poverty-bars { display: flex; flex-direction: column; gap: 0.6rem; }
 .poverty-bar-row { display: flex; align-items: center; gap: 0.5rem; }
 .poverty-label { font-size: 0.75rem; color: var(--color-text-muted); width: 72px; flex-shrink: 0; }
