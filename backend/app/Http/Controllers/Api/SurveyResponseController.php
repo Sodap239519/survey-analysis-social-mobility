@@ -23,7 +23,11 @@ class SurveyResponseController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = SurveyResponse::with(['household', 'person'])
+        $query = SurveyResponse::with([
+            'household', 
+            'person', 
+            'answers.question:id,question_key',
+        ])
             ->latest('surveyed_at')
             ->latest('id');
 
@@ -57,6 +61,7 @@ class SurveyResponseController extends Controller
         // Append comparison data (household is already eager-loaded; no N+1)
         $paginated->getCollection()->transform(function (SurveyResponse $response) {
             $this->appendComparison($response);
+            $this->appendIncomeTrend($response);
             return $response;
         });
 
@@ -134,6 +139,43 @@ class SurveyResponseController extends Controller
 
         $response->comparison     = $comparison;
         $response->overall_status = $overallStatus;
+    }
+
+    /**
+     * Compute and attach income trend (ดีขึ้น/คงที่/แย่ลง) for list view.
+     *
+     * before: person.baseline_income_monthly
+     * after : answer of question_key Q4 or 04 (value_numeric)
+     */
+    private function appendIncomeTrend(SurveyResponse $response): void
+    {
+        $before = $response->person?->baseline_income_monthly;
+
+        // หา answer ที่ question_key เป็น Q4 หรือ 04
+        $afterAnswer = $response->answers?->first(function ($ans) {
+            $key = $ans->question?->question_key;
+            return $key === 'Q4' || $key === '04';
+        });
+
+        $after = $afterAnswer?->value_numeric;
+
+        $trend = null;
+        if ($before !== null && $after !== null) {
+            if ($after > $before) {
+                $trend = 'ดีขึ้น';
+            } elseif ($after < $before) {
+                $trend = 'แย่ลง';
+            } else {
+                $trend = 'คงที่';
+            }
+        }
+
+        // แนบ field ให้ response (จะไปโผล่ใน JSON)
+        $response->income_trend = $trend;
+
+        // (optional) ถ้าคุณอยากส่งค่า before/after ไปด้วย
+        // $response->income_before = $before;
+        // $response->income_after  = $after;
     }
 
     public function show(SurveyResponse $response): JsonResponse

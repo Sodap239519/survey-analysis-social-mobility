@@ -56,7 +56,7 @@
         </select>
       </div>
       <div class="form-group" style="min-width:140px">
-        <label>สถานะการเปลี่ยนแปลง</label>
+        <label>สถานะทางรายได้</label>
         <select v-model="filterStatus">
           <option value="">ทุกสถานะ</option>
           <option value="ดีขึ้น">🟢 ดีขึ้น</option>
@@ -98,6 +98,7 @@
                   <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
                   <th><i class="fi fi-rr-leaf"></i> ทุนธรรมชาติ</th>
                   <th><i class="fi fi-rr-users"></i> ทุนสังคม</th>
+                  <th><i class="fi fi-rr-coins"></i> รายได้</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
@@ -111,6 +112,13 @@
                   <td><span v-html="capitalCell(r, 'financial')"></span></td>
                   <td><span v-html="capitalCell(r, 'natural')"></span></td>
                   <td><span v-html="capitalCell(r, 'social')"></span></td>
+                  <td class="text-center">
+                    <span v-if="incomeTrendFromRow(r)" class="badge" :style="statusStyle(incomeTrendFromRow(r))">
+                      <i :class="statusIconClass(incomeTrendFromRow(r))"></i>
+                      {{ incomeTrendFromRow(r) }}
+                    </span>
+                    <span v-else class="text-muted">—</span>
+                  </td>
                   <td>
                     <div class="flex gap-1">
                       <button class="btn btn-secondary btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด"><i class="fi fi-rr-eye" style="color:#0d6efd;"></i></button>
@@ -154,6 +162,7 @@
                 <th><i class="fi fi-rr-coins"></i> ทุนการเงิน</th>
                 <th><i class="fi fi-rr-leaf"></i> ทุนธรรมชาติ</th>
                 <th><i class="fi fi-rr-users"></i> ทุนสังคม</th>
+                <th><i class="fi fi-rr-coins"></i> รายได้</th>
                 <th>จัดการ</th>
               </tr>
             </thead>
@@ -168,6 +177,13 @@
                 <td><span v-html="capitalStatusCell(r, 'financial')"></span></td>
                 <td><span v-html="capitalStatusCell(r, 'natural')"></span></td>
                 <td><span v-html="capitalStatusCell(r, 'social')"></span></td>
+                <td class="text-center">
+                  <span v-if="incomeTrendFromRow(r)" class="badge" :style="statusStyle(incomeTrendFromRow(r))">
+                    <i :class="statusIconClass(incomeTrendFromRow(r))"></i>
+                    {{ incomeTrendFromRow(r) }}
+                  </span>
+                  <span v-else class="text-muted">—</span>
+                </td>
                 <td>
                   <div class="flex gap-1">
                     <button class="btn btn-secondary btn-sm" @click="openDetailModal(r)" title="ดูรายละเอียด"><i class="fi fi-rr-eye" style="color:#0d6efd;"></i></button>
@@ -261,6 +277,43 @@
                     <span v-if="detailResponse.comparison?.[slug]?.trend" class="badge" :style="statusStyle(detailResponse.comparison[slug].trend)">
                       <i :class="statusIconClass(detailResponse.comparison[slug].trend)"></i>
                       {{ detailResponse.comparison[slug].trend }}
+                    </span>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Income Comparison Section (override) -->
+          <h4 class="section-title mt-4">💰 รายได้ก่อน/หลังการสำรวจ และการเปลี่ยนแปลง</h4>
+          <div class="comparison-table-wrap">
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>รายการ</th>
+                  <th>ก่อนสำรวจ (บาท/เดือน)</th>
+                  <th>→ หลังสำรวจ (บาท/เดือน)</th>
+                  <th>= ผลต่าง</th>
+                  <th>เปลี่ยนแปลง</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="capital-name-cell">รายได้เฉลี่ย</td>
+                  <td class="text-center">{{ money(incomeBefore) }}</td>
+                  <td class="text-center">{{ money(incomeAfter) }}</td>
+                  <td class="text-center" :class="incomeDiffClass">
+                    {{ incomeDiffLabel }}
+                  </td>
+                  <td class="text-center" :class="incomeDiffClass">
+                    {{ incomePctLabel }}
+                  </td>
+                  <td class="text-center">
+                    <span v-if="incomeTrend" class="badge" :style="statusStyle(incomeTrend)">
+                      <i :class="statusIconClass(incomeTrend)"></i>
+                      {{ incomeTrend }}
                     </span>
                     <span v-else class="text-muted">—</span>
                   </td>
@@ -477,6 +530,39 @@ function statusIcon(status) {
   return icons[status] || ''
 }
 
+function toNumberOrNull(v) {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  const s = String(v).trim().replace(/,/g, '')
+  if (s === '' || s === '-') return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
+function findIncomeAfterFromRow(r) {
+  // รายได้หลัง = คำถาม Q4/04 ใน answers
+  const answers = r?.answers || r?.detail?.answers || [] // กันเคสโครงสร้างต่างกัน
+  const a =
+    answers.find(x => x?.question?.question_key === 'Q4') ??
+    answers.find(x => x?.question?.question_key === '04')
+  if (!a) return null
+  return toNumberOrNull(a.value_numeric ?? a.value_text)
+}
+
+function incomeTrendFromRow(r) {
+  // ใช้ค่าที่ backend คำนวณมาให้ใน list (/responses)
+  return r?.income_trend || null
+}
+
+function incomeStatusCell(r) {
+  const trend = incomeTrendFromRow(r)
+  if (!trend) return '<span class="text-muted">—</span>'
+
+  const icon = statusIcon(trend)
+  const style = statusStyle(trend)
+  return `<span class="badge" style="background:${style.background};color:${style.color}">${icon} ${trend}</span>`
+}
+
 function diffStyle(comp) {
   if (!comp || comp.diff === null) return {}
   const trend = comp.trend
@@ -639,6 +725,78 @@ function formatDetailedAnswers(questionCode, subAnswers) {
   }
 }
 
+// ── Income before/after (detail modal) ──────────────────────────────────────
+
+function money(val) {
+  const n = toNumberOrNull(val)
+  if (n === null) return '—'
+  return n.toLocaleString('th-TH')
+}
+
+const incomeBefore = computed(() => {
+  return toNumberOrNull(detailResponse.value?.person?.baseline_income_monthly)
+})
+
+// ── Income after (detail modal) ────────────────────────────────────────────
+
+function findIncomeAfter() {
+  const answers = detailResponse.value?.answers || []
+
+  // รายได้เฉลี่ยปัจจุบัน (บาท/เดือน) = Q4
+  // บางชุดอาจเป็น 'Q4' หรือ '04' เลยรองรับทั้งคู่
+  const a =
+    answers.find(x => x?.question?.question_key === 'Q4') ??
+    answers.find(x => x?.question?.question_key === '04')
+
+  if (!a) return null
+  return toNumberOrNull(a.value_numeric ?? a.value_text)
+}
+
+const incomeAfter = computed(() => findIncomeAfter())
+
+const incomeDiff = computed(() => {
+  const b = incomeBefore.value
+  const a = incomeAfter.value
+  if (b === null || a === null) return null
+  return a - b
+})
+
+const incomePct = computed(() => {
+  const b = incomeBefore.value
+  const d = incomeDiff.value
+  if (b === null || d === null) return null
+  if (b <= 0) return null
+  return (d / b) * 100
+})
+
+const incomeTrend = computed(() => {
+  const d = incomeDiff.value
+  if (d === null) return null
+  if (d > 0) return 'ดีขึ้น'
+  if (d < 0) return 'แย่ลง'
+  return 'คงที่'
+})
+
+const incomeDiffClass = computed(() => {
+  const t = incomeTrend.value
+  if (!t) return ''
+  return t === 'ดีขึ้น' ? 'diff-up' : t === 'แย่ลง' ? 'diff-down' : 'diff-same'
+})
+
+const incomeDiffLabel = computed(() => {
+  const d = incomeDiff.value
+  if (d === null) return '—'
+  const sign = d > 0 ? '+' : ''
+  return `${sign}${d.toLocaleString('th-TH')}`
+})
+
+const incomePctLabel = computed(() => {
+  const p = incomePct.value
+  if (p === null) return '—'
+  const sign = p > 0 ? '+' : ''
+  return `(${sign}${p.toFixed(1)}%)`
+})
+
 function formatDebtAnswers(debtData) {
   let html = '<div class="debt-summary">'
   let totalAmount = 0
@@ -783,7 +941,7 @@ function formatThaiDate(dateString) {
 const filteredRows = computed(() => {
   const data = responses.value.data || []
   if (!filterStatus.value) return data
-  return data.filter(r => r.overall_status === filterStatus.value)
+  return data.filter(r => incomeTrendFromRow(r) === filterStatus.value)
 })
 
 const groupedRows = computed(() => {
@@ -827,6 +985,8 @@ async function load() {
     if (filterModelName.value) params.model_name = filterModelName.value
     const res = await api.get('/responses', { params })
     responses.value = res.data
+    console.log('row keys', Object.keys(res.data?.data?.[0] || {}))
+    console.log('income_trend sample', res.data?.data?.slice(0, 5).map(x => x.income_trend))
   } catch (e) {
     error.value = e.response?.data?.message || 'เกิดข้อผิดพลาด'
   } finally {

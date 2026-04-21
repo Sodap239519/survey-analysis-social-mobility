@@ -13,10 +13,12 @@ class Person extends Model
     protected $fillable = [
         'household_id', 'title', 'first_name', 'last_name',
         'citizen_id', 'birthdate', 'phone', 'is_head',
+        'baseline_income_monthly',
     ];
 
     protected $casts = [
-        'is_head' => 'boolean',
+        'is_head'                 => 'boolean',
+        'baseline_income_monthly' => 'integer',
     ];
 
     public function household(): BelongsTo
