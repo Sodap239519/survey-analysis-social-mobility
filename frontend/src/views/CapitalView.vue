@@ -192,94 +192,15 @@
           <p class="text-muted text-sm mt-2">เปรียบเทียบ score ก่อนและหลังเข้าร่วมโครงการ</p>
         </div>
 
-        <!-- Radar Chart (all 5 capitals, this one highlighted) -->
+        <!-- Radar Chart (all 5 capitals, ApexCharts) -->
         <div class="card cap-card-radar">
-          <h3 class="card-title">ค่าเฉลี่ยศักยภาพ 5 ทุน ({{ capital.nameTh }} เน้น)</h3>
-          <div class="radar-wrap">
-            <svg viewBox="0 0 300 290" class="radar-svg" aria-label="Radar chart comparing all 5 capitals">
-              <!-- Grid rings -->
-              <polygon v-for="pct in [0.25, 0.5, 0.75, 1]" :key="pct"
-                :points="radarGrid(pct)"
-                fill="none"
-                :stroke="pct === 1 ? '#cbd5e1' : '#e2e8f0'"
-                stroke-width="1"
-              />
-              <!-- Axis lines -->
-              <line
-                v-for="ax in radarAxes"
-                :key="ax.cap.slug"
-                :x1="radarCx" :y1="radarCy"
-                :x2="ax.x2" :y2="ax.y2"
-                stroke="#e2e8f0" stroke-width="1"
-              />
-              <!-- Shaded area for current capital -->
-              <polygon
-                :points="radarPolygonCurrent"
-                :fill="capital.color + '33'"
-                :stroke="capital.color"
-                stroke-width="2.5"
-                stroke-linejoin="round"
-              />
-              <!-- Full radar polygon (all 5) -->
-              <polygon
-                :points="radarPolygon"
-                fill="rgba(14,165,233,0.12)"
-                stroke="#0ea5e9"
-                stroke-width="1.5"
-                stroke-linejoin="round"
-                stroke-dasharray="4 2"
-              />
-              <!-- Data points -->
-              <circle
-                v-for="(pt, i) in radarPoints"
-                :key="i"
-                :cx="pt.x" :cy="pt.y"
-                :r="capitals[i].slug === slug ? 6 : 4"
-                :fill="capitals[i].slug === slug ? capital.color : '#0ea5e9'"
-                stroke="#fff"
-                :stroke-width="capitals[i].slug === slug ? 2.5 : 1.5"
-              />
-              <!-- Axis labels -->
-              <text
-                v-for="ax in radarAxes"
-                :key="'lbl-' + ax.cap.slug"
-                :x="ax.labelX" :y="ax.labelY"
-                :text-anchor="ax.textAnchor"
-                dominant-baseline="middle"
-                :font-size="ax.cap.slug === slug ? 11 : 10"
-                :font-weight="ax.cap.slug === slug ? 700 : 400"
-                font-family="Prompt, sans-serif"
-                :fill="ax.cap.slug === slug ? capital.color : '#475569'"
-              >{{ ax.cap.icon }} {{ ax.cap.nameTh }}</text>
-              <!-- Score labels -->
-              <text
-                v-for="(pt, i) in radarPoints"
-                :key="'score-' + i"
-                :x="pt.x" :y="pt.y - 9"
-                text-anchor="middle"
-                font-size="9"
-                font-family="Prompt, sans-serif"
-                :fill="capitals[i].slug === slug ? capital.color : '#0ea5e9'"
-                :font-weight="capitals[i].slug === slug ? 800 : 600"
-              >{{ capitalAverages[capitals[i].slug] }}</text>
-              <!-- Grid value labels -->
-              <text :x="radarCx + 4" :y="radarCy - 25 + 2" font-size="8" fill="#94a3b8">25</text>
-              <text :x="radarCx + 4" :y="radarCy - 50 + 2" font-size="8" fill="#94a3b8">50</text>
-              <text :x="radarCx + 4" :y="radarCy - 75 + 2" font-size="8" fill="#94a3b8">75</text>
-              <text :x="radarCx + 4" :y="radarCy - 100 + 2" font-size="8" fill="#94a3b8">100</text>
-            </svg>
-          </div>
-          <!-- Legend -->
-          <div class="radar-legend">
-            <span class="radar-legend-item">
-              <span class="radar-dot" :style="{background: capital.color}"></span>
-              {{ capital.nameTh }} (เน้น)
-            </span>
-            <span class="radar-legend-item">
-              <span class="radar-dot" style="background:#0ea5e9; opacity:0.6"></span>
-              ภาพรวมทุก 5 ด้าน
-            </span>
-          </div>
+          <h3 class="card-title">ค่าเฉลี่ย 4 ระดับ ({{ capital.nameTh }})</h3>
+          <VueApexCharts
+            type="radar"
+            height="300"
+            :options="radarChart.chartOptions"
+            :series="radarChart.series"
+          />
         </div>
 
         <!-- Compare with other capitals (mini-table) -->
@@ -324,6 +245,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDashboardStore } from '../stores/dashboard'
 import { useDashboardFilters } from '../composables/useDashboardFilters'
+import VueApexCharts from 'vue3-apexcharts'
 
 const route = useRoute()
 const store = useDashboardStore()
@@ -430,65 +352,67 @@ const mobilityDonutSegments = computed(() => {
   return segments
 })
 
-// ─── Radar chart ──────────────────────────────────────────────────────────
-const radarCx = 150
-const radarCy = 145
-const radarMaxR = 95
-const radarLabelR = 122
+// ─── Capital Stats + Radar Chart (ApexCharts) ─────────────────────────────────
+const capitalStats = computed(() => store.data?.capital_stats || null)
 
-const radarAxes = computed(() =>
-  capitals.map((cap, i) => {
-    const angleDeg = -90 + i * 72
-    const rad = angleDeg * (Math.PI / 180)
-    return {
-      cap,
-      x2: (radarCx + radarMaxR * Math.cos(rad)).toFixed(1),
-      y2: (radarCy + radarMaxR * Math.sin(rad)).toFixed(1),
-      labelX: (radarCx + radarLabelR * Math.cos(rad)).toFixed(1),
-      labelY: (radarCy + radarLabelR * Math.sin(rad)).toFixed(1),
-      textAnchor: i === 0 ? 'middle' : i <= 2 ? 'start' : 'end',
-    }
+const radarChart = computed(() => {
+  const labels = capitals.map(c => c.nameTh)
+  const stats = capitalStats.value
+
+  const means = capitals.map(c => {
+    const avg4 = stats?.[c.slug]?.avg
+    if (avg4 != null) return parseFloat(avg4.toFixed(2))
+    const avg100 = capitalAverages.value[c.slug] || 0
+    return parseFloat((1 + (avg100 / 100) * 3).toFixed(2))
   })
-)
 
-const radarPoints = computed(() =>
-  capitals.map((cap, i) => {
-    const angleDeg = -90 + i * 72
-    const rad = angleDeg * (Math.PI / 180)
-    const val = capitalAverages.value[cap.slug] || 0
-    const r = (val / 100) * radarMaxR
-    return {
-      x: parseFloat((radarCx + r * Math.cos(rad)).toFixed(1)),
-      y: parseFloat((radarCy + r * Math.sin(rad)).toFixed(1)),
-    }
-  })
-)
+  const stds    = capitals.map(c => parseFloat((stats?.[c.slug]?.std    ?? means[capitals.indexOf(c)] * 0.1).toFixed(2)))
+  const medians = capitals.map(c => parseFloat((stats?.[c.slug]?.median ?? means[capitals.indexOf(c)]).toFixed(2)))
 
-const radarPolygon = computed(() =>
-  radarPoints.value.map(p => `${p.x},${p.y}`).join(' ')
-)
+  const meanPlusSd  = means.map((m, i) => parseFloat(Math.min(4, m + stds[i]).toFixed(2)))
+  const meanMinusSd = means.map((m, i) => parseFloat(Math.max(1, m - stds[i]).toFixed(2)))
 
-// Polygon for just the current capital (fills only that axis)
-const radarPolygonCurrent = computed(() => {
-  const idx = capitals.findIndex(c => c.slug === slug.value)
-  if (idx < 0) return ''
-  return capitals.map((cap, i) => {
-    const angleDeg = -90 + i * 72
-    const rad = angleDeg * (Math.PI / 180)
-    const val = i === idx ? (capitalAverages.value[cap.slug] || 0) : 0
-    const r = (val / 100) * radarMaxR
-    return `${(radarCx + r * Math.cos(rad)).toFixed(1)},${(radarCy + r * Math.sin(rad)).toFixed(1)}`
-  }).join(' ')
+  return {
+    series: [
+      { name: 'Mean+SD',             data: meanPlusSd },
+      { name: 'Mean-SD',             data: meanMinusSd },
+      { name: 'ค่ามัธยฐานกลาง',     data: medians },
+      { name: 'ผลการวิเคราะห์ทุนฯ', data: means },
+    ],
+    chartOptions: {
+      chart: {
+        type: 'radar',
+        height: 300,
+        dropShadow: { enabled: true, blur: 1, left: 1, top: 1 },
+        fontFamily: 'Prompt, sans-serif',
+        toolbar: { show: false },
+      },
+      stroke: { width: 2 },
+      fill: { opacity: 0.1 },
+      markers: { size: 3 },
+      colors: ['#7c3aed', '#0ea5e9', '#f59e0b', '#22c55e'],
+      yaxis: { show: false, min: 0, max: 4 },
+      xaxis: {
+        categories: labels,
+        labels: { style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' } },
+      },
+      legend: { position: 'bottom', fontFamily: 'Prompt, sans-serif', fontSize: '12px' },
+      tooltip: {
+        y: {
+          formatter: (val) => {
+            const v = parseFloat(val)
+            let level = ''
+            if (v < 1.75) level = ' (อยู่ลำบาก)'
+            else if (v < 2.50) level = ' (อยู่ยาก)'
+            else if (v < 3.25) level = ' (อยู่พอได้)'
+            else level = ' (อยู่ดี)'
+            return `${v.toFixed(2)}${level}`
+          },
+        },
+      },
+    },
+  }
 })
-
-function radarGrid(pct) {
-  return capitals.map((_, i) => {
-    const angleDeg = -90 + i * 72
-    const rad = angleDeg * (Math.PI / 180)
-    const r = pct * radarMaxR
-    return `${(radarCx + r * Math.cos(rad)).toFixed(1)},${(radarCy + r * Math.sin(rad)).toFixed(1)}`
-  }).join(' ')
-}
 
 // Reload when slug changes (navigating between capital pages)
 watch(slug, () => load())

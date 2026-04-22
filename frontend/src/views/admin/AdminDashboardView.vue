@@ -258,55 +258,13 @@
           </div>
         </div>
         <div class="income-chart-scroll" style="margin-top:0.5rem">
-          <svg v-if="finModelChart.hasData"
-            :viewBox="`0 0 ${finModelChart.svgW} ${finModelChart.svgH}`"
-            :width="finModelChart.svgW" :height="finModelChart.svgH"
-            class="income-model-svg" aria-label="Financial comparison by model chart">
-            <!-- Grid lines -->
-            <g v-for="(t, ti) in finModelChart.ticks" :key="'fin-tick-' + ti">
-              <line :x1="finModelChart.padL" :y1="t.y.toFixed(1)"
-                :x2="finModelChart.svgW - finModelChart.padR" :y2="t.y.toFixed(1)"
-                stroke="#e2e8f0" stroke-width="1"/>
-              <text :x="finModelChart.padL - 6" :y="(t.y + 4).toFixed(1)"
-                text-anchor="end" font-size="10" fill="#94a3b8" font-family="Prompt, sans-serif">{{ t.label }}</text>
-            </g>
-            <line :x1="finModelChart.padL" :y1="finModelChart.baseY"
-              :x2="finModelChart.svgW - finModelChart.padR" :y2="finModelChart.baseY"
-              stroke="#cbd5e1" stroke-width="1.5"/>
-            <!-- Series lines -->
-            <g v-for="s in finSeries" :key="'fin-series-' + s.key">
-              <path v-if="finSeriesVisible[s.key] && finModelChart.paths[s.key]"
-                :d="finModelChart.paths[s.key]"
-                fill="none" :stroke="s.color" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round"
-                :stroke-dasharray="s.dash || 'none'"/>
-              <g v-if="finSeriesVisible[s.key]" v-for="(p, pi) in finModelChart.pts" :key="'fin-dot-' + pi">
-                <circle v-if="p[s.key] !== null"
-                  :cx="p.x.toFixed(1)" :cy="finModelChart.yOf(p[s.key]).toFixed(1)"
-                  r="5" :fill="s.color" stroke="#fff" stroke-width="2">
-                  <title>{{ s.label }}: {{ (p[s.key] || 0).toLocaleString() }} บาท/เดือน</title>
-                </circle>
-              </g>
-            </g>
-            <!-- X-axis labels -->
-            <text v-for="(p, pi) in finModelChart.pts" :key="'fin-xlabel-' + pi"
-              :x="p.x.toFixed(1)" :y="(finModelChart.baseY + 14).toFixed(1)"
-              text-anchor="end" font-size="9" fill="#475569" font-family="Prompt, sans-serif"
-              :transform="`rotate(-40, ${p.x.toFixed(1)}, ${(finModelChart.baseY + 14).toFixed(1)})`">
-              {{ p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name }}
-            </text>
-            <!-- Legend -->
-            <g v-for="(s, si) in finSeries.filter(s => finSeriesVisible[s.key])" :key="'fin-legend-' + si">
-              <line
-                :x1="(finModelChart.legendStartX + si * 115).toFixed(1)" y1="20"
-                :x2="(finModelChart.legendStartX + si * 115 + 18).toFixed(1)" y2="20"
-                :stroke="s.color" stroke-width="2.5" :stroke-dasharray="s.dash || 'none'"/>
-              <circle :cx="(finModelChart.legendStartX + si * 115 + 9).toFixed(1)" cy="20" r="4"
-                :fill="s.color" stroke="#fff" stroke-width="2"/>
-              <text :x="(finModelChart.legendStartX + si * 115 + 24).toFixed(1)" y="24"
-                font-size="10" fill="#475569" font-family="Prompt, sans-serif">{{ s.label }}</text>
-            </g>
-          </svg>
+          <VueApexCharts
+            v-if="finModelChart.hasData"
+            type="area"
+            height="240"
+            :options="finModelChart.chartOptions"
+            :series="finModelChart.series"
+          />
           <p v-else class="text-muted text-sm" style="padding:1rem 0">ยังไม่มีข้อมูลตามโมเดล</p>
         </div>
       </div>
@@ -369,41 +327,12 @@
         <!-- Poverty Levels — Area/Line Chart -->
         <div class="bento-poverty card">
           <h3 class="card-title"><i class="fi fi-rr-stats"></i> การกระจายระดับความยากจน (รวม)</h3>
-          <svg viewBox="0 0 420 165" class="poverty-area-svg" aria-label="Area chart of poverty distribution by level">
-            <defs>
-              <linearGradient id="adminPovAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.22"/>
-                <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.02"/>
-              </linearGradient>
-            </defs>
-            <!-- Horizontal grid lines -->
-            <line v-for="frac in [0.25, 0.5, 0.75]" :key="frac"
-              x1="50" x2="390"
-              :y1="(overallAreaChart.baseY - frac * overallAreaChart.chartH).toFixed(1)"
-              :y2="(overallAreaChart.baseY - frac * overallAreaChart.chartH).toFixed(1)"
-              stroke="#f1f5f9" stroke-width="1"
-            />
-            <!-- Baseline -->
-            <line x1="50" x2="390" :y1="overallAreaChart.baseY" :y2="overallAreaChart.baseY" stroke="#e2e8f0" stroke-width="1.5"/>
-            <!-- Area fill -->
-            <path :d="overallAreaChart.areaPath" fill="url(#adminPovAreaGrad)"/>
-            <!-- Smooth line -->
-            <path :d="overallAreaChart.linePath" fill="none" stroke="#0ea5e9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <!-- Data points and count labels -->
-            <g v-for="pt in overallAreaChart.points" :key="pt.level">
-              <circle :cx="pt.x" :cy="pt.y" r="6" :fill="povertyColor(pt.level)" stroke="#fff" stroke-width="2"/>
-              <text :x="pt.x" :y="(pt.y - 13).toFixed(1)" text-anchor="middle" font-size="10" font-weight="700"
-                :fill="povertyColor(pt.level)" font-family="Prompt, sans-serif">{{ pt.count }}</text>
-            </g>
-            <!-- X-axis level labels -->
-            <text v-for="pt in overallAreaChart.points" :key="'xl-' + pt.level"
-              :x="pt.x" :y="overallAreaChart.baseY + 16"
-              text-anchor="middle" font-size="9.5" fill="#64748b" font-family="Prompt, sans-serif"
-            >{{ POVERTY_LEVEL_NAMES[pt.level] }}</text>
-            <!-- Y-axis value hints -->
-            <text x="46" :y="overallAreaChart.topY + 2" text-anchor="end" font-size="8" fill="#94a3b8" font-family="Prompt, sans-serif">{{ overallAreaChart.maxCount }}</text>
-            <text x="46" :y="(overallAreaChart.baseY - overallAreaChart.chartH * 0.5 + 2).toFixed(1)" text-anchor="end" font-size="8" fill="#94a3b8" font-family="Prompt, sans-serif">{{ Math.round(overallAreaChart.maxCount * 0.5) }}</text>
-          </svg>
+          <VueApexCharts
+            type="area"
+            height="165"
+            :options="povertyAreaChart.chartOptions"
+            :series="povertyAreaChart.series"
+          />
           <div class="poverty-legend">
             <span v-for="(desc, level) in POVERTY_DESC" :key="level" class="poverty-legend-item">
               <span class="legend-dot" :style="{ background: povertyColor(Number(level)) }"></span>
@@ -414,64 +343,13 @@
 
         <!-- Radar Chart -->
         <div class="bento-radar card">
-          <h3 class="card-title"><i class="fi fi-rr-chart-pie"></i> ค่าเฉลี่ยศักยภาพ 5 ทุน</h3>
-          <div class="radar-wrap">
-            <svg viewBox="0 0 300 290" class="radar-svg" aria-label="Radar chart of 5 capitals">
-              <polygon v-for="pct in [0.25, 0.5, 0.75, 1]" :key="pct"
-                :points="radarGrid(pct)"
-                fill="none"
-                :stroke="pct === 1 ? '#cbd5e1' : '#e2e8f0'"
-                stroke-width="1"
-              />
-              <line
-                v-for="ax in radarAxes"
-                :key="ax.cap.slug"
-                :x1="radarCx" :y1="radarCy"
-                :x2="ax.x2" :y2="ax.y2"
-                stroke="#e2e8f0" stroke-width="1"
-              />
-              <polygon
-                :points="radarPolygon"
-                fill="rgba(14,165,233,0.18)"
-                stroke="#0ea5e9"
-                stroke-width="2"
-                stroke-linejoin="round"
-              />
-              <circle
-                v-for="(pt, i) in radarPoints"
-                :key="i"
-                :cx="pt.x" :cy="pt.y"
-                r="4"
-                fill="#0ea5e9"
-                stroke="#fff"
-                stroke-width="1.5"
-              />
-              <text
-                v-for="ax in radarAxes"
-                :key="'lbl-' + ax.cap.slug"
-                :x="ax.labelX" :y="ax.labelY"
-                :text-anchor="ax.textAnchor"
-                dominant-baseline="middle"
-                font-size="10"
-                font-family="Prompt, sans-serif"
-                fill="#475569"
-              >{{ ax.cap.nameTh }}</text>
-              <text
-                v-for="(pt, i) in radarPoints"
-                :key="'score-' + i"
-                :x="pt.x" :y="pt.y - 8"
-                text-anchor="middle"
-                font-size="9"
-                font-family="Prompt, sans-serif"
-                fill="#0ea5e9"
-                font-weight="700"
-              >{{ capitalAverages[capitals[i]?.slug] }}</text>
-              <text :x="radarCx + 4" :y="radarCy - 25 + 2" font-size="8" fill="#94a3b8">25</text>
-              <text :x="radarCx + 4" :y="radarCy - 50 + 2" font-size="8" fill="#94a3b8">50</text>
-              <text :x="radarCx + 4" :y="radarCy - 75 + 2" font-size="8" fill="#94a3b8">75</text>
-              <text :x="radarCx + 4" :y="radarCy - 100 + 2" font-size="8" fill="#94a3b8">100</text>
-            </svg>
-          </div>
+          <h3 class="card-title"><i class="fi fi-rr-chart-pie"></i> ค่าเฉลี่ย 4 ระดับ</h3>
+          <VueApexCharts
+            type="radar"
+            height="320"
+            :options="radarChart.chartOptions"
+            :series="radarChart.series"
+          />
         </div>
 
         <!-- Mobility -->
@@ -1103,29 +981,29 @@ const POVERTY_LEVEL_NAMES = { 1: 'อยู่ลำบาก', 2: 'อยู่
 const overallPoverty = computed(() => store.data?.overall_poverty || { 1: 0, 2: 0, 3: 0, 4: 0 })
 const overallTotal = computed(() => Object.values(overallPoverty.value).reduce((a, b) => a + b, 0))
 
-// ─── Overview poverty area chart ──────────────────────────────────────────
-const overallAreaChart = computed(() => {
-  const padL = 50, padR = 30, padT = 32, padB = 30
-  const svgW = 420, svgH = 165
-  const chartW = svgW - padL - padR
-  const chartH = svgH - padT - padB
-  const baseY = svgH - padB
-  const topY = padT
+// ─── Poverty Area Chart (ApexCharts) ─────────────────────────────────────────
+const povertyAreaChart = computed(() => {
   const counts = [1, 2, 3, 4].map(l => Number(overallPoverty.value[l]) || 0)
-  const maxCount = Math.max(...counts, 1)
-  const points = [1, 2, 3, 4].map((l, i) => ({
-    level: l,
-    count: counts[i],
-    x: parseFloat((padL + (i / 3) * chartW).toFixed(1)),
-    y: parseFloat((baseY - (counts[i] / maxCount) * chartH).toFixed(1)),
-  }))
-  let linePath = `M ${points[0].x} ${points[0].y}`
-  for (let i = 1; i < points.length; i++) {
-    const dx = (points[i].x - points[i - 1].x) * 0.4
-    linePath += ` C ${(points[i - 1].x + dx).toFixed(1)} ${points[i - 1].y} ${(points[i].x - dx).toFixed(1)} ${points[i].y} ${points[i].x} ${points[i].y}`
+  return {
+    series: [{ name: 'ครัวเรือน', data: counts }],
+    chartOptions: {
+      chart: { type: 'area', height: 165, toolbar: { show: false }, fontFamily: 'Prompt, sans-serif' },
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2.5 },
+      colors: ['#0ea5e9'],
+      fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
+      xaxis: {
+        categories: ['อยู่ลำบาก', 'อยู่ยาก', 'อยู่พอได้', 'อยู่ดี'],
+        labels: { style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' } },
+      },
+      yaxis: {
+        labels: { formatter: (v) => String(Math.round(v)), style: { colors: '#94a3b8' } },
+      },
+      grid: { borderColor: '#e2e8f0', strokeDashArray: 3 },
+      tooltip: { y: { formatter: (v) => `${v} ครัวเรือน` } },
+      markers: { size: 5, colors: ['#0ea5e9'], strokeColors: '#fff', strokeWidth: 2 },
+    },
   }
-  const areaPath = linePath + ` L ${points[3].x} ${baseY} L ${points[0].x} ${baseY} Z`
-  return { points, linePath, areaPath, maxCount, baseY, topY, chartH }
 })
 
 const capitalPovertyMap = computed(() => {
@@ -1288,52 +1166,68 @@ function donutSegments(slug) {
   return segments
 }
 
-// Radar chart helpers
-const radarCx = 150
-const radarCy = 145
-const radarMaxR = 95
-const radarLabelR = 122
+// ─── Capital Stats + Radar Chart (ApexCharts) ─────────────────────────────────
+const capitalStats = computed(() => store.data?.capital_stats || null)
 
-const radarAxes = computed(() =>
-  capitals.value.map((cap, i) => {
-    const angleDeg = -90 + i * 72
-    const rad = angleDeg * (Math.PI / 180)
-    return {
-      cap,
-      x2: (radarCx + radarMaxR * Math.cos(rad)).toFixed(1),
-      y2: (radarCy + radarMaxR * Math.sin(rad)).toFixed(1),
-      labelX: (radarCx + radarLabelR * Math.cos(rad)).toFixed(1),
-      labelY: (radarCy + radarLabelR * Math.sin(rad)).toFixed(1),
-      textAnchor: i === 0 ? 'middle' : i <= 2 ? 'start' : 'end',
-    }
+const radarChart = computed(() => {
+  const capList = capitals.value
+  const labels = capList.map(c => c.nameTh)
+  const stats = capitalStats.value
+
+  const means = capList.map(c => {
+    const avg4 = stats?.[c.slug]?.avg
+    if (avg4 != null) return parseFloat(avg4.toFixed(2))
+    const avg100 = capitalAverages.value[c.slug] || 0
+    return parseFloat((1 + (avg100 / 100) * 3).toFixed(2))
   })
-)
 
-const radarPoints = computed(() =>
-  capitals.value.map((cap, i) => {
-    const angleDeg = -90 + i * 72
-    const rad = angleDeg * (Math.PI / 180)
-    const val = capitalAverages.value[cap.slug] || 0
-    const r = (val / 100) * radarMaxR
-    return {
-      x: parseFloat((radarCx + r * Math.cos(rad)).toFixed(1)),
-      y: parseFloat((radarCy + r * Math.sin(rad)).toFixed(1)),
-    }
-  })
-)
+  const stds    = capList.map(c => parseFloat((stats?.[c.slug]?.std    ?? means[capList.indexOf(c)] * 0.1).toFixed(2)))
+  const medians = capList.map(c => parseFloat((stats?.[c.slug]?.median ?? means[capList.indexOf(c)]).toFixed(2)))
 
-const radarPolygon = computed(() =>
-  radarPoints.value.map(p => `${p.x},${p.y}`).join(' ')
-)
+  const meanPlusSd  = means.map((m, i) => parseFloat(Math.min(4, m + stds[i]).toFixed(2)))
+  const meanMinusSd = means.map((m, i) => parseFloat(Math.max(1, m - stds[i]).toFixed(2)))
 
-function radarGrid(pct) {
-  return capitals.value.map((_, i) => {
-    const angleDeg = -90 + i * 72
-    const rad = angleDeg * (Math.PI / 180)
-    const r = pct * radarMaxR
-    return `${(radarCx + r * Math.cos(rad)).toFixed(1)},${(radarCy + r * Math.sin(rad)).toFixed(1)}`
-  }).join(' ')
-}
+  return {
+    series: [
+      { name: 'Mean+SD',             data: meanPlusSd },
+      { name: 'Mean-SD',             data: meanMinusSd },
+      { name: 'ค่ามัธยฐานกลาง',     data: medians },
+      { name: 'ผลการวิเคราะห์ทุนฯ', data: means },
+    ],
+    chartOptions: {
+      chart: {
+        type: 'radar',
+        height: 320,
+        dropShadow: { enabled: true, blur: 1, left: 1, top: 1 },
+        fontFamily: 'Prompt, sans-serif',
+        toolbar: { show: false },
+      },
+      stroke: { width: 2 },
+      fill: { opacity: 0.1 },
+      markers: { size: 3 },
+      colors: ['#7c3aed', '#0ea5e9', '#f59e0b', '#22c55e'],
+      yaxis: { show: false, min: 0, max: 4 },
+      xaxis: {
+        categories: labels,
+        labels: { style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' } },
+      },
+      legend: { position: 'bottom', fontFamily: 'Prompt, sans-serif', fontSize: '12px' },
+      tooltip: {
+        y: {
+          formatter: (val) => {
+            const v = parseFloat(val)
+            let level = ''
+            if (v < 1.75) level = ' (อยู่ลำบาก)'
+            else if (v < 2.50) level = ' (อยู่ยาก)'
+            else if (v < 3.25) level = ' (อยู่พอได้)'
+            else level = ' (อยู่ดี)'
+            return `${v.toFixed(2)}${level}`
+          },
+        },
+      },
+    },
+  }
+})
 
 // ─── Income comparison helpers ────────────────────────────────────────────
 function money(val) {
@@ -1458,57 +1352,45 @@ function toggleAllFinSeries(e) {
 
 const finModelChart = computed(() => {
   const models = store.data?.financial_by_model || []
-  const padL = 70, padR = 20, padT = 52, padB = 70
-  const colW = models.length > 1 ? Math.max(80, Math.min(130, 900 / models.length)) : 160
-  const svgW = Math.max(padL + padR + colW * Math.max(models.length, 1), 420)
-  const svgH = 244
-  const chartH = svgH - padT - padB
-  const baseY = svgH - padB
+  const visibleKeys = finSeries.filter(s => finSeriesVisible.value[s.key])
 
-  const seriesKeys = finSeries.map(s => s.key)
-  const allVals = models.flatMap(m => seriesKeys.map(k => (m[k] != null ? m[k] : 0)))
-  const rawMax = Math.max(...allVals, 1)
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawMax)))
-  const yMax = Math.ceil(rawMax / magnitude) * magnitude || 1
+  const series = visibleKeys.map(s => ({
+    name: s.label,
+    data: models.map(m => m[s.key] ?? 0),
+  }))
 
-  const xOf = (i) => models.length <= 1
-    ? padL + (svgW - padL - padR) / 2
-    : padL + (i / (models.length - 1)) * (svgW - padL - padR)
-
-  const yOf = (val) => baseY - ((val || 0) / yMax) * chartH
-
-  const pts = models.map((m, i) => {
-    const obj = { x: xOf(i), name: m.model_name }
-    seriesKeys.forEach(k => { obj[k] = m[k] ?? null })
-    return obj
-  })
-
-  const paths = {}
-  seriesKeys.forEach(k => {
-    const validPts = pts.filter(p => p[k] !== null)
-    paths[k] = validPts.length
-      ? `M ${validPts.map(p => `${p.x.toFixed(1)},${yOf(p[k]).toFixed(1)}`).join(' L ')}`
-      : ''
-  })
-
-  const tickCount = 5
-  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => {
-    const val = (i / tickCount) * yMax
-    return {
-      y: yOf(val),
-      label: val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toFixed(0),
-    }
-  })
-
-  const visibleCount = finSeries.filter(s => finSeriesVisible.value[s.key]).length
-  const legendStartX = svgW / 2 - (visibleCount * 115) / 2
-
-  return {
-    pts, paths, ticks, yOf,
-    svgW, svgH, baseY, chartH, padL, padR, padB,
-    legendStartX,
-    hasData: models.length > 0,
+  const chartOptions = {
+    chart: {
+      height: 240,
+      type: 'area',
+      toolbar: { show: false },
+      fontFamily: 'Prompt, sans-serif',
+    },
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 2.5 },
+    colors: visibleKeys.map(s => s.color),
+    fill: {
+      type: 'gradient',
+      gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] },
+    },
+    xaxis: {
+      categories: models.map(m => m.model_name),
+      labels: { rotate: -30, style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' } },
+    },
+    yaxis: {
+      labels: {
+        formatter: (v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(Math.round(v)),
+        style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#94a3b8' },
+      },
+    },
+    legend: { position: 'top', horizontalAlign: 'center', fontFamily: 'Prompt, sans-serif', fontSize: '12px' },
+    grid: { borderColor: '#e2e8f0', strokeDashArray: 3 },
+    tooltip: {
+      y: { formatter: (v) => `${(v || 0).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท/เดือน` },
+    },
   }
+
+  return { series, chartOptions, hasData: models.length > 0 }
 })
 
 async function load() {
