@@ -147,16 +147,37 @@ class ImportProdSqlite extends Command
         $bar = $this->output->createProgressBar($total);
         $bar->start();
 
+        $orderColumn = $this->resolveSqliteOrderColumn($src, $table);
+
         $imported = 0;
-        $src->table($table)->chunk($chunk, function ($rows) use ($table, $bar, &$imported) {
-            $data = collect($rows)->map(fn ($row) => (array) $row)->toArray();
-            DB::table($table)->insert($data);
-            $imported += count($data);
-            $bar->advance(count($data));
-        });
+        $src->table($table)
+            ->orderBy($orderColumn)
+            ->chunk($chunk, function ($rows) use ($table, $bar, &$imported) {
+                $data = collect($rows)->map(fn ($row) => (array) $row)->toArray();
+                DB::table($table)->insert($data);
+                $imported += count($data);
+                $bar->advance(count($data));
+            });
 
         $bar->finish();
         $this->newLine();
         $this->info("  [{$table}] {$imported} rows imported.");
+    }
+
+    private function resolveSqliteOrderColumn($src, string $table): string
+    {
+        // Prefer common PK/timestamp columns if present; fallback to SQLite rowid.
+        $cols = $src->select("PRAGMA table_info($table)");
+        $names = collect($cols)->pluck('name')->all();
+
+        if (in_array('id', $names, true)) {
+            return 'id';
+        }
+        if (in_array('created_at', $names, true)) {
+            return 'created_at';
+        }
+
+        // rowid is available for most SQLite tables unless created WITHOUT ROWID
+        return 'rowid';
     }
 }
