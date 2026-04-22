@@ -1058,7 +1058,8 @@ class DashboardController extends Controller
 
     /**
      * Compute financial summary cards for expenses (Q8), debt (Q10), and savings (Q9).
-     * Returns { expenses, debt, savings } each with { title, denominator, top, note }.
+     * Returns { expenses, debt, savings } each with { title, denominator, sum_amount, avg_amount, top, note }.
+     * Each top item contains { label, total_amount } sorted by total_amount descending.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
      */
