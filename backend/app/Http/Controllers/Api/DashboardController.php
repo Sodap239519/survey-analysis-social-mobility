@@ -114,6 +114,7 @@ class DashboardController extends Controller
 
         // Average scores per capital (for Radar Chart)
         $capitalAverages = $this->getCapitalAverages(clone $responseQuery);
+        $capitalStats    = $this->getCapitalStats(clone $responseQuery);
 
         // Before/After comparison summary (for paired households)
         $comparisonSummary = $this->getComparisonSummary($district, $subdistrict, $surveyYear, $modelName);
@@ -143,6 +144,7 @@ class DashboardController extends Controller
             'total_villages'       => $geoTotals['villages'],
             'total_households'     => $geoTotals['households'],
             'capital_averages'     => $capitalAverages,
+            'capital_stats'        => $capitalStats,
             'poverty_by_capital'   => $povertyByCapital,
             'overall_poverty'      => $overallPoverty,
             'mobility'             => $mobility,
@@ -634,6 +636,57 @@ class DashboardController extends Controller
             'natural'   => $row ? round((float) $row->avg_natural, 1) : 0,
             'social'    => $row ? round((float) $row->avg_social, 1) : 0,
         ];
+    }
+
+    private function getCapitalStats($query): array
+    {
+        $capitals = [
+            'human'     => 'score_human',
+            'physical'  => 'score_physical',
+            'financial' => 'score_financial',
+            'natural'   => 'score_natural',
+            'social'    => 'score_social',
+        ];
+
+        $responseIds = (clone $query)->pluck('id');
+        if ($responseIds->isEmpty()) {
+            $empty = ['avg' => 0, 'std' => 0, 'median' => 0];
+            return array_fill_keys(array_keys($capitals), $empty);
+        }
+
+        $result = [];
+
+        foreach ($capitals as $slug => $scoreCol) {
+            $rows = \App\Models\SurveyResponse::whereIn('id', $responseIds)
+                ->whereNotNull($scoreCol)
+                ->pluck($scoreCol)
+                ->map(fn($v) => 1.0 + ((float)$v / 100.0) * 3.0)
+                ->values()
+                ->all();
+
+            $n = count($rows);
+            if ($n === 0) {
+                $result[$slug] = ['avg' => 0, 'std' => 0, 'median' => 0];
+                continue;
+            }
+
+            $mean = array_sum($rows) / $n;
+
+            $variance = array_sum(array_map(fn($x) => ($x - $mean) ** 2, $rows)) / $n;
+            $std = sqrt($variance);
+
+            sort($rows);
+            $mid = intdiv($n, 2);
+            $median = ($n % 2 === 0) ? ($rows[$mid - 1] + $rows[$mid]) / 2 : $rows[$mid];
+
+            $result[$slug] = [
+                'avg'    => round($mean,   2),
+                'std'    => round($std,    2),
+                'median' => round($median, 2),
+            ];
+        }
+
+        return $result;
     }
 
     /**
