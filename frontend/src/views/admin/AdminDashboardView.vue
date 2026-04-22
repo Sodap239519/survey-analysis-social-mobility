@@ -150,20 +150,23 @@
 
       <!-- ── Survey Insights ── -->
       <div v-if="store.data.overview_insights?.length" class="insights-section">
-        <h2 class="insights-section-title"><i class="fi fi-rr-bulb"></i> Survey Insights</h2>
+        <h2 class="insights-section-title"><i class="fi fi-rr-bulb"></i> Financial Literacy Insights</h2>
+        <p class="insights-multiselect-note">เลือกได้หลายข้อ ผลรวมอาจเกิน 100%</p>
         <div class="insights-grid">
           <div v-for="ins in store.data.overview_insights" :key="ins.title" class="insight-card card">
             <div class="insight-card-header">
               <i class="fi fi-rr-comment-alt insight-icon"></i>
               <span class="insight-title">{{ ins.title }}</span>
             </div>
-            <p class="insight-headline">{{ ins.headline }}</p>
+            <div v-if="ins.denominator > 0" class="insight-denom">TOP 3: จากผู้ตอบ {{ ins.denominator.toLocaleString() }} คน</div>
             <ul v-if="ins.top?.length" class="insight-top-list">
-              <li v-for="(choice, idx) in ins.top" :key="idx" class="insight-top-item">
+              <li v-for="(item, idx) in ins.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank">{{ idx + 1 }}</span>
-                <span class="insight-choice">{{ choice }}</span>
+                <span class="insight-choice">{{ item.label }}</span>
+                <span class="insight-percent">{{ item.percent.toFixed(1) }}%</span>
               </li>
             </ul>
+            <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
           </div>
         </div>
       </div>
@@ -1638,13 +1641,21 @@ watch(() => route.fullPath, async () => {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 .insights-section-title i { color: var(--color-primary); }
+.insights-multiselect-note {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+}
 .insights-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
+}
+@media (max-width: 640px) {
+  .insights-grid { grid-template-columns: 1fr; }
 }
 .insight-card {
   padding: 1rem 1.25rem;
@@ -1668,12 +1679,9 @@ watch(() => route.fullPath, async () => {
   color: var(--color-text);
   line-height: 1.3;
 }
-.insight-headline {
-  font-size: 0.875rem;
-  color: var(--color-text);
-  font-style: italic;
-  margin: 0;
-  line-height: 1.5;
+.insight-denom {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 .insight-top-list {
   list-style: none;
@@ -1705,6 +1713,17 @@ watch(() => route.fullPath, async () => {
 .insight-choice {
   color: var(--color-text);
   line-height: 1.4;
+  flex: 1;
+}
+.insight-percent {
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.insight-empty {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 /* ── Bento grid ── */
