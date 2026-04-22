@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use DateTime;
 
 /**
  * ImportProdSqlite
@@ -153,7 +154,17 @@ class ImportProdSqlite extends Command
         $src->table($table)
             ->orderBy($orderColumn)
             ->chunk($chunk, function ($rows) use ($table, $bar, &$imported) {
-                $data = collect($rows)->map(fn ($row) => (array) $row)->toArray();
+                $data = collect($rows)->map(function ($row) use ($table) {
+                    $arr = (array) $row;
+
+                    // Fix invalid birthdate values when importing persons
+                    if ($table === 'persons' && array_key_exists('birthdate', $arr)) {
+                        $arr['birthdate'] = $this->normalizeBirthdate($arr['birthdate'] ?? null);
+                    }
+
+                    return $arr;
+                })->toArray();
+
                 DB::table($table)->insert($data);
                 $imported += count($data);
                 $bar->advance(count($data));
@@ -179,5 +190,52 @@ class ImportProdSqlite extends Command
 
         // rowid is available for most SQLite tables unless created WITHOUT ROWID
         return 'rowid';
+    }
+
+    private function normalizeBirthdate($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $v = trim((string) $value);
+
+        // Common placeholders from the prod data
+        if ($v === '' || $v === '?' || $v === '0000-00-00') {
+            return null;
+        }
+
+        // Only handle YYYY-MM-DD like strings; otherwise set null
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
+            return null;
+        }
+
+        [$y, $m, $d] = array_map('intval', explode('-', $v));
+
+        // 1) If already valid YYYY-MM-DD, keep
+        if ($this->isValidDate($y, $m, $d)) {
+            return sprintf('%04d-%02d-%02d', $y, $m, $d);
+        }
+
+        // 2) Heuristic: if month looks impossible but day could be month, swap MM<->DD
+        // Example: 1961-20-06 -> 1961-06-20
+        if ($m > 12 && $d >= 1 && $d <= 12) {
+            $m2 = $d;
+            $d2 = $m;
+
+            if ($this->isValidDate($y, $m2, $d2)) {
+                return sprintf('%04d-%02d-%02d', $y, $m2, $d2);
+            }
+        }
+
+        // 3) Otherwise give up -> null (to allow import to proceed)
+        return null;
+    }
+
+    private function isValidDate(int $y, int $m, int $d): bool
+    {
+        // Use DateTime validation (handles leap years etc.)
+        $dt = DateTime::createFromFormat('Y-m-d', sprintf('%04d-%02d-%02d', $y, $m, $d));
+        return $dt !== false && $dt->format('Y-m-d') === sprintf('%04d-%02d-%02d', $y, $m, $d);
     }
 }
