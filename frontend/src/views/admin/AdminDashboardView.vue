@@ -182,9 +182,10 @@
               <span class="fin-card-title">{{ store.data.financial_summary_cards.expenses?.title || 'รายจ่ายครัวเรือนปัจจุบัน' }}</span>
               <span v-if="store.data.financial_summary_cards.expenses?.avg_amount != null" class="fin-card-kpi" style="color:#f97316">{{ store.data.financial_summary_cards.expenses.avg_amount.toLocaleString() }} บาท</span>
             </div>
-            <div v-if="store.data.financial_summary_cards.expenses?.denominator > 0" class="fin-card-denom">
-              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.expenses.denominator).toLocaleString() }} คน
+            <div v-if="store.data.financial_summary_cards.expenses?.denominator > 0 && store.data.financial_summary_cards.expenses?.avg_amount != null" class="fin-card-avg">
+              เฉลี่ย {{ store.data.financial_summary_cards.expenses.avg_amount.toLocaleString() }} บาท/คน
             </div>
+            <div v-if="store.data.financial_summary_cards.expenses?.top?.length" class="fin-top3-label">TOP 3</div>
             <ul v-if="store.data.financial_summary_cards.expenses?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.expenses.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(249,115,22,0.15);color:#f97316">{{ idx + 1 }}</span>
@@ -202,9 +203,10 @@
               <span class="fin-card-title">{{ store.data.financial_summary_cards.debt?.title || 'หนี้สินปัจจุบัน' }}</span>
               <span v-if="store.data.financial_summary_cards.debt?.avg_amount != null" class="fin-card-kpi" style="color:#ef4444">{{ store.data.financial_summary_cards.debt.avg_amount.toLocaleString() }} บาท</span>
             </div>
-            <div v-if="store.data.financial_summary_cards.debt?.denominator > 0" class="fin-card-denom">
-              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.debt.denominator).toLocaleString() }} คน
+            <div v-if="store.data.financial_summary_cards.debt?.denominator > 0 && store.data.financial_summary_cards.debt?.avg_amount != null" class="fin-card-avg">
+              เฉลี่ย {{ store.data.financial_summary_cards.debt.avg_amount.toLocaleString() }} บาท/คน
             </div>
+            <div v-if="store.data.financial_summary_cards.debt?.top?.length" class="fin-top3-label">TOP 3</div>
             <ul v-if="store.data.financial_summary_cards.debt?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.debt.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(239,68,68,0.15);color:#ef4444">{{ idx + 1 }}</span>
@@ -222,9 +224,10 @@
               <span class="fin-card-title">{{ store.data.financial_summary_cards.savings?.title || 'การออมปัจจุบัน' }}</span>
               <span v-if="store.data.financial_summary_cards.savings?.avg_amount != null" class="fin-card-kpi" style="color:#22c55e">{{ store.data.financial_summary_cards.savings.avg_amount.toLocaleString() }} บาท</span>
             </div>
-            <div v-if="store.data.financial_summary_cards.savings?.denominator > 0" class="fin-card-denom">
-              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.savings.denominator).toLocaleString() }} คน
+            <div v-if="store.data.financial_summary_cards.savings?.denominator > 0 && store.data.financial_summary_cards.savings?.avg_amount != null" class="fin-card-avg">
+              เฉลี่ย {{ store.data.financial_summary_cards.savings.avg_amount.toLocaleString() }} บาท/คน
             </div>
+            <div v-if="store.data.financial_summary_cards.savings?.top?.length" class="fin-top3-label">TOP 3</div>
             <ul v-if="store.data.financial_summary_cards.savings?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.savings.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(34,197,94,0.15);color:#22c55e">{{ idx + 1 }}</span>
@@ -2339,6 +2342,18 @@ watch(() => route.fullPath, async () => {
 .fin-card-denom {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+.fin-card-avg {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+.fin-top3-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .fin-card-note {
   font-size: 0.7rem;

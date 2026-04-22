@@ -1041,6 +1041,22 @@ class DashboardController extends Controller
     }
 
     /**
+     * Savings type label mapping (Q9_savings keys → Thai labels).
+     * Keys match Q9_SAVINGS_ITEMS in the frontend form.
+     */
+    private static function savingsLabelMap(): array
+    {
+        return [
+            '1.1' => 'เงินสด และทรัพย์สิน (ทอง เพชร พลอย พระเครื่อง ของสะสมมีมูลค่า)',
+            '1.2' => 'เงินฝากกับสถาบันการเงิน (ธนาคาร หน่วยประกันชีวิต)',
+            '1.3' => 'เงินฝากกับสหกรณ์ กลุ่มออมทรัพย์ กองทุนชุมชน กลุ่มสัจจะ กองทุนหมู่บ้าน',
+            '1.4' => 'พันธบัตร/สลากออมทรัพย์ (ออมสิน ธกส. ฯลฯ)',
+            '1.5' => 'กองทุนการออมแห่งชาติ (กอช.)',
+            '1.6' => 'การออมอื่นๆ',
+        ];
+    }
+
+    /**
      * Compute financial summary cards for expenses (Q8), debt (Q10), and savings (Q9).
      * Returns { expenses, debt, savings } each with { title, denominator, top, note }.
      *
@@ -1137,56 +1153,34 @@ class DashboardController extends Controller
             ];
         }
 
-        // ── 3. Savings card (Q9, question_id=10, single_select) ──────────────────
-        $q9Id = Question::where('question_key', 'Q9')->value('id');
+        // ── 3. Savings card (Q9_savings detailed_answers, savings types by respondent count) ──
+        $savingsLabelMap = self::savingsLabelMap();
         $savingsFreq  = [];
         $savingsTotal = 0.0;
-        if ($q9Id) {
-            $savingsChoices = Choice::where('question_id', $q9Id)->orderBy('sort_order')->get()->keyBy('id');
 
-            $savingsAnswers = Answer::whereIn('survey_response_id', $surveyResponseIds)
-                ->where('question_id', $q9Id)
-                ->whereNotNull('selected_choice_ids')
-                ->get(['survey_response_id', 'selected_choice_ids']);
+        $savingsDetailRows = DetailedAnswer::whereIn('survey_response_id', $surveyResponseIds)
+            ->where('question_code', 'Q9_savings')
+            ->whereNotNull('sub_answers')
+            ->get(['survey_response_id', 'sub_answers']);
 
-            foreach ($savingsAnswers as $row) {
-                $ids = $row->selected_choice_ids;
-                if (!is_array($ids)) {
-                    continue;
-                }
-                foreach ($ids as $cid) {
-                    $cid = (int) $cid;
-                    $savingsFreq[$cid] = ($savingsFreq[$cid] ?? 0) + 1;
+        foreach ($savingsDetailRows as $row) {
+            $subAnswers = $row->sub_answers;
+            if (!is_array($subAnswers)) {
+                continue;
+            }
+            foreach ($subAnswers as $key => $value) {
+                if (is_numeric($value) && (float) $value > 0) {
+                    $savingsFreq[$key] = ($savingsFreq[$key] ?? 0) + 1;
+                    $savingsTotal += (float) $value;
                 }
             }
-
-            // Compute average savings amount from detailed_answers Q9_savings
-            $savingsDetailRows = DetailedAnswer::whereIn('survey_response_id', $surveyResponseIds)
-                ->where('question_code', 'Q9_savings')
-                ->whereNotNull('sub_answers')
-                ->get(['survey_response_id', 'sub_answers']);
-
-            foreach ($savingsDetailRows as $row) {
-                $subAnswers = $row->sub_answers;
-                if (!is_array($subAnswers)) {
-                    continue;
-                }
-                foreach ($subAnswers as $value) {
-                    if (is_numeric($value) && (float) $value > 0) {
-                        $savingsTotal += (float) $value;
-                    }
-                }
-            }
-        } else {
-            $savingsChoices = collect();
         }
         $savingsAvg = $denominator > 0 ? (int) round($savingsTotal / $denominator) : 0;
         arsort($savingsFreq);
         $savingsTop = [];
-        foreach (array_slice($savingsFreq, 0, 3, true) as $cid => $count) {
-            $choice = $savingsChoices->get($cid);
+        foreach (array_slice($savingsFreq, 0, 3, true) as $key => $count) {
             $savingsTop[] = [
-                'label'   => $choice ? $choice->text_th : (string) $cid,
+                'label'   => $savingsLabelMap[$key] ?? $key,
                 'percent' => round($count / $denominator * 100, 1),
             ];
         }
