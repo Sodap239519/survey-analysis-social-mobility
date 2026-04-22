@@ -883,6 +883,15 @@ class DashboardController extends Controller
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
      */
+    /**
+     * Compute concise "Survey Insights" for 4 multi-select questions.
+     * Returns an array of 4 items, each with title, denominator, and top (up to 3)
+     * items each containing { label, count, percent }.
+     * Percent denominator = total distinct respondents in the current filter scope.
+     * Since multi-select, totals may exceed 100%.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
+     */
     private function getOverviewInsights($responseQuery): array
     {
         $insightQuestions = [
@@ -896,14 +905,15 @@ class DashboardController extends Controller
 
         // Get filtered survey response IDs
         $surveyResponseIds = (clone $responseQuery)->pluck('id');
+        $denominator       = $surveyResponseIds->count();
 
         $emptyResult = array_map(fn ($q) => [
-            'title'    => $q['title'],
-            'headline' => 'ยังไม่มีข้อมูลเพียงพอ',
-            'top'      => [],
+            'title'       => $q['title'],
+            'denominator' => 0,
+            'top'         => [],
         ], $insightQuestions);
 
-        if ($surveyResponseIds->isEmpty()) {
+        if ($denominator === 0) {
             return $emptyResult;
         }
 
@@ -914,11 +924,11 @@ class DashboardController extends Controller
             ->groupBy('question_id')
             ->map(fn ($choices) => $choices->keyBy('id'));
 
-        // Load answers in one query
+        // Load answers in one query — include survey_response_id for distinct counting
         $allAnswers = Answer::whereIn('survey_response_id', $surveyResponseIds)
             ->whereIn('question_id', $questionIds)
             ->whereNotNull('selected_choice_ids')
-            ->get(['question_id', 'selected_choice_ids']);
+            ->get(['survey_response_id', 'question_id', 'selected_choice_ids']);
 
         // Group answers by question_id
         $answersByQuestion = $allAnswers->groupBy('question_id');
@@ -930,24 +940,28 @@ class DashboardController extends Controller
             $answers    = $answersByQuestion->get($questionId, collect());
             $choices    = $choicesByQuestion->get($questionId, collect());
 
-            // Count frequency of each selected choice_id
+            // Count distinct respondents who selected each choice_id
             $freq = [];
             foreach ($answers as $answer) {
                 $choiceIds = $answer->selected_choice_ids;
                 if (!is_array($choiceIds)) {
                     continue;
                 }
+                $seen = [];
                 foreach ($choiceIds as $cid) {
                     $cid = (int) $cid;
-                    $freq[$cid] = ($freq[$cid] ?? 0) + 1;
+                    if (!isset($seen[$cid])) {
+                        $seen[$cid]  = true;
+                        $freq[$cid] = ($freq[$cid] ?? 0) + 1;
+                    }
                 }
             }
 
             if (empty($freq)) {
                 $result[] = [
-                    'title'    => $q['title'],
-                    'headline' => 'ยังไม่มีข้อมูลเพียงพอ',
-                    'top'      => [],
+                    'title'       => $q['title'],
+                    'denominator' => $denominator,
+                    'top'         => [],
                 ];
                 continue;
             }
@@ -955,69 +969,28 @@ class DashboardController extends Controller
             // Sort by frequency descending
             arsort($freq);
 
-            // Build sorted items array: [{text, count, is_exclusive}]
-            $sortedItems = [];
-            foreach ($freq as $cid => $count) {
+            // Build top-3 items with label, count, percent
+            $top = [];
+            foreach (array_slice($freq, 0, 3, true) as $cid => $count) {
                 $choice = $choices->get($cid);
                 if ($choice) {
-                    $sortedItems[] = [
-                        'text'         => $choice->text_th,
-                        'count'        => $count,
-                        'is_exclusive' => (bool) $choice->is_exclusive,
+                    $top[] = [
+                        'label'   => $choice->text_th,
+                        'count'   => $count,
+                        'percent' => $denominator > 0
+                            ? round($count / $denominator * 100, 1)
+                            : 0.0,
                     ];
                 }
             }
 
-            // Top 3 choice texts
-            $top = array_slice(array_column($sortedItems, 'text'), 0, 3);
-
-            $headline = $this->computeInsightHeadline($sortedItems);
-
             $result[] = [
-                'title'    => $q['title'],
-                'headline' => $headline,
-                'top'      => $top,
+                'title'       => $q['title'],
+                'denominator' => $denominator,
+                'top'         => $top,
             ];
         }
 
         return $result;
-    }
-
-    /**
-     * Generate a concise Thai headline from a sorted list of top choices.
-     *
-     * Rules:
-     * - If the top choice text contains "ไม่เคย" or "ยังไม่มีการเปลี่ยนแปลง", begin with "ส่วนใหญ่" and reflect it.
-     * - Else if the top-2 choices are close in count (second >= 80% of first), mention both.
-     * - Otherwise mention the top choice with "รองลงมาคือ" for the second.
-     *
-     * @param  array  $sortedItems  [{text, count, is_exclusive}, ...]  sorted desc by count
-     */
-    private function computeInsightHeadline(array $sortedItems): string
-    {
-        if (empty($sortedItems)) {
-            return 'ยังไม่มีข้อมูลเพียงพอ';
-        }
-
-        $top = $sortedItems[0];
-
-        // Check for negative/no-change keywords in top choice
-        $noChangeKeywords = ['ไม่เคย', 'ยังไม่มีการเปลี่ยนแปลง'];
-        foreach ($noChangeKeywords as $kw) {
-            if (str_contains($top['text'], $kw)) {
-                return "ส่วนใหญ่{$top['text']}";
-            }
-        }
-
-        if (count($sortedItems) >= 2) {
-            $second = $sortedItems[1];
-            $ratio  = $top['count'] > 0 ? $second['count'] / $top['count'] : 0;
-            if ($ratio >= 0.8) {
-                return "ส่วนใหญ่เลือก \"{$top['text']}\" และ \"{$second['text']}\" ใกล้เคียงกัน";
-            }
-            return "ส่วนใหญ่เลือก \"{$top['text']}\" รองลงมาคือ \"{$second['text']}\"";
-        }
-
-        return "ส่วนใหญ่เลือก \"{$top['text']}\"";
     }
 }
