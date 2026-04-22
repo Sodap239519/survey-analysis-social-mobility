@@ -879,12 +879,6 @@ class DashboardController extends Controller
 
     /**
      * Compute concise "Survey Insights" for 4 multi-select questions.
-     * Returns an array of 4 items, each with title, headline, and top (up to 3 choice strings).
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
-     */
-    /**
-     * Compute concise "Survey Insights" for 4 multi-select questions.
      * Returns an array of 4 items, each with title, denominator, and top (up to 3)
      * items each containing { label, count, percent }.
      * Percent denominator = total distinct respondents in the current filter scope.
@@ -947,11 +941,11 @@ class DashboardController extends Controller
                 if (!is_array($choiceIds)) {
                     continue;
                 }
-                $seen = [];
+                $respondentChoices = [];
                 foreach ($choiceIds as $cid) {
                     $cid = (int) $cid;
-                    if (!isset($seen[$cid])) {
-                        $seen[$cid]  = true;
+                    if (!isset($respondentChoices[$cid])) {
+                        $respondentChoices[$cid]  = true;
                         $freq[$cid] = ($freq[$cid] ?? 0) + 1;
                     }
                 }
