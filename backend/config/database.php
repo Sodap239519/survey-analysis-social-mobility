@@ -43,6 +43,17 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        'sqlite_prod' => [
+            'driver' => 'sqlite',
+            'database' => env('DB_PROD_SQLITE_PATH', database_path('prod-database.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+            'busy_timeout' => null,
+            'journal_mode' => null,
+            'synchronous' => null,
+            'transaction_mode' => 'DEFERRED',
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
