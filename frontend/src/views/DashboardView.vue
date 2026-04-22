@@ -186,15 +186,16 @@
             <div class="fin-card-header">
               <i class="fi fi-rr-shopping-cart fin-card-icon" style="color:#f97316"></i>
               <span class="fin-card-title">{{ store.data.financial_summary_cards.expenses?.title || 'รายจ่ายครัวเรือนปัจจุบัน' }}</span>
+              <span v-if="store.data.financial_summary_cards.expenses?.avg_amount != null" class="fin-card-kpi" style="color:#f97316">{{ store.data.financial_summary_cards.expenses.avg_amount.toLocaleString() }} บาท</span>
             </div>
             <div v-if="store.data.financial_summary_cards.expenses?.denominator > 0" class="fin-card-denom">
-              จากผู้ตอบ {{ (store.data.financial_summary_cards.expenses.denominator).toLocaleString() }} คน
+              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.expenses.denominator).toLocaleString() }} คน
             </div>
             <ul v-if="store.data.financial_summary_cards.expenses?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.expenses.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(249,115,22,0.15);color:#f97316">{{ idx + 1 }}</span>
                 <span class="insight-choice">{{ item.label }}</span>
-                <span class="insight-percent" style="color:#f97316">{{ item.percent.toFixed(1) }}% <span class="insight-count">({{ item.count }} คน)</span></span>
+                <span class="insight-percent" style="color:#f97316">{{ item.percent.toFixed(1) }}%</span>
               </li>
             </ul>
             <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
@@ -205,15 +206,16 @@
             <div class="fin-card-header">
               <i class="fi fi-rr-hand-holding-usd fin-card-icon" style="color:#ef4444"></i>
               <span class="fin-card-title">{{ store.data.financial_summary_cards.debt?.title || 'หนี้สินปัจจุบัน' }}</span>
+              <span v-if="store.data.financial_summary_cards.debt?.avg_amount != null" class="fin-card-kpi" style="color:#ef4444">{{ store.data.financial_summary_cards.debt.avg_amount.toLocaleString() }} บาท</span>
             </div>
             <div v-if="store.data.financial_summary_cards.debt?.denominator > 0" class="fin-card-denom">
-              จากผู้ตอบ {{ (store.data.financial_summary_cards.debt.denominator).toLocaleString() }} คน
+              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.debt.denominator).toLocaleString() }} คน
             </div>
             <ul v-if="store.data.financial_summary_cards.debt?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.debt.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(239,68,68,0.15);color:#ef4444">{{ idx + 1 }}</span>
                 <span class="insight-choice">{{ item.label }}</span>
-                <span class="insight-percent" style="color:#ef4444">{{ item.percent.toFixed(1) }}% <span class="insight-count">({{ item.count }} คน)</span></span>
+                <span class="insight-percent" style="color:#ef4444">{{ item.percent.toFixed(1) }}%</span>
               </li>
             </ul>
             <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
@@ -224,15 +226,16 @@
             <div class="fin-card-header">
               <i class="fi fi-rr-piggy-bank fin-card-icon" style="color:#22c55e"></i>
               <span class="fin-card-title">{{ store.data.financial_summary_cards.savings?.title || 'การออมปัจจุบัน' }}</span>
+              <span v-if="store.data.financial_summary_cards.savings?.avg_amount != null" class="fin-card-kpi" style="color:#22c55e">{{ store.data.financial_summary_cards.savings.avg_amount.toLocaleString() }} บาท</span>
             </div>
             <div v-if="store.data.financial_summary_cards.savings?.denominator > 0" class="fin-card-denom">
-              จากผู้ตอบ {{ (store.data.financial_summary_cards.savings.denominator).toLocaleString() }} คน
+              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.savings.denominator).toLocaleString() }} คน
             </div>
             <ul v-if="store.data.financial_summary_cards.savings?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.savings.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(34,197,94,0.15);color:#22c55e">{{ idx + 1 }}</span>
                 <span class="insight-choice">{{ item.label }}</span>
-                <span class="insight-percent" style="color:#22c55e">{{ item.percent.toFixed(1) }}% <span class="insight-count">({{ item.count }} คน)</span></span>
+                <span class="insight-percent" style="color:#22c55e">{{ item.percent.toFixed(1) }}%</span>
               </li>
             </ul>
             <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
@@ -1884,12 +1887,6 @@ watch(() => route.fullPath, async () => {
   color: var(--color-primary);
   white-space: nowrap;
 }
-.insight-count {
-  font-weight: 400;
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
 .insight-empty {
   font-size: 0.8rem;
   color: var(--color-text-muted);
@@ -2218,6 +2215,14 @@ watch(() => route.fullPath, async () => {
   font-weight: 700;
   color: var(--color-text);
   line-height: 1.3;
+  flex: 1;
+}
+.fin-card-kpi {
+  font-size: 1.05rem;
+  font-weight: 800;
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
 }
 .fin-card-denom {
   font-size: 0.75rem;
