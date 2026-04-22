@@ -40,6 +40,18 @@ The API will be available at **http://localhost:8000**.
 
 > **Change this immediately in production!**
 
+## Importing Production Data into Local MySQL
+
+If you have downloaded `prod-database.sqlite` from the production server (Plesk), you can import
+core data tables into your local MySQL database with the built-in artisan command:
+
+```bash
+php artisan app:import-prod-sqlite --truncate
+```
+
+See **[docs/import-prod-sqlite.md](docs/import-prod-sqlite.md)** for the complete step-by-step guide
+(downloading from Plesk, setting `DB_PROD_SQLITE_PATH`, Windows path tips, and post-import verification).
+
 ## Running Tests
 
 ```bash
