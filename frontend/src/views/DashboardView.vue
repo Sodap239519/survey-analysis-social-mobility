@@ -579,6 +579,17 @@
                   <td style="text-align:right;font-weight:700">{{ modelRowTotal(m) }}</td>
                 </tr>
               </tbody>
+              <tfoot>
+                <tr class="summary-footer">
+                  <td><strong>รวมทั้งหมด</strong></td>
+                  <template v-for="level in 4" :key="'mfooter-' + level">
+                    <td class="td-count"><strong>{{ byModelColTotal(level, 'improved') }}</strong></td>
+                    <td class="td-count"><strong>{{ byModelColTotal(level, 'same') }}</strong></td>
+                    <td class="td-count"><strong>{{ byModelColTotal(level, 'decreased') }}</strong></td>
+                  </template>
+                  <td style="text-align:right"><strong>{{ byModelGrandTotal }}</strong></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -606,6 +617,15 @@
                   <td style="text-align:center;font-weight:700">{{ d.respondent_count }}</td>
                 </tr>
               </tbody>
+              <tfoot>
+                <tr class="summary-footer">
+                  <td><strong>รวมทั้งหมด</strong></td>
+                  <td style="text-align:center"><strong>{{ byDistrictTotal('subdistrict_count') }}</strong></td>
+                  <td style="text-align:center"><strong>{{ byDistrictTotal('village_count') }}</strong></td>
+                  <td style="text-align:center"><strong>{{ byDistrictTotal('household_count') }}</strong></td>
+                  <td style="text-align:center"><strong>{{ byDistrictTotal('respondent_count') }}</strong></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -856,6 +876,17 @@
                   <td style="text-align:right;font-weight:700">{{ modelRowCapTotal(m, cap.slug) }}</td>
                 </tr>
               </tbody>
+              <tfoot>
+                <tr class="summary-footer">
+                  <td><strong>รวมทั้งหมด</strong></td>
+                  <template v-for="level in 4" :key="'cmfooter-' + level">
+                    <td class="td-count"><strong>{{ byModelCapColTotal(level, cap.slug, 'improved') }}</strong></td>
+                    <td class="td-count"><strong>{{ byModelCapColTotal(level, cap.slug, 'same') }}</strong></td>
+                    <td class="td-count"><strong>{{ byModelCapColTotal(level, cap.slug, 'decreased') }}</strong></td>
+                  </template>
+                  <td style="text-align:right"><strong>{{ byModelCapGrandTotal(cap.slug) }}</strong></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -883,6 +914,15 @@
                   <td style="text-align:right;font-weight:700">{{ d.household_count }}</td>
                 </tr>
               </tbody>
+              <tfoot>
+                <tr class="summary-footer">
+                  <td><strong>รวมทั้งหมด</strong></td>
+                  <td><!-- รหัส column placeholder --></td>
+                  <td style="text-align:right"><strong>{{ byDistrictTotal('subdistrict_count') }}</strong></td>
+                  <td style="text-align:right"><strong>{{ byDistrictTotal('village_count') }}</strong></td>
+                  <td style="text-align:right"><strong>{{ byDistrictTotal('household_count') }}</strong></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -1264,6 +1304,27 @@ function modelRowCapTotal(modelRow, capSlug) {
     total += modelCapLevelForCap(modelRow, level, capSlug, 'decreased')
   }
   return total
+}
+
+// Bottom-row totals for "สรุปการสำรวจตามโมเดลแก้จน" (overview)
+function byModelColTotal(level, key) {
+  return (store.data?.by_model || []).reduce((sum, m) => sum + modelCapLevelSum(m, level, key), 0)
+}
+const byModelGrandTotal = computed(() =>
+  (store.data?.by_model || []).reduce((sum, m) => sum + modelRowTotal(m), 0)
+)
+
+// Bottom-row totals for "สรุปการสำรวจตามโมเดลแก้จน" (capital-detail tab)
+function byModelCapColTotal(level, capSlug, key) {
+  return (store.data?.by_model || []).reduce((sum, m) => sum + modelCapLevelForCap(m, level, capSlug, key), 0)
+}
+function byModelCapGrandTotal(capSlug) {
+  return (store.data?.by_model || []).reduce((sum, m) => sum + modelRowCapTotal(m, capSlug), 0)
+}
+
+// Bottom-row totals for "สรุปการสำรวจตามอำเภอ"
+function byDistrictTotal(key) {
+  return (store.data?.by_district || []).reduce((sum, d) => sum + (Number(d[key]) || 0), 0)
 }
 
 // ─── Financial Series Line Chart ─────────────────────────────────────────────
