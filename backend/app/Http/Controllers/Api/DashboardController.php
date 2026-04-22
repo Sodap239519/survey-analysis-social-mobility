@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Answer;
+use App\Models\Choice;
 use App\Models\Household;
 use App\Models\Person;
 use App\Models\Question;
@@ -122,6 +123,9 @@ class DashboardController extends Controller
         // Income breakdown per model
         $incomeByModel = $this->getIncomeByModel(clone $responseQuery);
 
+        // Overview insights: top multi-select choices for 4 key questions
+        $overviewInsights = $this->getOverviewInsights(clone $responseQuery);
+
         return response()->json([
             'total_house_codes'    => $totalHouseCodes,
             'total_models'         => $totalModels,
@@ -146,6 +150,7 @@ class DashboardController extends Controller
             'income_baseline_count'        => $incomeAverages['baseline_count'],
             'income_survey_count'          => $incomeAverages['survey_count'],
             'income_by_model'              => $incomeByModel,
+            'overview_insights'            => $overviewInsights,
         ]);
     }
 
@@ -870,5 +875,149 @@ class DashboardController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * Compute concise "Survey Insights" for 4 multi-select questions.
+     * Returns an array of 4 items, each with title, headline, and top (up to 3 choice strings).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
+     */
+    private function getOverviewInsights($responseQuery): array
+    {
+        $insightQuestions = [
+            ['id' => 4,  'title' => 'กิจกรรมด้านการเงิน'],
+            ['id' => 8,  'title' => 'การนำความรู้ด้านการเงินไปใช้ในชีวิตประจำวัน'],
+            ['id' => 19, 'title' => 'การดำเนินการเรื่องหนี้หลังเข้าร่วมโครงการ'],
+            ['id' => 3,  'title' => 'การเปลี่ยนแปลงทักษะ/ความสามารถหลังเข้าร่วมโครงการ'],
+        ];
+
+        $questionIds = array_column($insightQuestions, 'id');
+
+        // Get filtered survey response IDs
+        $surveyResponseIds = (clone $responseQuery)->pluck('id');
+
+        $emptyResult = array_map(fn ($q) => [
+            'title'    => $q['title'],
+            'headline' => 'ยังไม่มีข้อมูลเพียงพอ',
+            'top'      => [],
+        ], $insightQuestions);
+
+        if ($surveyResponseIds->isEmpty()) {
+            return $emptyResult;
+        }
+
+        // Pre-load choices for these questions (keyed by question_id => [choice_id => Choice])
+        $choicesByQuestion = Choice::whereIn('question_id', $questionIds)
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('question_id')
+            ->map(fn ($choices) => $choices->keyBy('id'));
+
+        // Load answers in one query
+        $allAnswers = Answer::whereIn('survey_response_id', $surveyResponseIds)
+            ->whereIn('question_id', $questionIds)
+            ->whereNotNull('selected_choice_ids')
+            ->get(['question_id', 'selected_choice_ids']);
+
+        // Group answers by question_id
+        $answersByQuestion = $allAnswers->groupBy('question_id');
+
+        $result = [];
+
+        foreach ($insightQuestions as $q) {
+            $questionId = $q['id'];
+            $answers    = $answersByQuestion->get($questionId, collect());
+            $choices    = $choicesByQuestion->get($questionId, collect());
+
+            // Count frequency of each selected choice_id
+            $freq = [];
+            foreach ($answers as $answer) {
+                $choiceIds = $answer->selected_choice_ids;
+                if (!is_array($choiceIds)) {
+                    continue;
+                }
+                foreach ($choiceIds as $cid) {
+                    $cid = (int) $cid;
+                    $freq[$cid] = ($freq[$cid] ?? 0) + 1;
+                }
+            }
+
+            if (empty($freq)) {
+                $result[] = [
+                    'title'    => $q['title'],
+                    'headline' => 'ยังไม่มีข้อมูลเพียงพอ',
+                    'top'      => [],
+                ];
+                continue;
+            }
+
+            // Sort by frequency descending
+            arsort($freq);
+
+            // Build sorted items array: [{text, count, is_exclusive}]
+            $sortedItems = [];
+            foreach ($freq as $cid => $count) {
+                $choice = $choices->get($cid);
+                if ($choice) {
+                    $sortedItems[] = [
+                        'text'         => $choice->text_th,
+                        'count'        => $count,
+                        'is_exclusive' => (bool) $choice->is_exclusive,
+                    ];
+                }
+            }
+
+            // Top 3 choice texts
+            $top = array_slice(array_column($sortedItems, 'text'), 0, 3);
+
+            $headline = $this->computeInsightHeadline($sortedItems);
+
+            $result[] = [
+                'title'    => $q['title'],
+                'headline' => $headline,
+                'top'      => $top,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Generate a concise Thai headline from a sorted list of top choices.
+     *
+     * Rules:
+     * - If the top choice text contains "ไม่เคย" or "ยังไม่มีการเปลี่ยนแปลง", begin with "ส่วนใหญ่" and reflect it.
+     * - Else if the top-2 choices are close in count (second >= 80% of first), mention both.
+     * - Otherwise mention the top choice with "รองลงมาคือ" for the second.
+     *
+     * @param  array  $sortedItems  [{text, count, is_exclusive}, ...]  sorted desc by count
+     */
+    private function computeInsightHeadline(array $sortedItems): string
+    {
+        if (empty($sortedItems)) {
+            return 'ยังไม่มีข้อมูลเพียงพอ';
+        }
+
+        $top = $sortedItems[0];
+
+        // Check for negative/no-change keywords in top choice
+        $noChangeKeywords = ['ไม่เคย', 'ยังไม่มีการเปลี่ยนแปลง'];
+        foreach ($noChangeKeywords as $kw) {
+            if (str_contains($top['text'], $kw)) {
+                return "ส่วนใหญ่{$top['text']}";
+            }
+        }
+
+        if (count($sortedItems) >= 2) {
+            $second = $sortedItems[1];
+            $ratio  = $top['count'] > 0 ? $second['count'] / $top['count'] : 0;
+            if ($ratio >= 0.8) {
+                return "ส่วนใหญ่เลือก \"{$top['text']}\" และ \"{$second['text']}\" ใกล้เคียงกัน";
+            }
+            return "ส่วนใหญ่เลือก \"{$top['text']}\" รองลงมาคือ \"{$second['text']}\"";
+        }
+
+        return "ส่วนใหญ่เลือก \"{$top['text']}\"";
     }
 }
