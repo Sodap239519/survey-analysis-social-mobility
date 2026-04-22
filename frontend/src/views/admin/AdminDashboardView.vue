@@ -126,6 +126,48 @@
         </div>
       </div>
 
+      <!-- ── 3-Stat-Card Row ── -->
+      <div class="overview-stat-row">
+        <div class="bento-stat card">
+          <div class="stat-icon-wrap" style="--ic:#0ea5e9"><i class="fi fi-rr-layers"></i></div>
+          <div class="stat-label">จำนวนโมเดล</div>
+          <div class="stat-value">{{ (store.data.total_models || 0).toLocaleString() }}</div>
+          <div class="stat-sub">โมเดลแก้จนที่ไม่ซ้ำกัน</div>
+        </div>
+        <div class="bento-stat card">
+          <div class="stat-icon-wrap" style="--ic:#6366f1"><i class="fi fi-rr-user"></i></div>
+          <div class="stat-label">จำนวนผู้ตอบ</div>
+          <div class="stat-value">{{ store.data.total_respondents.toLocaleString() }}</div>
+          <div class="stat-sub">ผู้ตอบแบบสอบถาม</div>
+        </div>
+        <div class="bento-stat card">
+          <div class="stat-icon-wrap" style="--ic:#10b981"><i class="fi fi-rr-document"></i></div>
+          <div class="stat-label">จำนวนการสำรวจ</div>
+          <div class="stat-value">{{ store.data.total_responses.toLocaleString() }}</div>
+          <div class="stat-sub">ครั้งที่บันทึก</div>
+        </div>
+      </div>
+
+      <!-- ── Survey Insights ── -->
+      <div v-if="store.data.overview_insights?.length" class="insights-section">
+        <h2 class="insights-section-title"><i class="fi fi-rr-bulb"></i> Survey Insights</h2>
+        <div class="insights-grid">
+          <div v-for="ins in store.data.overview_insights" :key="ins.title" class="insight-card card">
+            <div class="insight-card-header">
+              <i class="fi fi-rr-comment-alt insight-icon"></i>
+              <span class="insight-title">{{ ins.title }}</span>
+            </div>
+            <p class="insight-headline">{{ ins.headline }}</p>
+            <ul v-if="ins.top?.length" class="insight-top-list">
+              <li v-for="(choice, idx) in ins.top" :key="idx" class="insight-top-item">
+                <span class="insight-rank">{{ idx + 1 }}</span>
+                <span class="insight-choice">{{ choice }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Income comparison row ── -->
       <div class="income-row">
         <!-- LEFT: three income cards -->
@@ -225,25 +267,6 @@
       </div>
 
       <div class="bento-grid">
-        <div class="bento-stat card">
-          <div class="stat-icon-wrap" style="--ic:#0ea5e9"><i class="fi fi-rr-layers"></i></div>
-          <div class="stat-label">จำนวนโมเดล</div>
-          <div class="stat-value">{{ (store.data.total_models || 0).toLocaleString() }}</div>
-          <div class="stat-sub">โมเดลแก้จนที่ไม่ซ้ำกัน</div>
-        </div>
-        <div class="bento-stat card">
-          <div class="stat-icon-wrap" style="--ic:#6366f1"><i class="fi fi-rr-user"></i></div>
-          <div class="stat-label">จำนวนผู้ตอบ</div>
-          <div class="stat-value">{{ store.data.total_respondents.toLocaleString() }}</div>
-          <div class="stat-sub">ผู้ตอบแบบสอบถาม</div>
-        </div>
-        <div class="bento-stat card">
-          <div class="stat-icon-wrap" style="--ic:#10b981"><i class="fi fi-rr-document"></i></div>
-          <div class="stat-label">จำนวนการสำรวจ</div>
-          <div class="stat-value">{{ store.data.total_responses.toLocaleString() }}</div>
-          <div class="stat-sub">ครั้งที่บันทึก</div>
-        </div>
-
         <!-- Poverty Levels — Area/Line Chart -->
         <div class="bento-poverty card">
           <h3 class="card-title"><i class="fi fi-rr-stats"></i> การกระจายระดับความยากจน (รวม)</h3>
@@ -1596,6 +1619,94 @@ watch(() => route.fullPath, async () => {
 .stat-mini-value { font-size: 1.5rem; font-weight: 800; color: var(--color-primary); line-height: 1.1; }
 .stat-mini-label { font-size: 0.75rem; color: var(--color-text-muted); font-weight: 500; }
 
+/* ── Overview 3-Stat-Card Row ── */
+.overview-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ── Survey Insights ── */
+.insights-section {
+  margin-bottom: 1rem;
+}
+.insights-section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.insights-section-title i { color: var(--color-primary); }
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+.insight-card {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.insight-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.insight-icon {
+  font-size: 1rem;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+.insight-title {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+.insight-headline {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+}
+.insight-top-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.insight-top-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.insight-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  color: var(--color-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.insight-choice {
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
 /* ── Bento grid ── */
 .bento-grid {
   display: grid;
@@ -1888,6 +1999,7 @@ watch(() => route.fullPath, async () => {
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .overview-stat-row { grid-template-columns: repeat(3, 1fr); }
   .bento-grid { grid-template-columns: 1fr 1fr; }
   .bento-poverty, .bento-district, .bento-cap-mobility, .bento-summary, .bento-comparison { grid-column: span 2; }
   .bento-radar { grid-column: span 1; }
@@ -1899,6 +2011,8 @@ watch(() => route.fullPath, async () => {
 @media (max-width: 600px) {
   .admin-dashboard { padding: 0; }
   .stats-bar { grid-template-columns: 1fr 1fr; }
+  .overview-stat-row { grid-template-columns: 1fr; }
+  .insights-grid { grid-template-columns: 1fr; }
   .bento-grid { grid-template-columns: 1fr; }
   .bento-poverty, .bento-radar, .bento-district, .bento-mobility, .bento-cap-mobility, .bento-summary, .bento-comparison { grid-column: span 1; }
   .dash-filters { flex-direction: column; }
