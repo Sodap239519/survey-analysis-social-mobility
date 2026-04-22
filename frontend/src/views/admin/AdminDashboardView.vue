@@ -257,7 +257,7 @@
             :width="finModelChart.svgW" :height="finModelChart.svgH"
             class="income-model-svg" aria-label="Financial comparison by model chart">
             <!-- Grid lines -->
-            <g v-for="(t, ti) in finModelChart.ticks" :key="'aft-' + ti">
+            <g v-for="(t, ti) in finModelChart.ticks" :key="'fin-tick-' + ti">
               <line :x1="finModelChart.padL" :y1="t.y.toFixed(1)"
                 :x2="finModelChart.svgW - finModelChart.padR" :y2="t.y.toFixed(1)"
                 stroke="#e2e8f0" stroke-width="1"/>
@@ -268,13 +268,13 @@
               :x2="finModelChart.svgW - finModelChart.padR" :y2="finModelChart.baseY"
               stroke="#cbd5e1" stroke-width="1.5"/>
             <!-- Series lines -->
-            <g v-for="s in finSeries" :key="'afs-' + s.key">
+            <g v-for="s in finSeries" :key="'fin-series-' + s.key">
               <path v-if="finSeriesVisible[s.key] && finModelChart.paths[s.key]"
                 :d="finModelChart.paths[s.key]"
                 fill="none" :stroke="s.color" stroke-width="2.5"
                 stroke-linecap="round" stroke-linejoin="round"
                 :stroke-dasharray="s.dash || 'none'"/>
-              <g v-if="finSeriesVisible[s.key]" v-for="(p, pi) in finModelChart.pts" :key="'afd-' + pi">
+              <g v-if="finSeriesVisible[s.key]" v-for="(p, pi) in finModelChart.pts" :key="'fin-dot-' + pi">
                 <circle v-if="p[s.key] !== null"
                   :cx="p.x.toFixed(1)" :cy="finModelChart.yOf(p[s.key]).toFixed(1)"
                   r="5" :fill="s.color" stroke="#fff" stroke-width="2">
@@ -283,14 +283,14 @@
               </g>
             </g>
             <!-- X-axis labels -->
-            <text v-for="(p, pi) in finModelChart.pts" :key="'afxl-' + pi"
+            <text v-for="(p, pi) in finModelChart.pts" :key="'fin-xlabel-' + pi"
               :x="p.x.toFixed(1)" :y="(finModelChart.baseY + 14).toFixed(1)"
               text-anchor="end" font-size="9" fill="#475569" font-family="Prompt, sans-serif"
               :transform="`rotate(-40, ${p.x.toFixed(1)}, ${(finModelChart.baseY + 14).toFixed(1)})`">
               {{ p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name }}
             </text>
             <!-- Legend -->
-            <g v-for="(s, si) in finSeries.filter(s => finSeriesVisible[s.key])" :key="'afleg-' + si">
+            <g v-for="(s, si) in finSeries.filter(s => finSeriesVisible[s.key])" :key="'fin-legend-' + si">
               <line
                 :x1="(finModelChart.legendStartX + si * 115).toFixed(1)" y1="20"
                 :x2="(finModelChart.legendStartX + si * 115 + 18).toFixed(1)" y2="20"
