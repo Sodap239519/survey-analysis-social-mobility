@@ -188,7 +188,7 @@
               <li v-for="(item, idx) in store.data.financial_summary_cards.expenses.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(249,115,22,0.15);color:#f97316">{{ idx + 1 }}</span>
                 <span class="insight-choice">{{ item.label }}</span>
-                <span class="insight-percent" style="color:#f97316">{{ item.percent.toFixed(1) }}%</span>
+                <span class="insight-percent" style="color:#f97316">{{ item.percent.toFixed(1) }}% <span class="insight-count">({{ item.count }} คน)</span></span>
               </li>
             </ul>
             <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
@@ -207,7 +207,7 @@
               <li v-for="(item, idx) in store.data.financial_summary_cards.debt.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(239,68,68,0.15);color:#ef4444">{{ idx + 1 }}</span>
                 <span class="insight-choice">{{ item.label }}</span>
-                <span class="insight-percent" style="color:#ef4444">{{ item.percent.toFixed(1) }}%</span>
+                <span class="insight-percent" style="color:#ef4444">{{ item.percent.toFixed(1) }}% <span class="insight-count">({{ item.count }} คน)</span></span>
               </li>
             </ul>
             <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
@@ -226,7 +226,7 @@
               <li v-for="(item, idx) in store.data.financial_summary_cards.savings.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank" style="background:rgba(34,197,94,0.15);color:#22c55e">{{ idx + 1 }}</span>
                 <span class="insight-choice">{{ item.label }}</span>
-                <span class="insight-percent" style="color:#22c55e">{{ item.percent.toFixed(1) }}%</span>
+                <span class="insight-percent" style="color:#22c55e">{{ item.percent.toFixed(1) }}% <span class="insight-count">({{ item.count }} คน)</span></span>
               </li>
             </ul>
             <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
@@ -1926,6 +1926,12 @@ watch(() => route.fullPath, async () => {
   color: var(--color-primary);
   white-space: nowrap;
 }
+.insight-count {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
 .insight-empty {
   font-size: 0.8rem;
   color: var(--color-text-muted);
@@ -2352,7 +2358,7 @@ watch(() => route.fullPath, async () => {
 .fin-chart-toggles {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  gap: 0.25rem 0.6rem;
   align-items: center;
   margin-left: auto;
 }
@@ -2360,16 +2366,28 @@ watch(() => route.fullPath, async () => {
 .fin-toggle-item {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.775rem;
+  gap: 0.25rem;
+  font-size: 0.72rem;
   color: var(--color-text);
   cursor: pointer;
   user-select: none;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  line-height: 1.3;
+}
+.fin-toggle-all input[type="checkbox"],
+.fin-toggle-item input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
 }
 .fin-toggle-dot {
   display: inline-block;
-  width: 12px;
-  height: 4px;
+  width: 10px;
+  height: 3px;
   border-radius: 2px;
   flex-shrink: 0;
 }
