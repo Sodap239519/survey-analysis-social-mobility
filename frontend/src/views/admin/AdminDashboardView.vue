@@ -182,7 +182,7 @@
               <span class="fin-card-title">{{ store.data.financial_summary_cards.expenses?.title || 'รายจ่ายครัวเรือนปัจจุบัน' }}</span>
               <span v-if="store.data.financial_summary_cards.expenses?.avg_amount != null" class="fin-card-kpi" style="color:#f97316">{{ store.data.financial_summary_cards.expenses.avg_amount.toLocaleString() }} บาท</span>
             </div>
-            <div v-if="store.data.financial_summary_cards.expenses?.denominator > 0" class="fin-card-avg">
+            <div v-if="store.data.financial_summary_cards.expenses?.denominator > 0 && store.data.financial_summary_cards.expenses?.avg_amount != null" class="fin-card-avg">
               เฉลี่ย {{ store.data.financial_summary_cards.expenses.avg_amount.toLocaleString() }} บาท/คน
             </div>
             <div v-if="store.data.financial_summary_cards.expenses?.top?.length" class="fin-top3-label">TOP 3</div>
@@ -203,7 +203,7 @@
               <span class="fin-card-title">{{ store.data.financial_summary_cards.debt?.title || 'หนี้สินปัจจุบัน' }}</span>
               <span v-if="store.data.financial_summary_cards.debt?.avg_amount != null" class="fin-card-kpi" style="color:#ef4444">{{ store.data.financial_summary_cards.debt.avg_amount.toLocaleString() }} บาท</span>
             </div>
-            <div v-if="store.data.financial_summary_cards.debt?.denominator > 0" class="fin-card-avg">
+            <div v-if="store.data.financial_summary_cards.debt?.denominator > 0 && store.data.financial_summary_cards.debt?.avg_amount != null" class="fin-card-avg">
               เฉลี่ย {{ store.data.financial_summary_cards.debt.avg_amount.toLocaleString() }} บาท/คน
             </div>
             <div v-if="store.data.financial_summary_cards.debt?.top?.length" class="fin-top3-label">TOP 3</div>
@@ -224,7 +224,7 @@
               <span class="fin-card-title">{{ store.data.financial_summary_cards.savings?.title || 'การออมปัจจุบัน' }}</span>
               <span v-if="store.data.financial_summary_cards.savings?.avg_amount != null" class="fin-card-kpi" style="color:#22c55e">{{ store.data.financial_summary_cards.savings.avg_amount.toLocaleString() }} บาท</span>
             </div>
-            <div v-if="store.data.financial_summary_cards.savings?.denominator > 0" class="fin-card-avg">
+            <div v-if="store.data.financial_summary_cards.savings?.denominator > 0 && store.data.financial_summary_cards.savings?.avg_amount != null" class="fin-card-avg">
               เฉลี่ย {{ store.data.financial_summary_cards.savings.avg_amount.toLocaleString() }} บาท/คน
             </div>
             <div v-if="store.data.financial_summary_cards.savings?.top?.length" class="fin-top3-label">TOP 3</div>
