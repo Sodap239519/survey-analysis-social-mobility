@@ -180,9 +180,10 @@
             <div class="fin-card-header">
               <i class="fi fi-rr-shopping-cart fin-card-icon" style="color:#f97316"></i>
               <span class="fin-card-title">{{ store.data.financial_summary_cards.expenses?.title || 'รายจ่ายครัวเรือนปัจจุบัน' }}</span>
+              <span v-if="store.data.financial_summary_cards.expenses?.avg_amount != null" class="fin-card-kpi" style="color:#f97316">{{ store.data.financial_summary_cards.expenses.avg_amount.toLocaleString() }} บาท</span>
             </div>
             <div v-if="store.data.financial_summary_cards.expenses?.denominator > 0" class="fin-card-denom">
-              จากผู้ตอบ {{ (store.data.financial_summary_cards.expenses.denominator).toLocaleString() }} คน
+              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.expenses.denominator).toLocaleString() }} คน
             </div>
             <ul v-if="store.data.financial_summary_cards.expenses?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.expenses.top" :key="idx" class="insight-top-item">
@@ -199,9 +200,10 @@
             <div class="fin-card-header">
               <i class="fi fi-rr-hand-holding-usd fin-card-icon" style="color:#ef4444"></i>
               <span class="fin-card-title">{{ store.data.financial_summary_cards.debt?.title || 'หนี้สินปัจจุบัน' }}</span>
+              <span v-if="store.data.financial_summary_cards.debt?.avg_amount != null" class="fin-card-kpi" style="color:#ef4444">{{ store.data.financial_summary_cards.debt.avg_amount.toLocaleString() }} บาท</span>
             </div>
             <div v-if="store.data.financial_summary_cards.debt?.denominator > 0" class="fin-card-denom">
-              จากผู้ตอบ {{ (store.data.financial_summary_cards.debt.denominator).toLocaleString() }} คน
+              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.debt.denominator).toLocaleString() }} คน
             </div>
             <ul v-if="store.data.financial_summary_cards.debt?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.debt.top" :key="idx" class="insight-top-item">
@@ -218,9 +220,10 @@
             <div class="fin-card-header">
               <i class="fi fi-rr-piggy-bank fin-card-icon" style="color:#22c55e"></i>
               <span class="fin-card-title">{{ store.data.financial_summary_cards.savings?.title || 'การออมปัจจุบัน' }}</span>
+              <span v-if="store.data.financial_summary_cards.savings?.avg_amount != null" class="fin-card-kpi" style="color:#22c55e">{{ store.data.financial_summary_cards.savings.avg_amount.toLocaleString() }} บาท</span>
             </div>
             <div v-if="store.data.financial_summary_cards.savings?.denominator > 0" class="fin-card-denom">
-              จากผู้ตอบ {{ (store.data.financial_summary_cards.savings.denominator).toLocaleString() }} คน
+              เฉลี่ยต่อครัวเรือน จาก {{ (store.data.financial_summary_cards.savings.denominator).toLocaleString() }} คน
             </div>
             <ul v-if="store.data.financial_summary_cards.savings?.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in store.data.financial_summary_cards.savings.top" :key="idx" class="insight-top-item">
@@ -2324,6 +2327,14 @@ watch(() => route.fullPath, async () => {
   font-weight: 700;
   color: var(--color-text);
   line-height: 1.3;
+  flex: 1;
+}
+.fin-card-kpi {
+  font-size: 1.05rem;
+  font-weight: 800;
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
 }
 .fin-card-denom {
   font-size: 0.75rem;
@@ -2352,7 +2363,7 @@ watch(() => route.fullPath, async () => {
 .fin-chart-toggles {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  gap: 0.25rem 0.6rem;
   align-items: center;
   margin-left: auto;
 }
@@ -2360,16 +2371,28 @@ watch(() => route.fullPath, async () => {
 .fin-toggle-item {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.775rem;
+  gap: 0.25rem;
+  font-size: 0.72rem;
   color: var(--color-text);
   cursor: pointer;
   user-select: none;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  line-height: 1.3;
+}
+.fin-toggle-all input[type="checkbox"],
+.fin-toggle-item input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
 }
 .fin-toggle-dot {
   display: inline-block;
-  width: 12px;
-  height: 4px;
+  width: 10px;
+  height: 3px;
   border-radius: 2px;
   flex-shrink: 0;
 }

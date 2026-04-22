@@ -1054,6 +1054,7 @@ class DashboardController extends Controller
         $emptyCard = fn (string $title) => [
             'title'       => $title,
             'denominator' => 0,
+            'avg_amount'  => 0,
             'top'         => [],
             'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
         ];
@@ -1070,7 +1071,8 @@ class DashboardController extends Controller
         $expenseLabelMap = self::expenseLabelMap();
 
         $q8Id = Question::where('question_key', 'Q8')->value('id');
-        $expenseFreq = [];
+        $expenseFreq  = [];
+        $expenseTotal = 0.0;
         if ($q8Id) {
             $expenseAnswers = Answer::whereIn('survey_response_id', $surveyResponseIds)
                 ->where('question_id', $q8Id)
@@ -1085,23 +1087,25 @@ class DashboardController extends Controller
                 foreach ($decoded as $key => $value) {
                     if (is_numeric($value) && (float) $value > 0) {
                         $expenseFreq[$key] = ($expenseFreq[$key] ?? 0) + 1;
+                        $expenseTotal += (float) $value;
                     }
                 }
             }
         }
+        $expensesAvg = $denominator > 0 ? (int) round($expenseTotal / $denominator) : 0;
         arsort($expenseFreq);
         $expenseTop = [];
         foreach (array_slice($expenseFreq, 0, 3, true) as $key => $count) {
             $expenseTop[] = [
                 'label'   => $expenseLabelMap[$key] ?? $key,
-                'count'   => $count,
                 'percent' => round($count / $denominator * 100, 1),
             ];
         }
 
         // ── 2. Debt card (Q10, question_code='Q10_debt', sub_answers JSON) ────────
         $debtLabelMap = self::debtLabelMap();
-        $debtFreq = [];
+        $debtFreq  = [];
+        $debtTotal = 0.0;
 
         $debtRows = DetailedAnswer::whereIn('survey_response_id', $surveyResponseIds)
             ->where('question_code', 'Q10_debt')
@@ -1116,24 +1120,27 @@ class DashboardController extends Controller
             foreach ($subAnswers as $key => $info) {
                 if (is_array($info) && isset($info['amount']) && is_numeric($info['amount']) && (float) $info['amount'] > 0) {
                     $debtFreq[$key] = ($debtFreq[$key] ?? 0) + 1;
+                    $debtTotal += (float) $info['amount'];
                 } elseif (is_numeric($info) && (float) $info > 0) {
                     $debtFreq[$key] = ($debtFreq[$key] ?? 0) + 1;
+                    $debtTotal += (float) $info;
                 }
             }
         }
+        $debtAvg = $denominator > 0 ? (int) round($debtTotal / $denominator) : 0;
         arsort($debtFreq);
         $debtTop = [];
         foreach (array_slice($debtFreq, 0, 3, true) as $key => $count) {
             $debtTop[] = [
                 'label'   => $debtLabelMap[$key] ?? $key,
-                'count'   => $count,
                 'percent' => round($count / $denominator * 100, 1),
             ];
         }
 
         // ── 3. Savings card (Q9, question_id=10, single_select) ──────────────────
         $q9Id = Question::where('question_key', 'Q9')->value('id');
-        $savingsFreq = [];
+        $savingsFreq  = [];
+        $savingsTotal = 0.0;
         if ($q9Id) {
             $savingsChoices = Choice::where('question_id', $q9Id)->orderBy('sort_order')->get()->keyBy('id');
 
@@ -1152,16 +1159,34 @@ class DashboardController extends Controller
                     $savingsFreq[$cid] = ($savingsFreq[$cid] ?? 0) + 1;
                 }
             }
+
+            // Compute average savings amount from detailed_answers Q9_savings
+            $savingsDetailRows = DetailedAnswer::whereIn('survey_response_id', $surveyResponseIds)
+                ->where('question_code', 'Q9_savings')
+                ->whereNotNull('sub_answers')
+                ->get(['survey_response_id', 'sub_answers']);
+
+            foreach ($savingsDetailRows as $row) {
+                $subAnswers = $row->sub_answers;
+                if (!is_array($subAnswers)) {
+                    continue;
+                }
+                foreach ($subAnswers as $value) {
+                    if (is_numeric($value) && (float) $value > 0) {
+                        $savingsTotal += (float) $value;
+                    }
+                }
+            }
         } else {
             $savingsChoices = collect();
         }
+        $savingsAvg = $denominator > 0 ? (int) round($savingsTotal / $denominator) : 0;
         arsort($savingsFreq);
         $savingsTop = [];
         foreach (array_slice($savingsFreq, 0, 3, true) as $cid => $count) {
             $choice = $savingsChoices->get($cid);
             $savingsTop[] = [
                 'label'   => $choice ? $choice->text_th : (string) $cid,
-                'count'   => $count,
                 'percent' => round($count / $denominator * 100, 1),
             ];
         }
@@ -1170,18 +1195,21 @@ class DashboardController extends Controller
             'expenses' => [
                 'title'       => 'รายจ่ายครัวเรือนปัจจุบัน',
                 'denominator' => $denominator,
+                'avg_amount'  => $expensesAvg,
                 'top'         => $expenseTop,
                 'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
             ],
             'debt'     => [
                 'title'       => 'หนี้สินปัจจุบัน',
                 'denominator' => $denominator,
+                'avg_amount'  => $debtAvg,
                 'top'         => $debtTop,
                 'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
             ],
             'savings'  => [
                 'title'       => 'การออมปัจจุบัน',
                 'denominator' => $denominator,
+                'avg_amount'  => $savingsAvg,
                 'top'         => $savingsTop,
                 'note'        => null,
             ],
