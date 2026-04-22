@@ -150,7 +150,7 @@
 
       <!-- ── Survey Insights ── -->
       <div v-if="store.data.overview_insights?.length" class="insights-section">
-        <h2 class="insights-section-title"><i class="fi fi-rr-bulb"></i> Survey Insights</h2>
+        <h2 class="insights-section-title"><i class="fi fi-rr-bulb"></i> Financial Literacy Insights</h2>
         <p class="insights-multiselect-note">เลือกได้หลายข้อ ผลรวมอาจเกิน 100%</p>
         <div class="insights-grid">
           <div v-for="ins in store.data.overview_insights" :key="ins.title" class="insight-card card">
@@ -158,7 +158,7 @@
               <i class="fi fi-rr-comment-alt insight-icon"></i>
               <span class="insight-title">{{ ins.title }}</span>
             </div>
-            <div v-if="ins.denominator > 0" class="insight-denom">จากผู้ตอบ {{ ins.denominator.toLocaleString() }} คน</div>
+            <div v-if="ins.denominator > 0" class="insight-denom">TOP 3: จากผู้ตอบ {{ ins.denominator.toLocaleString() }} คน</div>
             <ul v-if="ins.top?.length" class="insight-top-list">
               <li v-for="(item, idx) in ins.top" :key="idx" class="insight-top-item">
                 <span class="insight-rank">{{ idx + 1 }}</span>

@@ -889,7 +889,7 @@ class DashboardController extends Controller
     private function getOverviewInsights($responseQuery): array
     {
         $insightQuestions = [
-            ['id' => 4,  'title' => 'กิจกรรมด้านการเงิน'],
+            ['id' => 4,  'title' => 'การเข้าร่วมกิจกรรมด้านการเงินจากโครงการ'],
             ['id' => 8,  'title' => 'การนำความรู้ด้านการเงินไปใช้ในชีวิตประจำวัน'],
             ['id' => 19, 'title' => 'การดำเนินการเรื่องหนี้หลังเข้าร่วมโครงการ'],
             ['id' => 3,  'title' => 'การเปลี่ยนแปลงทักษะ/ความสามารถหลังเข้าร่วมโครงการ'],
