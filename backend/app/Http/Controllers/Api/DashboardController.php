@@ -153,7 +153,9 @@ class DashboardController extends Controller
             'by_district'                  => $byDistrict,
             'by_model'                     => $byModel,
             'income_baseline_avg'          => $incomeAverages['baseline_avg'],
+            'income_baseline_sum'          => $incomeAverages['baseline_sum'],
             'income_survey_avg'            => $incomeAverages['survey_avg'],
+            'income_survey_sum'            => $incomeAverages['survey_sum'],
             'income_baseline_count'        => $incomeAverages['baseline_count'],
             'income_survey_count'          => $incomeAverages['survey_count'],
             'income_by_model'              => $incomeByModel,
@@ -177,35 +179,38 @@ class DashboardController extends Controller
     }
 
     /**
-     * Compute average baseline income (from Person) and average survey income
+     * Compute average and sum baseline income (from Person) and average/sum survey income
      * (from Answer question_key Q4 or 04) for the filtered response set.
      * Also returns counts of records with valid income data.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query  Filtered SurveyResponse query
-     * @return array{baseline_avg: float|null, survey_avg: float|null, baseline_count: int, survey_count: int}
+     * @return array{baseline_avg: float|null, baseline_sum: float|null, survey_avg: float|null, survey_sum: float|null, baseline_count: int, survey_count: int}
      */
     private function getIncomeAverages($query): array
     {
-        // Baseline income: average + count from persons.baseline_income_monthly
+        // Baseline income: average + sum + count from persons.baseline_income_monthly
         $personIds = (clone $query)->whereNotNull('person_id')->pluck('person_id');
 
         $baselineAvg   = null;
+        $baselineSum   = null;
         $baselineCount = 0;
         if ($personIds->isNotEmpty()) {
             $row = Person::whereIn('id', $personIds)
                 ->whereNotNull('baseline_income_monthly')
-                ->selectRaw('AVG(baseline_income_monthly) AS avg_val, COUNT(*) AS cnt')
+                ->selectRaw('AVG(baseline_income_monthly) AS avg_val, SUM(baseline_income_monthly) AS sum_val, COUNT(*) AS cnt')
                 ->first();
             if ($row) {
                 $baselineAvg   = $row->avg_val !== null ? (float) $row->avg_val : null;
+                $baselineSum   = $row->sum_val !== null ? (float) $row->sum_val : null;
                 $baselineCount = (int) $row->cnt;
             }
         }
 
-        // Survey income: average + count from answers.value_numeric for question_key Q4/04
+        // Survey income: average + sum + count from answers.value_numeric for question_key Q4/04
         $surveyResponseIds = (clone $query)->pluck('id');
 
         $surveyAvg   = null;
+        $surveySum   = null;
         $surveyCount = 0;
         if ($surveyResponseIds->isNotEmpty()) {
             $questionIds = Question::whereIn('question_key', ['Q4', '04'])->pluck('id');
@@ -213,10 +218,11 @@ class DashboardController extends Controller
                 $row = Answer::whereIn('survey_response_id', $surveyResponseIds)
                     ->whereNotNull('value_numeric')
                     ->whereIn('question_id', $questionIds)
-                    ->selectRaw('AVG(value_numeric) AS avg_val, COUNT(*) AS cnt')
+                    ->selectRaw('AVG(value_numeric) AS avg_val, SUM(value_numeric) AS sum_val, COUNT(*) AS cnt')
                     ->first();
                 if ($row) {
                     $surveyAvg   = $row->avg_val !== null ? (float) $row->avg_val : null;
+                    $surveySum   = $row->sum_val !== null ? (float) $row->sum_val : null;
                     $surveyCount = (int) $row->cnt;
                 }
             }
@@ -224,7 +230,9 @@ class DashboardController extends Controller
 
         return [
             'baseline_avg'   => $baselineAvg   !== null ? round($baselineAvg, 2) : null,
+            'baseline_sum'   => $baselineSum    !== null ? round($baselineSum,  2) : null,
             'survey_avg'     => $surveyAvg      !== null ? round($surveyAvg,   2) : null,
+            'survey_sum'     => $surveySum      !== null ? round($surveySum,   2) : null,
             'baseline_count' => $baselineCount,
             'survey_count'   => $surveyCount,
         ];
