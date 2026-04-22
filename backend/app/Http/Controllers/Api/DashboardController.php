@@ -160,6 +160,9 @@ class DashboardController extends Controller
             'income_survey_sum'            => $incomeAverages['survey_sum'],
             'income_baseline_count'        => $incomeAverages['baseline_count'],
             'income_survey_count'          => $incomeAverages['survey_count'],
+            'income_household_members'     => $incomeAverages['household_members'],
+            'income_diff_sum'              => $incomeAverages['diff_sum'],
+            'income_diff_avg'              => $incomeAverages['diff_avg'],
             'income_by_model'              => $incomeByModel,
             'overview_insights'            => $overviewInsights,
             'financial_summary_cards'      => $financialSummaryCards,
@@ -186,12 +189,15 @@ class DashboardController extends Controller
      * Also returns counts of records with valid income data.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query  Filtered SurveyResponse query
-     * @return array{baseline_avg: float|null, baseline_sum: float|null, survey_avg: float|null, survey_sum: float|null, baseline_count: int, survey_count: int}
+     * @return array{baseline_avg: float|null, baseline_sum: float|null, survey_avg: float|null, survey_sum: float|null, baseline_count: int, survey_count: int, household_members: int, diff_sum: int|null, diff_avg: int|null}
      */
     private function getIncomeAverages($query): array
     {
         // Baseline income: average + sum + count from persons.baseline_income_monthly
         $personIds = (clone $query)->whereNotNull('person_id')->pluck('person_id');
+
+        // Total household members in scope (all persons linked to survey responses)
+        $householdMembers = $personIds->unique()->count();
 
         $baselineAvg   = null;
         $baselineSum   = null;
@@ -230,13 +236,24 @@ class DashboardController extends Controller
             }
         }
 
+        // Difference computed from totals (integers), not averages
+        $diffSum = ($baselineSum !== null && $surveySum !== null)
+            ? (int) round($surveySum - $baselineSum)
+            : null;
+        $diffAvg = ($diffSum !== null && $householdMembers > 0)
+            ? (int) round($diffSum / $householdMembers)
+            : null;
+
         return [
-            'baseline_avg'   => $baselineAvg   !== null ? round($baselineAvg, 2) : null,
-            'baseline_sum'   => $baselineSum    !== null ? round($baselineSum,  2) : null,
-            'survey_avg'     => $surveyAvg      !== null ? round($surveyAvg,   2) : null,
-            'survey_sum'     => $surveySum      !== null ? round($surveySum,   2) : null,
-            'baseline_count' => $baselineCount,
-            'survey_count'   => $surveyCount,
+            'baseline_avg'      => $baselineAvg   !== null ? round($baselineAvg, 2) : null,
+            'baseline_sum'      => $baselineSum    !== null ? round($baselineSum,  2) : null,
+            'survey_avg'        => $surveyAvg      !== null ? round($surveyAvg,   2) : null,
+            'survey_sum'        => $surveySum      !== null ? round($surveySum,   2) : null,
+            'baseline_count'    => $baselineCount,
+            'survey_count'      => $surveyCount,
+            'household_members' => $householdMembers,
+            'diff_sum'          => $diffSum,
+            'diff_avg'          => $diffAvg,
         ];
     }
 
