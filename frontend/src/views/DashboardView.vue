@@ -307,8 +307,11 @@
                 <template v-if="incomeDiff !== null">{{ incomeDiff >= 0 ? '+' : '' }}{{ money(incomeDiff) }}</template>
                 <template v-else>—</template>
               </div>
-              <div class="income-card-sub">บาท/เดือน</div>
-              <div class="income-card-count" :style="{ color: (incomeDiff ?? 0) >= 0 ? '#22c55e' : '#ef4444' }">{{ incomeDiffPctLabel }}</div>
+              <div class="income-card-sub">บาท/เดือน (รวม)</div>
+              <div class="income-card-count" :style="{ color: (incomeDiff ?? 0) >= 0 ? '#22c55e' : '#ef4444' }">
+                <template v-if="incomeDiffAvg !== null">เฉลี่ย {{ incomeDiffAvg >= 0 ? '+' : '' }}{{ money(incomeDiffAvg) }} บาท/คน</template>
+                <template v-else>—</template>
+              </div>
             </div>
           </div>
         </div>
@@ -797,8 +800,11 @@
                   <template v-if="incomeDiff !== null">{{ incomeDiff >= 0 ? '+' : '' }}{{ money(incomeDiff) }}</template>
                   <template v-else>—</template>
                 </div>
-                <div class="income-card-sub">บาท/เดือน</div>
-                <div class="income-card-count" :style="{ color: (incomeDiff ?? 0) >= 0 ? '#22c55e' : '#ef4444' }">{{ incomeDiffPctLabel }}</div>
+                <div class="income-card-sub">บาท/เดือน (รวม)</div>
+                <div class="income-card-count" :style="{ color: (incomeDiff ?? 0) >= 0 ? '#22c55e' : '#ef4444' }">
+                  <template v-if="incomeDiffAvg !== null">เฉลี่ย {{ incomeDiffAvg >= 0 ? '+' : '' }}{{ money(incomeDiffAvg) }} บาท/คน</template>
+                  <template v-else>—</template>
+                </div>
               </div>
             </div>
           </div>
@@ -1165,18 +1171,17 @@ function money(val) {
 }
 
 const incomeDiff = computed(() => {
-  const b = Number(store.data?.income_baseline_avg)
-  const s = Number(store.data?.income_survey_avg)
-  if (!Number.isFinite(b) || !Number.isFinite(s)) return null
-  return s - b
+  const v = store.data?.income_diff_sum
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
 })
 
-const incomeDiffPctLabel = computed(() => {
-  const b = Number(store.data?.income_baseline_avg)
-  const d = incomeDiff.value
-  if (d === null || !b) return '—'
-  const pct = (d / b) * 100
-  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
+const incomeDiffAvg = computed(() => {
+  const v = store.data?.income_diff_avg
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
 })
 
 const incomeModelChart = computed(() => {
