@@ -319,18 +319,18 @@
             <div class="income-card-icon"><i class="fi fi-rr-wallet"></i></div>
             <div class="income-card-body">
               <div class="income-card-label">รายได้เดิม</div>
-              <div class="income-card-value">{{ money(store.data.income_baseline_avg) }}</div>
-              <div class="income-card-sub">บาท/เดือน (เฉลี่ย)</div>
-              <div class="income-card-count">จากการสำรวจ {{ (store.data.income_baseline_count || 0).toLocaleString() }} คน</div>
+              <div class="income-card-value">{{ store.data.income_baseline_sum != null ? money(store.data.income_baseline_sum) : '—' }}</div>
+              <div class="income-card-sub">บาท/เดือน (รวม)</div>
+              <div class="income-card-count">เฉลี่ย {{ store.data.income_baseline_avg != null ? money(store.data.income_baseline_avg) : '—' }} บาท/คน</div>
             </div>
           </div>
           <div class="card income-card">
             <div class="income-card-icon" style="color:#0ea5e9"><i class="fi fi-rr-chart-line-up"></i></div>
             <div class="income-card-body">
               <div class="income-card-label">รายได้จากการสำรวจ</div>
-              <div class="income-card-value" style="color:#0ea5e9">{{ money(store.data.income_survey_avg) }}</div>
-              <div class="income-card-sub">บาท/เดือน (เฉลี่ย)</div>
-              <div class="income-card-count">จากการสำรวจ {{ (store.data.income_survey_count || 0).toLocaleString() }} คน</div>
+              <div class="income-card-value" style="color:#0ea5e9">{{ store.data.income_survey_sum != null ? money(store.data.income_survey_sum) : '—' }}</div>
+              <div class="income-card-sub">บาท/เดือน (รวม)</div>
+              <div class="income-card-count">เฉลี่ย {{ store.data.income_survey_avg != null ? money(store.data.income_survey_avg) : '—' }} บาท/คน</div>
             </div>
           </div>
           <div class="card income-card income-card-diff">
@@ -353,57 +353,13 @@
         <div class="card income-chart-card">
           <h3 class="card-title"><i class="fi fi-rr-chart-line-up"></i> เปรียบเทียบรายได้ตามโมเดลแก้จน</h3>
           <div class="income-chart-scroll">
-            <svg v-if="incomeModelChart.hasData"
-              :viewBox="`0 0 ${incomeModelChart.svgW} ${incomeModelChart.svgH}`"
-              preserveAspectRatio="xMinYMin meet"
-              class="income-model-svg"
-              aria-label="Income by model chart">
-              <g v-for="(t, ti) in incomeModelChart.ticks" :key="'yt-' + ti">
-                <line :x1="incomeModelChart.padL" :y1="t.y.toFixed(1)"
-                  :x2="incomeModelChart.svgW - incomeModelChart.padR" :y2="t.y.toFixed(1)"
-                  stroke="#e2e8f0" stroke-width="1"/>
-                <text :x="incomeModelChart.padL - 6" :y="(t.y + 4).toFixed(1)"
-                  text-anchor="end" font-size="10" fill="#94a3b8" font-family="Prompt, sans-serif">{{ t.label }}</text>
-              </g>
-              <line :x1="incomeModelChart.padL" :y1="incomeModelChart.baseY"
-                :x2="incomeModelChart.svgW - incomeModelChart.padR" :y2="incomeModelChart.baseY"
-                stroke="#cbd5e1" stroke-width="1.5"/>
-              <path :d="incomeModelChart.baselinePath" fill="none" stroke="#64748b" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 4"/>
-              <path :d="incomeModelChart.surveyPath" fill="none" stroke="#0ea5e9" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round"/>
-              <g v-for="(p, pi) in incomeModelChart.pts" :key="'dots-' + pi">
-                <g class="income-dot">
-                  <title>{{ p.baseFull }}</title>
-                  <circle :cx="p.x.toFixed(1)" :cy="p.yBase.toFixed(1)" r="6" fill="#fff" stroke="#64748b" stroke-width="2"/>
-                </g>
-                <g class="income-dot">
-                  <title>{{ p.survFull }}</title>
-                  <circle :cx="p.x.toFixed(1)" :cy="p.ySurv.toFixed(1)" r="6" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
-                </g>
-                <text :x="p.x.toFixed(1)" :y="p.baseLabelY.toFixed(1)"
-                  text-anchor="middle" font-size="9" font-weight="700" fill="#64748b" font-family="Prompt, sans-serif">{{ p.baseLabel }}</text>
-                <text :x="p.x.toFixed(1)" :y="p.survLabelY.toFixed(1)"
-                  text-anchor="middle" font-size="9" font-weight="700" fill="#0284c7" font-family="Prompt, sans-serif">{{ p.survLabel }}</text>
-              </g>
-              <text v-for="(p, pi) in incomeModelChart.pts" :key="'xl-' + pi"
-                :x="p.x.toFixed(1)" :y="(incomeModelChart.baseY + 14).toFixed(1)"
-                text-anchor="end" font-size="9" fill="#475569" font-family="Prompt, sans-serif"
-                :transform="`rotate(-40, ${p.x.toFixed(1)}, ${(incomeModelChart.baseY + 14).toFixed(1)})`">
-                {{ p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name }}
-              </text>
-              <!-- Legend top center -->
-              <line :x1="incomeModelChart.legendX.toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 18).toFixed(1)" y2="20"
-                stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 4"/>
-              <circle :cx="(incomeModelChart.legendX + 9).toFixed(1)" cy="20" r="4" fill="#fff" stroke="#64748b" stroke-width="2"/>
-              <text :x="(incomeModelChart.legendX + 24).toFixed(1)" y="24"
-                font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้เดิม</text>
-              <line :x1="(incomeModelChart.legendX + 99).toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 117).toFixed(1)" y2="20"
-                stroke="#0ea5e9" stroke-width="2.5"/>
-              <circle :cx="(incomeModelChart.legendX + 108).toFixed(1)" cy="20" r="4" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
-              <text :x="(incomeModelChart.legendX + 123).toFixed(1)" y="24"
-                font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้สำรวจ</text>
-            </svg>
+            <VueApexCharts
+              v-if="incomeModelChart.hasData"
+              type="area"
+              height="280"
+              :options="incomeModelChart.chartOptions"
+              :series="incomeModelChart.series"
+            />
             <p v-else class="text-muted text-sm" style="padding:1rem 0">ยังไม่มีข้อมูลรายได้ตามโมเดล</p>
           </div>
         </div>
@@ -991,18 +947,18 @@
               <div class="income-card-icon"><i class="fi fi-rr-wallet"></i></div>
               <div class="income-card-body">
                 <div class="income-card-label">รายได้เดิม</div>
-                <div class="income-card-value">{{ money(store.data.income_baseline_avg) }}</div>
-                <div class="income-card-sub">บาท/เดือน (เฉลี่ย)</div>
-                <div class="income-card-count">จากการสำรวจ {{ (store.data.income_baseline_count || 0).toLocaleString() }} คน</div>
+                <div class="income-card-value">{{ store.data.income_baseline_sum != null ? money(store.data.income_baseline_sum) : '—' }}</div>
+                <div class="income-card-sub">บาท/เดือน (รวม)</div>
+                <div class="income-card-count">เฉลี่ย {{ store.data.income_baseline_avg != null ? money(store.data.income_baseline_avg) : '—' }} บาท/คน</div>
               </div>
             </div>
             <div class="card income-card">
               <div class="income-card-icon" style="color:#0ea5e9"><i class="fi fi-rr-chart-line-up"></i></div>
               <div class="income-card-body">
                 <div class="income-card-label">รายได้จากการสำรวจ</div>
-                <div class="income-card-value" style="color:#0ea5e9">{{ money(store.data.income_survey_avg) }}</div>
-                <div class="income-card-sub">บาท/เดือน (เฉลี่ย)</div>
-                <div class="income-card-count">จากการสำรวจ {{ (store.data.income_survey_count || 0).toLocaleString() }} คน</div>
+                <div class="income-card-value" style="color:#0ea5e9">{{ store.data.income_survey_sum != null ? money(store.data.income_survey_sum) : '—' }}</div>
+                <div class="income-card-sub">บาท/เดือน (รวม)</div>
+                <div class="income-card-count">เฉลี่ย {{ store.data.income_survey_avg != null ? money(store.data.income_survey_avg) : '—' }} บาท/คน</div>
               </div>
             </div>
             <div class="card income-card income-card-diff">
@@ -1023,57 +979,13 @@
           <div class="card income-chart-card">
             <h3 class="card-title"><i class="fi fi-rr-chart-line-up"></i> เปรียบเทียบรายได้ตามโมเดลแก้จน</h3>
             <div class="income-chart-scroll">
-              <svg v-if="incomeModelChart.hasData"
-                :viewBox="`0 0 ${incomeModelChart.svgW} ${incomeModelChart.svgH}`"
-                preserveAspectRatio="xMinYMin meet"
-                class="income-model-svg"
-                aria-label="Income by model chart">
-                <g v-for="(t, ti) in incomeModelChart.ticks" :key="'cyt-' + ti">
-                  <line :x1="incomeModelChart.padL" :y1="t.y.toFixed(1)"
-                    :x2="incomeModelChart.svgW - incomeModelChart.padR" :y2="t.y.toFixed(1)"
-                    stroke="#e2e8f0" stroke-width="1"/>
-                  <text :x="incomeModelChart.padL - 6" :y="(t.y + 4).toFixed(1)"
-                    text-anchor="end" font-size="10" fill="#94a3b8" font-family="Prompt, sans-serif">{{ t.label }}</text>
-                </g>
-                <line :x1="incomeModelChart.padL" :y1="incomeModelChart.baseY"
-                  :x2="incomeModelChart.svgW - incomeModelChart.padR" :y2="incomeModelChart.baseY"
-                  stroke="#cbd5e1" stroke-width="1.5"/>
-                <path :d="incomeModelChart.baselinePath" fill="none" stroke="#64748b" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 4"/>
-                <path :d="incomeModelChart.surveyPath" fill="none" stroke="#0ea5e9" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round"/>
-                <g v-for="(p, pi) in incomeModelChart.pts" :key="'cdots-' + pi">
-                  <g class="income-dot">
-                    <title>{{ p.baseFull }}</title>
-                    <circle :cx="p.x.toFixed(1)" :cy="p.yBase.toFixed(1)" r="6" fill="#fff" stroke="#64748b" stroke-width="2"/>
-                  </g>
-                  <g class="income-dot">
-                    <title>{{ p.survFull }}</title>
-                    <circle :cx="p.x.toFixed(1)" :cy="p.ySurv.toFixed(1)" r="6" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
-                  </g>
-                  <text :x="p.x.toFixed(1)" :y="p.baseLabelY.toFixed(1)"
-                    text-anchor="middle" font-size="9" font-weight="700" fill="#64748b" font-family="Prompt, sans-serif">{{ p.baseLabel }}</text>
-                  <text :x="p.x.toFixed(1)" :y="p.survLabelY.toFixed(1)"
-                    text-anchor="middle" font-size="9" font-weight="700" fill="#0284c7" font-family="Prompt, sans-serif">{{ p.survLabel }}</text>
-                </g>
-                <text v-for="(p, pi) in incomeModelChart.pts" :key="'cxl-' + pi"
-                  :x="p.x.toFixed(1)" :y="(incomeModelChart.baseY + 14).toFixed(1)"
-                  text-anchor="end" font-size="9" fill="#475569" font-family="Prompt, sans-serif"
-                  :transform="`rotate(-40, ${p.x.toFixed(1)}, ${(incomeModelChart.baseY + 14).toFixed(1)})`">
-                  {{ p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name }}
-                </text>
-                <!-- Legend top center -->
-                <line :x1="incomeModelChart.legendX.toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 18).toFixed(1)" y2="20"
-                  stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 4"/>
-                <circle :cx="(incomeModelChart.legendX + 9).toFixed(1)" cy="20" r="4" fill="#fff" stroke="#64748b" stroke-width="2"/>
-                <text :x="(incomeModelChart.legendX + 24).toFixed(1)" y="24"
-                  font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้เดิม</text>
-                <line :x1="(incomeModelChart.legendX + 99).toFixed(1)" y1="20" :x2="(incomeModelChart.legendX + 117).toFixed(1)" y2="20"
-                  stroke="#0ea5e9" stroke-width="2.5"/>
-                <circle :cx="(incomeModelChart.legendX + 108).toFixed(1)" cy="20" r="4" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
-                <text :x="(incomeModelChart.legendX + 123).toFixed(1)" y="24"
-                  font-size="10" fill="#475569" font-family="Prompt, sans-serif">รายได้สำรวจ</text>
-              </svg>
+              <VueApexCharts
+                v-if="incomeModelChart.hasData"
+                type="area"
+                height="280"
+                :options="incomeModelChart.chartOptions"
+                :series="incomeModelChart.series"
+              />
               <p v-else class="text-muted text-sm" style="padding:1rem 0">ยังไม่มีข้อมูลรายได้ตามโมเดล</p>
             </div>
           </div>
@@ -1160,6 +1072,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDashboardStore } from '../../stores/dashboard'
 import { useAuthStore } from '../../stores/auth'
+import VueApexCharts from 'vue3-apexcharts'
 
 const store = useDashboardStore()
 const auth = useAuthStore()
@@ -1446,74 +1359,68 @@ const incomeDiffPctLabel = computed(() => {
 
 const incomeModelChart = computed(() => {
   const models = store.data?.income_by_model || []
-  const padL = 70, padR = 20, padT = 52, padB = 70
-  const colW = models.length > 1 ? Math.max(80, Math.min(130, 900 / models.length)) : 160
-  const svgW = Math.max(padL + padR + colW * Math.max(models.length, 1), 420)
-  const svgH = 244
-  const chartW = svgW - padL - padR
-  const chartH = svgH - padT - padB
-  const baseY = svgH - padB
 
-  const allVals = models.flatMap(m => [m.baseline_avg || 0, m.survey_avg || 0])
-  const rawMax = Math.max(...allVals, 1)
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawMax)))
-  const yMax = Math.ceil(rawMax / magnitude) * magnitude || 1
+  const categories = models.map(m => m.model_name)
+  const baselineData = models.map(m => m.baseline_avg ?? 0)
+  const surveyData = models.map(m => m.survey_avg ?? 0)
 
-  const xOf = (i) => models.length <= 1
-    ? padL + chartW / 2
-    : padL + (i / (models.length - 1)) * chartW
-  const yOf = (val) => baseY - ((val || 0) / yMax) * chartH
+  const series = [
+    { name: 'รายได้เดิม', data: baselineData },
+    { name: 'รายได้สำรวจ', data: surveyData },
+  ]
 
-  const fmtVal = (v) => {
-    if (!v) return '0'
-    if (v >= 1000) return `${(v / 1000).toFixed(1)}k`
-    return String(Math.round(v))
+  const chartOptions = {
+    chart: {
+      height: 280,
+      type: 'area',
+      toolbar: { show: false },
+      fontFamily: 'Prompt, sans-serif',
+    },
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 2.5 },
+    colors: ['#64748b', '#0ea5e9'],
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.35,
+        opacityTo: 0.05,
+        stops: [0, 100],
+      },
+    },
+    xaxis: {
+      categories,
+      labels: {
+        rotate: -30,
+        style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' },
+      },
+    },
+    yaxis: {
+      labels: {
+        formatter: (v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(Math.round(v)),
+        style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#94a3b8' },
+      },
+    },
+    legend: {
+      position: 'top',
+      horizontalAlign: 'center',
+      fontFamily: 'Prompt, sans-serif',
+      fontSize: '12px',
+    },
+    grid: {
+      borderColor: '#e2e8f0',
+      strokeDashArray: 3,
+    },
+    tooltip: {
+      y: {
+        formatter: (v) => `${(v || 0).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท/เดือน`,
+      },
+    },
   }
 
-  const pts = models.map((m, i) => {
-    const x = xOf(i)
-    const yBase = yOf(m.baseline_avg)
-    const ySurv = yOf(m.survey_avg)
-    const gap = yBase - ySurv
-    // Label collision avoidance: when the two lines are close, offset labels to different sides
-    const MIN_LABEL_GAP = 26    // px gap threshold before labels are considered "close"
-    const LABEL_OFFSET_FAR = 14 // default offset above a dot
-    const LABEL_OFFSET_CLOSE = 8   // tight offset used for the lower label when lines are close
-    const LABEL_OFFSET_STACKED = 22 // larger offset used for the upper label when lines are close
-    return {
-      x, yBase, ySurv,
-      name: m.model_name,
-      baseLabel: fmtVal(m.baseline_avg),
-      survLabel: fmtVal(m.survey_avg),
-      baseFull: `รายได้เดิม: ${(m.baseline_avg || 0).toLocaleString()} บาท/เดือน`,
-      survFull: `รายได้สำรวจ: ${(m.survey_avg || 0).toLocaleString()} บาท/เดือน`,
-      baseLabelY: gap > 0 && gap < MIN_LABEL_GAP ? yBase - LABEL_OFFSET_CLOSE : yBase - LABEL_OFFSET_FAR,
-      survLabelY: gap > 0 && gap < MIN_LABEL_GAP ? ySurv - LABEL_OFFSET_STACKED : (gap <= 0 && gap > -MIN_LABEL_GAP ? ySurv - LABEL_OFFSET_CLOSE : ySurv - LABEL_OFFSET_FAR),
-    }
-  })
-
-  const baselinePath = pts.length
-    ? `M ${pts.map(p => `${p.x.toFixed(1)},${p.yBase.toFixed(1)}`).join(' L ')}`
-    : ''
-  const surveyPath = pts.length
-    ? `M ${pts.map(p => `${p.x.toFixed(1)},${p.ySurv.toFixed(1)}`).join(' L ')}`
-    : ''
-
-  const tickCount = 5
-  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => {
-    const val = (i / tickCount) * yMax
-    return {
-      y: yOf(val),
-      label: val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toFixed(0),
-    }
-  })
-
-  const legendX = svgW / 2 - 99
-
   return {
-    pts, baselinePath, surveyPath, ticks,
-    svgW, svgH, baseY, chartH, padL, padR, padB,
-    legendX,
+    series,
+    chartOptions,
     hasData: models.length > 0,
   }
 })
