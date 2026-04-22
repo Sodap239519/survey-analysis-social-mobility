@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Answer;
+use App\Models\DetailedAnswer;
 use App\Models\ExportLog;
 use App\Models\Household;
 use App\Models\ImportLog;
 use App\Models\Person;
+use App\Models\Question;
 use App\Models\SurveyResponse;
 use App\Services\CompareHouseholdSurveyLogic;
 use App\Services\ScoringService;
@@ -283,10 +286,121 @@ class ExportController extends Controller
             'avg_score'              => 'คะแนนเฉลี่ย',
             'poverty_level'          => 'ระดับ (1-4)',
             'poverty_label'          => 'ระดับความเป็นอยู่',
+
+            // 🆕 ข้อมูลการเงินส่วนบุคคล
+            'income_baseline'        => 'รายได้เดิม',
+            'income_survey'          => 'รายได้จากการสำรวจ',
+            'expense_total'          => 'รายจ่าย',
+            'debt_total'             => 'หนี้สิน',
+            'savings_total'          => 'เงินออม',
         ]);
 
         $scoring = new ScoringService();
-        $rows = $query->orderBy('id')->get()->map(function ($r) use ($scoring) {
+
+        // ── Bulk-load financial data to avoid N+1 ──────────────────────────────
+
+        // Fetch all responses first so we can collect IDs
+        $responses = $query->orderBy('id')->get();
+        $responseIds = $responses->pluck('id');
+
+        // Baseline income: from persons.baseline_income_monthly (already eager-loaded via 'person')
+        // (accessed per response below)
+
+        // Survey income: from answers.value_numeric for question_key Q4/04
+        $surveyIncomeByResponseId = [];
+        $q4Ids = Question::whereIn('question_key', ['Q4', '04'])->pluck('id');
+        if ($q4Ids->isNotEmpty() && $responseIds->isNotEmpty()) {
+            Answer::whereIn('survey_response_id', $responseIds)
+                ->whereIn('question_id', $q4Ids)
+                ->whereNotNull('value_numeric')
+                ->get(['survey_response_id', 'value_numeric'])
+                ->each(function ($a) use (&$surveyIncomeByResponseId) {
+                    $surveyIncomeByResponseId[$a->survey_response_id] = (float) $a->value_numeric;
+                });
+        }
+
+        // Expenses: sum of Q8 value_text JSON amounts > 0 per response
+        $expenseByResponseId = [];
+        $q8Id = Question::where('question_key', 'Q8')->value('id');
+        if ($q8Id && $responseIds->isNotEmpty()) {
+            Answer::whereIn('survey_response_id', $responseIds)
+                ->where('question_id', $q8Id)
+                ->whereNotNull('value_text')
+                ->get(['survey_response_id', 'value_text'])
+                ->each(function ($a) use (&$expenseByResponseId) {
+                    $decoded = json_decode($a->value_text, true);
+                    if (!is_array($decoded)) {
+                        return;
+                    }
+                    $sum = 0.0;
+                    foreach ($decoded as $value) {
+                        if (is_numeric($value) && (float) $value > 0) {
+                            $sum += (float) $value;
+                        }
+                    }
+                    if ($sum > 0) {
+                        $expenseByResponseId[$a->survey_response_id] = $sum;
+                    }
+                });
+        }
+
+        // Debt: sum of Q10_debt sub_answers amounts > 0 per response
+        $debtByResponseId = [];
+        if ($responseIds->isNotEmpty()) {
+            DetailedAnswer::whereIn('survey_response_id', $responseIds)
+                ->where('question_code', 'Q10_debt')
+                ->whereNotNull('sub_answers')
+                ->get(['survey_response_id', 'sub_answers'])
+                ->each(function ($da) use (&$debtByResponseId) {
+                    $subAnswers = $da->sub_answers;
+                    if (!is_array($subAnswers)) {
+                        return;
+                    }
+                    $sum = 0.0;
+                    foreach ($subAnswers as $info) {
+                        if (is_array($info) && isset($info['amount']) && is_numeric($info['amount']) && (float) $info['amount'] > 0) {
+                            $sum += (float) $info['amount'];
+                        } elseif (is_numeric($info) && (float) $info > 0) {
+                            $sum += (float) $info;
+                        }
+                    }
+                    if ($sum > 0) {
+                        $debtByResponseId[$da->survey_response_id] = ($debtByResponseId[$da->survey_response_id] ?? 0.0) + $sum;
+                    }
+                });
+        }
+
+        // Savings: sum of Q9_savings sub_answers amounts > 0 per response
+        // Q9_savings sub_answers structure: key -> numeric amount (unlike Q10_debt which uses key -> {amount: ...})
+        // Added defensive array-with-amount handling for forward-compatibility
+        $savingsByResponseId = [];
+        if ($responseIds->isNotEmpty()) {
+            DetailedAnswer::whereIn('survey_response_id', $responseIds)
+                ->where('question_code', 'Q9_savings')
+                ->whereNotNull('sub_answers')
+                ->get(['survey_response_id', 'sub_answers'])
+                ->each(function ($da) use (&$savingsByResponseId) {
+                    $subAnswers = $da->sub_answers;
+                    if (!is_array($subAnswers)) {
+                        return;
+                    }
+                    $sum = 0.0;
+                    foreach ($subAnswers as $value) {
+                        if (is_array($value) && isset($value['amount']) && is_numeric($value['amount']) && (float) $value['amount'] > 0) {
+                            $sum += (float) $value['amount'];
+                        } elseif (is_numeric($value) && (float) $value > 0) {
+                            $sum += (float) $value;
+                        }
+                    }
+                    if ($sum > 0) {
+                        $savingsByResponseId[$da->survey_response_id] = ($savingsByResponseId[$da->survey_response_id] ?? 0.0) + $sum;
+                    }
+                });
+        }
+
+        // ── Build rows ─────────────────────────────────────────────────────────
+
+        $rows = $responses->map(function ($r) use ($scoring, $surveyIncomeByResponseId, $expenseByResponseId, $debtByResponseId, $savingsByResponseId) {
             $h = $r->household;
             $p = $r->person;
             
@@ -298,6 +412,13 @@ class ExportController extends Controller
             $socialData = $this->calculateCapitalData($r->score_social, $h?->baseline_score_social);
             
             $avgScore = ($r->score_human + $r->score_physical + $r->score_financial + $r->score_natural + $r->score_social) / 5;
+
+            // 🆕 ข้อมูลการเงินส่วนบุคคล
+            $incomeBaseline = $p?->baseline_income_monthly !== null ? (float) $p->baseline_income_monthly : '';
+            $incomeSurvey   = isset($surveyIncomeByResponseId[$r->id]) ? $surveyIncomeByResponseId[$r->id] : '';
+            $expenseTotal   = isset($expenseByResponseId[$r->id])      ? (int) round($expenseByResponseId[$r->id])  : '';
+            $debtTotal      = isset($debtByResponseId[$r->id])         ? (int) round($debtByResponseId[$r->id])     : '';
+            $savingsTotal   = isset($savingsByResponseId[$r->id])      ? (int) round($savingsByResponseId[$r->id])  : '';
             
             return [
                 'house_code'         => $h?->house_code,
@@ -353,6 +474,13 @@ class ExportController extends Controller
                 'avg_score'          => round($avgScore, 2),
                 'poverty_level'      => $r->poverty_level,
                 'poverty_label'      => $r->poverty_level ? $scoring->getPovertyLevelLabel((int) $r->poverty_level) : '',
+
+                // 🆕 ข้อมูลการเงินส่วนบุคคล
+                'income_baseline'    => $incomeBaseline,
+                'income_survey'      => $incomeSurvey,
+                'expense_total'      => $expenseTotal,
+                'debt_total'         => $debtTotal,
+                'savings_total'      => $savingsTotal,
             ];
         })->toArray();
 
