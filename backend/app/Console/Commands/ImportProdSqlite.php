@@ -88,15 +88,21 @@ class ImportProdSqlite extends Command
             return self::SUCCESS;
         }
 
-        // Disable FK checks on MySQL destination so we can insert in any order.
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        // Disable FK checks on MySQL/MariaDB so we can insert in any order.
+        $driver = DB::getDriverName();
+        $mysqlFamily = in_array($driver, ['mysql', 'mariadb'], true);
+        if ($mysqlFamily) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        }
 
         try {
             foreach ($tables as $table) {
                 $this->importTable($table, $truncate, $chunk);
             }
         } finally {
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            if ($mysqlFamily) {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            }
         }
 
         $this->newLine();
@@ -142,7 +148,7 @@ class ImportProdSqlite extends Command
         $bar->start();
 
         $imported = 0;
-        $src->table($table)->orderBy('id')->chunk($chunk, function ($rows) use ($table, $bar, &$imported) {
+        $src->table($table)->chunk($chunk, function ($rows) use ($table, $bar, &$imported) {
             $data = collect($rows)->map(fn ($row) => (array) $row)->toArray();
             DB::table($table)->insert($data);
             $imported += count($data);
