@@ -171,6 +171,140 @@
         </div>
       </div>
 
+      <!-- ── Financial Summary Cards (Expenses / Debt / Savings) ── -->
+      <div v-if="store.data.financial_summary_cards" class="fin-cards-section">
+        <h2 class="insights-section-title"><i class="fi fi-rr-coins"></i> สรุปการเงินครัวเรือน</h2>
+        <div class="fin-cards-row">
+          <!-- Expenses Card -->
+          <div class="card fin-summary-card">
+            <div class="fin-card-header">
+              <i class="fi fi-rr-shopping-cart fin-card-icon" style="color:#f97316"></i>
+              <span class="fin-card-title">{{ store.data.financial_summary_cards.expenses?.title || 'รายจ่ายครัวเรือนปัจจุบัน' }}</span>
+            </div>
+            <div v-if="store.data.financial_summary_cards.expenses?.denominator > 0" class="fin-card-denom">
+              จากผู้ตอบ {{ (store.data.financial_summary_cards.expenses.denominator).toLocaleString() }} คน
+            </div>
+            <ul v-if="store.data.financial_summary_cards.expenses?.top?.length" class="insight-top-list">
+              <li v-for="(item, idx) in store.data.financial_summary_cards.expenses.top" :key="idx" class="insight-top-item">
+                <span class="insight-rank" style="background:rgba(249,115,22,0.15);color:#f97316">{{ idx + 1 }}</span>
+                <span class="insight-choice">{{ item.label }}</span>
+                <span class="insight-percent" style="color:#f97316">{{ item.percent.toFixed(1) }}%</span>
+              </li>
+            </ul>
+            <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
+            <p v-if="store.data.financial_summary_cards.expenses?.note" class="fin-card-note">{{ store.data.financial_summary_cards.expenses.note }}</p>
+          </div>
+          <!-- Debt Card -->
+          <div class="card fin-summary-card">
+            <div class="fin-card-header">
+              <i class="fi fi-rr-hand-holding-usd fin-card-icon" style="color:#ef4444"></i>
+              <span class="fin-card-title">{{ store.data.financial_summary_cards.debt?.title || 'หนี้สินปัจจุบัน' }}</span>
+            </div>
+            <div v-if="store.data.financial_summary_cards.debt?.denominator > 0" class="fin-card-denom">
+              จากผู้ตอบ {{ (store.data.financial_summary_cards.debt.denominator).toLocaleString() }} คน
+            </div>
+            <ul v-if="store.data.financial_summary_cards.debt?.top?.length" class="insight-top-list">
+              <li v-for="(item, idx) in store.data.financial_summary_cards.debt.top" :key="idx" class="insight-top-item">
+                <span class="insight-rank" style="background:rgba(239,68,68,0.15);color:#ef4444">{{ idx + 1 }}</span>
+                <span class="insight-choice">{{ item.label }}</span>
+                <span class="insight-percent" style="color:#ef4444">{{ item.percent.toFixed(1) }}%</span>
+              </li>
+            </ul>
+            <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
+            <p v-if="store.data.financial_summary_cards.debt?.note" class="fin-card-note">{{ store.data.financial_summary_cards.debt.note }}</p>
+          </div>
+          <!-- Savings Card -->
+          <div class="card fin-summary-card">
+            <div class="fin-card-header">
+              <i class="fi fi-rr-piggy-bank fin-card-icon" style="color:#22c55e"></i>
+              <span class="fin-card-title">{{ store.data.financial_summary_cards.savings?.title || 'การออมปัจจุบัน' }}</span>
+            </div>
+            <div v-if="store.data.financial_summary_cards.savings?.denominator > 0" class="fin-card-denom">
+              จากผู้ตอบ {{ (store.data.financial_summary_cards.savings.denominator).toLocaleString() }} คน
+            </div>
+            <ul v-if="store.data.financial_summary_cards.savings?.top?.length" class="insight-top-list">
+              <li v-for="(item, idx) in store.data.financial_summary_cards.savings.top" :key="idx" class="insight-top-item">
+                <span class="insight-rank" style="background:rgba(34,197,94,0.15);color:#22c55e">{{ idx + 1 }}</span>
+                <span class="insight-choice">{{ item.label }}</span>
+                <span class="insight-percent" style="color:#22c55e">{{ item.percent.toFixed(1) }}%</span>
+              </li>
+            </ul>
+            <div v-else class="insight-empty">ยังไม่มีข้อมูลเพียงพอ</div>
+            <p v-if="store.data.financial_summary_cards.savings?.note" class="fin-card-note">{{ store.data.financial_summary_cards.savings.note }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Financial Line Chart (income/expense/debt/savings by model) ── -->
+      <div v-if="store.data.financial_by_model" class="card fin-chart-card">
+        <div class="fin-chart-header">
+          <h3 class="card-title" style="margin-bottom:0"><i class="fi fi-rr-chart-line-up"></i> เปรียบเทียบการเงินตามโมเดลแก้จน (เฉลี่ยต่อครัวเรือน)</h3>
+          <div class="fin-chart-toggles">
+            <label class="fin-toggle-all">
+              <input type="checkbox" :checked="finSeriesAll" @change="toggleAllFinSeries" />
+              <span>ทั้งหมด</span>
+            </label>
+            <label v-for="s in finSeries" :key="s.key" class="fin-toggle-item">
+              <input type="checkbox" v-model="finSeriesVisible[s.key]" />
+              <span class="fin-toggle-dot" :style="{ background: s.color }"></span>
+              <span>{{ s.label }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="income-chart-scroll" style="margin-top:0.5rem">
+          <svg v-if="finModelChart.hasData"
+            :viewBox="`0 0 ${finModelChart.svgW} ${finModelChart.svgH}`"
+            :width="finModelChart.svgW" :height="finModelChart.svgH"
+            class="income-model-svg" aria-label="Financial comparison by model chart">
+            <!-- Grid lines -->
+            <g v-for="(t, ti) in finModelChart.ticks" :key="'fin-tick-' + ti">
+              <line :x1="finModelChart.padL" :y1="t.y.toFixed(1)"
+                :x2="finModelChart.svgW - finModelChart.padR" :y2="t.y.toFixed(1)"
+                stroke="#e2e8f0" stroke-width="1"/>
+              <text :x="finModelChart.padL - 6" :y="(t.y + 4).toFixed(1)"
+                text-anchor="end" font-size="10" fill="#94a3b8" font-family="Prompt, sans-serif">{{ t.label }}</text>
+            </g>
+            <line :x1="finModelChart.padL" :y1="finModelChart.baseY"
+              :x2="finModelChart.svgW - finModelChart.padR" :y2="finModelChart.baseY"
+              stroke="#cbd5e1" stroke-width="1.5"/>
+            <!-- Series lines -->
+            <g v-for="s in finSeries" :key="'fin-series-' + s.key">
+              <path v-if="finSeriesVisible[s.key] && finModelChart.paths[s.key]"
+                :d="finModelChart.paths[s.key]"
+                fill="none" :stroke="s.color" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round"
+                :stroke-dasharray="s.dash || 'none'"/>
+              <g v-if="finSeriesVisible[s.key]" v-for="(p, pi) in finModelChart.pts" :key="'fin-dot-' + pi">
+                <circle v-if="p[s.key] !== null"
+                  :cx="p.x.toFixed(1)" :cy="finModelChart.yOf(p[s.key]).toFixed(1)"
+                  r="5" :fill="s.color" stroke="#fff" stroke-width="2">
+                  <title>{{ s.label }}: {{ (p[s.key] || 0).toLocaleString() }} บาท/เดือน</title>
+                </circle>
+              </g>
+            </g>
+            <!-- X-axis labels -->
+            <text v-for="(p, pi) in finModelChart.pts" :key="'fin-xlabel-' + pi"
+              :x="p.x.toFixed(1)" :y="(finModelChart.baseY + 14).toFixed(1)"
+              text-anchor="end" font-size="9" fill="#475569" font-family="Prompt, sans-serif"
+              :transform="`rotate(-40, ${p.x.toFixed(1)}, ${(finModelChart.baseY + 14).toFixed(1)})`">
+              {{ p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name }}
+            </text>
+            <!-- Legend -->
+            <g v-for="(s, si) in finSeries.filter(s => finSeriesVisible[s.key])" :key="'fin-legend-' + si">
+              <line
+                :x1="(finModelChart.legendStartX + si * 115).toFixed(1)" y1="20"
+                :x2="(finModelChart.legendStartX + si * 115 + 18).toFixed(1)" y2="20"
+                :stroke="s.color" stroke-width="2.5" :stroke-dasharray="s.dash || 'none'"/>
+              <circle :cx="(finModelChart.legendStartX + si * 115 + 9).toFixed(1)" cy="20" r="4"
+                :fill="s.color" stroke="#fff" stroke-width="2"/>
+              <text :x="(finModelChart.legendStartX + si * 115 + 24).toFixed(1)" y="24"
+                font-size="10" fill="#475569" font-family="Prompt, sans-serif">{{ s.label }}</text>
+            </g>
+          </svg>
+          <p v-else class="text-muted text-sm" style="padding:1rem 0">ยังไม่มีข้อมูลตามโมเดล</p>
+        </div>
+      </div>
+
       <!-- ── Income comparison row ── -->
       <div class="income-row">
         <!-- LEFT: three income cards -->
@@ -1392,6 +1526,78 @@ function modelRowCapTotal(modelRow, capSlug) {
   return total
 }
 
+// ─── Financial Series Line Chart ─────────────────────────────────────────────
+const finSeries = [
+  { key: 'income_avg',  label: 'รายได้ปัจจุบัน',      color: '#0ea5e9', dash: '' },
+  { key: 'expense_avg', label: 'รายจ่ายครัวเรือน',    color: '#f97316', dash: '7 4' },
+  { key: 'debt_avg',    label: 'หนี้สิน',             color: '#ef4444', dash: '3 3' },
+  { key: 'savings_avg', label: 'การออม',              color: '#22c55e', dash: '' },
+]
+
+const finSeriesVisible = ref({ income_avg: true, expense_avg: true, debt_avg: true, savings_avg: true })
+
+const finSeriesAll = computed(() => finSeries.every(s => finSeriesVisible.value[s.key]))
+
+function toggleAllFinSeries(e) {
+  const v = e.target.checked
+  finSeries.forEach(s => { finSeriesVisible.value[s.key] = v })
+}
+
+const finModelChart = computed(() => {
+  const models = store.data?.financial_by_model || []
+  const padL = 70, padR = 20, padT = 52, padB = 70
+  const colW = models.length > 1 ? Math.max(80, Math.min(130, 900 / models.length)) : 160
+  const svgW = Math.max(padL + padR + colW * Math.max(models.length, 1), 420)
+  const svgH = 244
+  const chartH = svgH - padT - padB
+  const baseY = svgH - padB
+
+  const seriesKeys = finSeries.map(s => s.key)
+  const allVals = models.flatMap(m => seriesKeys.map(k => (m[k] != null ? m[k] : 0)))
+  const rawMax = Math.max(...allVals, 1)
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawMax)))
+  const yMax = Math.ceil(rawMax / magnitude) * magnitude || 1
+
+  const xOf = (i) => models.length <= 1
+    ? padL + (svgW - padL - padR) / 2
+    : padL + (i / (models.length - 1)) * (svgW - padL - padR)
+
+  const yOf = (val) => baseY - ((val || 0) / yMax) * chartH
+
+  const pts = models.map((m, i) => {
+    const obj = { x: xOf(i), name: m.model_name }
+    seriesKeys.forEach(k => { obj[k] = m[k] ?? null })
+    return obj
+  })
+
+  const paths = {}
+  seriesKeys.forEach(k => {
+    const validPts = pts.filter(p => p[k] !== null)
+    paths[k] = validPts.length
+      ? `M ${validPts.map(p => `${p.x.toFixed(1)},${yOf(p[k]).toFixed(1)}`).join(' L ')}`
+      : ''
+  })
+
+  const tickCount = 5
+  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => {
+    const val = (i / tickCount) * yMax
+    return {
+      y: yOf(val),
+      label: val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toFixed(0),
+    }
+  })
+
+  const visibleCount = finSeries.filter(s => finSeriesVisible.value[s.key]).length
+  const legendStartX = svgW / 2 - (visibleCount * 115) / 2
+
+  return {
+    pts, paths, ticks, yOf,
+    svgW, svgH, baseY, chartH, padL, padR, padB,
+    legendStartX,
+    hasData: models.length > 0,
+  }
+})
+
 async function load() {
   const params = {}
   if (filters.value.survey_year) params.survey_year = filters.value.survey_year
@@ -2083,5 +2289,88 @@ watch(() => route.fullPath, async () => {
   .capital-tab {
     justify-content: flex-start;
   }
+  .fin-cards-row { grid-template-columns: 1fr; }
+}
+
+/* ── Financial Summary Cards ── */
+.fin-cards-section {
+  margin-bottom: 1rem;
+}
+.fin-cards-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 768px) {
+  .fin-cards-row { grid-template-columns: 1fr; }
+}
+.fin-summary-card {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.fin-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fin-card-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.fin-card-title {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+.fin-card-denom {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.fin-card-note {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ── Financial Line Chart Card ── */
+.fin-chart-card {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.fin-chart-header {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.fin-chart-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  margin-left: auto;
+}
+.fin-toggle-all,
+.fin-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.775rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+.fin-toggle-dot {
+  display: inline-block;
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 </style>

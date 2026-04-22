@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Answer;
 use App\Models\Choice;
+use App\Models\DetailedAnswer;
 use App\Models\Household;
 use App\Models\Person;
 use App\Models\Question;
@@ -126,6 +127,12 @@ class DashboardController extends Controller
         // Overview insights: top multi-select choices for 4 key questions
         $overviewInsights = $this->getOverviewInsights(clone $responseQuery);
 
+        // Financial summary cards: expenses (Q8), debt (Q10), savings (Q9)
+        $financialSummaryCards = $this->getFinancialSummaryCards(clone $responseQuery);
+
+        // Financial averages by model: income, expenses, debt, savings
+        $financialByModel = $this->getFinancialByModel(clone $responseQuery);
+
         return response()->json([
             'total_house_codes'    => $totalHouseCodes,
             'total_models'         => $totalModels,
@@ -151,6 +158,8 @@ class DashboardController extends Controller
             'income_survey_count'          => $incomeAverages['survey_count'],
             'income_by_model'              => $incomeByModel,
             'overview_insights'            => $overviewInsights,
+            'financial_summary_cards'      => $financialSummaryCards,
+            'financial_by_model'           => $financialByModel,
         ]);
     }
 
@@ -982,6 +991,336 @@ class DashboardController extends Controller
                 'title'       => $q['title'],
                 'denominator' => $denominator,
                 'top'         => $top,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Expense category label mapping (Q8 keys → Thai labels).
+     * Keys match Q8_EXPENSE_ITEMS in the frontend form.
+     */
+    private static function expenseLabelMap(): array
+    {
+        return [
+            '10.1'  => 'ค่าใช้จ่ายเพื่อการบริโภค (อาหาร เครื่องดื่ม)',
+            '10.2'  => 'ค่าใช้จ่ายเพื่อการอุปโภค (ของใช้ในครัวเรือน เดินทาง พลังงาน)',
+            '10.3'  => 'ค่าน้ำ ไฟ โทรศัพท์ อินเทอร์เน็ต',
+            '10.4'  => 'ค่าใช้จ่ายเพื่อการศึกษา',
+            '10.5'  => 'ค่ารักษาพยาบาล',
+            '10.6'  => 'ค่าประกันภัยต่างๆ',
+            '10.7'  => 'ค่าใช้จ่ายด้านสังคม (งานบวช งานแต่ง งานศพ) ศาสนา บริจาค',
+            '10.8'  => 'ค่าใช้จ่ายเพื่อความบันเทิง ท่องเที่ยว',
+            '10.9'  => 'ค่าใช้จ่ายเสี่ยงโชค (ลอตเตอรี่ หวย)',
+            '10.10' => 'ค่าเครื่องดื่มแอลกอฮอล์ บุหรี่ ยาสูบ',
+            '10.11' => 'อื่นๆ',
+        ];
+    }
+
+    /**
+     * Debt type label mapping (Q10 keys → Thai labels).
+     * Keys match Q10_DEBT_SOURCES in the frontend form.
+     */
+    private static function debtLabelMap(): array
+    {
+        return [
+            '1.1'  => 'ญาติ/เพื่อน/เพื่อนบ้าน (ไม่มีค่าตอบแทนอื่น)',
+            '1.2'  => 'ญาติ/เพื่อน/เพื่อนบ้าน (ดอกเบี้ย < 15%/ปี)',
+            '1.3'  => 'กองทุนการเงินของชุมชน (สหกรณ์ กลุ่มออมทรัพย์)',
+            '1.4'  => 'กองทุนการเงินที่รัฐสนับสนุน (กองทุนหมู่บ้าน/กขคจ.)',
+            '1.5'  => 'ธนาคารเพื่อการเกษตรและสหกรณ์ (ธกส.)',
+            '1.6'  => 'ธนาคารออมสิน',
+            '1.7'  => 'ธนาคารพาณิชย์อื่นๆ',
+            '1.8'  => 'สถาบันการเงินเอกชน (ไฟแนนซ์ บัตรกดเงินสด)',
+            '1.9'  => 'ร้านค้าอุปโภค บริโภค ปัจจัยการผลิต',
+            '1.10' => 'เงินกู้นอกระบบ (ดอกเบี้ย > 15%/ปี)',
+            '1.11' => 'กองทุนเงินให้กู้ยืมเพื่อการศึกษา (กยศ./กอร.)',
+            '1.12' => 'แหล่งอื่นๆ',
+        ];
+    }
+
+    /**
+     * Compute financial summary cards for expenses (Q8), debt (Q10), and savings (Q9).
+     * Returns { expenses, debt, savings } each with { title, denominator, top, note }.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
+     */
+    private function getFinancialSummaryCards($responseQuery): array
+    {
+        $surveyResponseIds = (clone $responseQuery)->pluck('id');
+        $denominator       = $surveyResponseIds->count();
+
+        $emptyCard = fn (string $title) => [
+            'title'       => $title,
+            'denominator' => 0,
+            'top'         => [],
+            'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
+        ];
+
+        if ($denominator === 0) {
+            return [
+                'expenses' => $emptyCard('รายจ่ายครัวเรือนปัจจุบัน'),
+                'debt'     => $emptyCard('หนี้สินปัจจุบัน'),
+                'savings'  => $emptyCard('การออมปัจจุบัน'),
+            ];
+        }
+
+        // ── 1. Expenses card (Q8, question_id=9, value_text is JSON) ─────────────
+        $expenseLabelMap = self::expenseLabelMap();
+
+        $q8Id = Question::where('question_key', 'Q8')->value('id');
+        $expenseFreq = [];
+        if ($q8Id) {
+            $expenseAnswers = Answer::whereIn('survey_response_id', $surveyResponseIds)
+                ->where('question_id', $q8Id)
+                ->whereNotNull('value_text')
+                ->get(['survey_response_id', 'value_text']);
+
+            foreach ($expenseAnswers as $row) {
+                $decoded = json_decode($row->value_text, true);
+                if (!is_array($decoded)) {
+                    continue;
+                }
+                foreach ($decoded as $key => $value) {
+                    if (is_numeric($value) && (float) $value > 0) {
+                        $expenseFreq[$key] = ($expenseFreq[$key] ?? 0) + 1;
+                    }
+                }
+            }
+        }
+        arsort($expenseFreq);
+        $expenseTop = [];
+        foreach (array_slice($expenseFreq, 0, 3, true) as $key => $count) {
+            $expenseTop[] = [
+                'label'   => $expenseLabelMap[$key] ?? $key,
+                'count'   => $count,
+                'percent' => round($count / $denominator * 100, 1),
+            ];
+        }
+
+        // ── 2. Debt card (Q10, question_code='Q10_debt', sub_answers JSON) ────────
+        $debtLabelMap = self::debtLabelMap();
+        $debtFreq = [];
+
+        $debtRows = DetailedAnswer::whereIn('survey_response_id', $surveyResponseIds)
+            ->where('question_code', 'Q10_debt')
+            ->whereNotNull('sub_answers')
+            ->get(['survey_response_id', 'sub_answers']);
+
+        foreach ($debtRows as $row) {
+            $subAnswers = $row->sub_answers;
+            if (!is_array($subAnswers)) {
+                continue;
+            }
+            foreach ($subAnswers as $key => $info) {
+                if (is_array($info) && isset($info['amount']) && is_numeric($info['amount']) && (float) $info['amount'] > 0) {
+                    $debtFreq[$key] = ($debtFreq[$key] ?? 0) + 1;
+                } elseif (is_numeric($info) && (float) $info > 0) {
+                    $debtFreq[$key] = ($debtFreq[$key] ?? 0) + 1;
+                }
+            }
+        }
+        arsort($debtFreq);
+        $debtTop = [];
+        foreach (array_slice($debtFreq, 0, 3, true) as $key => $count) {
+            $debtTop[] = [
+                'label'   => $debtLabelMap[$key] ?? $key,
+                'count'   => $count,
+                'percent' => round($count / $denominator * 100, 1),
+            ];
+        }
+
+        // ── 3. Savings card (Q9, question_id=10, single_select) ──────────────────
+        $q9Id = Question::where('question_key', 'Q9')->value('id');
+        $savingsFreq = [];
+        if ($q9Id) {
+            $savingsChoices = Choice::where('question_id', $q9Id)->orderBy('sort_order')->get()->keyBy('id');
+
+            $savingsAnswers = Answer::whereIn('survey_response_id', $surveyResponseIds)
+                ->where('question_id', $q9Id)
+                ->whereNotNull('selected_choice_ids')
+                ->get(['survey_response_id', 'selected_choice_ids']);
+
+            foreach ($savingsAnswers as $row) {
+                $ids = $row->selected_choice_ids;
+                if (!is_array($ids)) {
+                    continue;
+                }
+                foreach ($ids as $cid) {
+                    $cid = (int) $cid;
+                    $savingsFreq[$cid] = ($savingsFreq[$cid] ?? 0) + 1;
+                }
+            }
+        } else {
+            $savingsChoices = collect();
+        }
+        arsort($savingsFreq);
+        $savingsTop = [];
+        foreach (array_slice($savingsFreq, 0, 3, true) as $cid => $count) {
+            $choice = $savingsChoices->get($cid);
+            $savingsTop[] = [
+                'label'   => $choice ? $choice->text_th : (string) $cid,
+                'count'   => $count,
+                'percent' => round($count / $denominator * 100, 1),
+            ];
+        }
+
+        return [
+            'expenses' => [
+                'title'       => 'รายจ่ายครัวเรือนปัจจุบัน',
+                'denominator' => $denominator,
+                'top'         => $expenseTop,
+                'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
+            ],
+            'debt'     => [
+                'title'       => 'หนี้สินปัจจุบัน',
+                'denominator' => $denominator,
+                'top'         => $debtTop,
+                'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
+            ],
+            'savings'  => [
+                'title'       => 'การออมปัจจุบัน',
+                'denominator' => $denominator,
+                'top'         => $savingsTop,
+                'note'        => null,
+            ],
+        ];
+    }
+
+    /**
+     * Compute financial averages per model: income, expenses, debt, savings.
+     * Returns array of { model_name, income_avg, expense_avg, debt_avg, savings_avg }.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
+     */
+    private function getFinancialByModel($responseQuery): array
+    {
+        $modelNames = (clone $responseQuery)
+            ->whereNotNull('model_name')
+            ->distinct()
+            ->orderBy('model_name')
+            ->pluck('model_name');
+
+        $result = [];
+
+        // Q4/04 for income (survey), Q8 for expenses, Q10_debt for debt, Q9_savings for savings
+        $q8Id = Question::where('question_key', 'Q8')->value('id');
+        $q4Ids = Question::whereIn('question_key', ['Q4', '04'])->pluck('id');
+
+        foreach ($modelNames as $mName) {
+            $modelQuery        = (clone $responseQuery)->where('model_name', $mName);
+            $modelResponseIds  = (clone $modelQuery)->pluck('id');
+            $modelCount        = $modelResponseIds->count();
+
+            if ($modelCount === 0) {
+                $result[] = [
+                    'model_name'  => $mName,
+                    'income_avg'  => null,
+                    'expense_avg' => null,
+                    'debt_avg'    => null,
+                    'savings_avg' => null,
+                ];
+                continue;
+            }
+
+            // Income avg (survey Q4)
+            $incomeAvg = null;
+            if ($q4Ids->isNotEmpty()) {
+                $row = Answer::whereIn('survey_response_id', $modelResponseIds)
+                    ->whereIn('question_id', $q4Ids)
+                    ->whereNotNull('value_numeric')
+                    ->selectRaw('AVG(value_numeric) AS avg_val')
+                    ->first();
+                $incomeAvg = $row && $row->avg_val !== null ? round((float) $row->avg_val, 2) : null;
+            }
+
+            // Expenses avg (Q8 value_text JSON, sum per respondent)
+            $expenseAvg = null;
+            if ($q8Id) {
+                $expenseRows = Answer::whereIn('survey_response_id', $modelResponseIds)
+                    ->where('question_id', $q8Id)
+                    ->whereNotNull('value_text')
+                    ->get(['value_text']);
+
+                $totalExpense = 0.0;
+                $expenseCount = 0;
+                foreach ($expenseRows as $row) {
+                    $decoded = json_decode($row->value_text, true);
+                    if (is_array($decoded)) {
+                        $sum = 0.0;
+                        foreach ($decoded as $v) {
+                            if (is_numeric($v)) {
+                                $sum += (float) $v;
+                            }
+                        }
+                        $totalExpense += $sum;
+                        $expenseCount++;
+                    }
+                }
+                $expenseAvg = $expenseCount > 0 ? round($totalExpense / $expenseCount, 2) : null;
+            }
+
+            // Debt avg (Q10_debt sub_answers, sum of amounts per respondent)
+            $debtAvg = null;
+            $debtRows = DetailedAnswer::whereIn('survey_response_id', $modelResponseIds)
+                ->where('question_code', 'Q10_debt')
+                ->whereNotNull('sub_answers')
+                ->get(['sub_answers']);
+
+            $totalDebt = 0.0;
+            $debtCount = 0;
+            foreach ($debtRows as $row) {
+                $subAnswers = $row->sub_answers;
+                if (is_array($subAnswers)) {
+                    $sum = 0.0;
+                    foreach ($subAnswers as $info) {
+                        if (is_array($info) && isset($info['amount']) && is_numeric($info['amount'])) {
+                            $sum += (float) $info['amount'];
+                        } elseif (is_numeric($info)) {
+                            $sum += (float) $info;
+                        }
+                    }
+                    $totalDebt += $sum;
+                    $debtCount++;
+                }
+            }
+            $debtAvg = $debtCount > 0 ? round($totalDebt / $debtCount, 2) : null;
+
+            // Savings avg (Q9_savings sub_answers, sum of amounts per respondent)
+            $savingsAvg = null;
+            $savingsRows = DetailedAnswer::whereIn('survey_response_id', $modelResponseIds)
+                ->where('question_code', 'Q9_savings')
+                ->whereNotNull('sub_answers')
+                ->get(['sub_answers']);
+
+            $totalSavings = 0.0;
+            $savingsCount = 0;
+            foreach ($savingsRows as $row) {
+                $subAnswers = $row->sub_answers;
+                if (is_array($subAnswers)) {
+                    $sum = 0.0;
+                    foreach ($subAnswers as $key => $value) {
+                        // Skip '_name' keys (text fields)
+                        if (str_ends_with((string) $key, '_name')) {
+                            continue;
+                        }
+                        if (is_numeric($value)) {
+                            $sum += (float) $value;
+                        }
+                    }
+                    $totalSavings += $sum;
+                    $savingsCount++;
+                }
+            }
+            $savingsAvg = $savingsCount > 0 ? round($totalSavings / $savingsCount, 2) : null;
+
+            $result[] = [
+                'model_name'  => $mName,
+                'income_avg'  => $incomeAvg,
+                'expense_avg' => $expenseAvg,
+                'debt_avg'    => $debtAvg,
+                'savings_avg' => $savingsAvg,
             ];
         }
 
