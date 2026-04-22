@@ -1058,7 +1058,8 @@ class DashboardController extends Controller
 
     /**
      * Compute financial summary cards for expenses (Q8), debt (Q10), and savings (Q9).
-     * Returns { expenses, debt, savings } each with { title, denominator, top, note }.
+     * Returns { expenses, debt, savings } each with { title, denominator, sum_amount, avg_amount, top, note }.
+     * Each top item contains { label, total_amount } sorted by total_amount descending.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $responseQuery  Filtered SurveyResponse query
      */
@@ -1070,6 +1071,7 @@ class DashboardController extends Controller
         $emptyCard = fn (string $title) => [
             'title'       => $title,
             'denominator' => 0,
+            'sum_amount'  => 0,
             'avg_amount'  => 0,
             'top'         => [],
             'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
@@ -1087,8 +1089,8 @@ class DashboardController extends Controller
         $expenseLabelMap = self::expenseLabelMap();
 
         $q8Id = Question::where('question_key', 'Q8')->value('id');
-        $expenseFreq  = [];
-        $expenseTotal = 0.0;
+        $expenseKeyTotals = [];
+        $expenseTotal     = 0.0;
         if ($q8Id) {
             $expenseAnswers = Answer::whereIn('survey_response_id', $surveyResponseIds)
                 ->where('question_id', $q8Id)
@@ -1102,26 +1104,27 @@ class DashboardController extends Controller
                 }
                 foreach ($decoded as $key => $value) {
                     if (is_numeric($value) && (float) $value > 0) {
-                        $expenseFreq[$key] = ($expenseFreq[$key] ?? 0) + 1;
+                        $expenseKeyTotals[$key] = ($expenseKeyTotals[$key] ?? 0.0) + (float) $value;
                         $expenseTotal += (float) $value;
                     }
                 }
             }
         }
+        $expensesSum = (int) round($expenseTotal);
         $expensesAvg = $denominator > 0 ? (int) round($expenseTotal / $denominator) : 0;
-        arsort($expenseFreq);
+        arsort($expenseKeyTotals);
         $expenseTop = [];
-        foreach (array_slice($expenseFreq, 0, 3, true) as $key => $count) {
+        foreach (array_slice($expenseKeyTotals, 0, 3, true) as $key => $keyTotal) {
             $expenseTop[] = [
-                'label'   => $expenseLabelMap[$key] ?? $key,
-                'percent' => round($count / $denominator * 100, 1),
+                'label'        => $expenseLabelMap[$key] ?? $key,
+                'total_amount' => (int) round($keyTotal),
             ];
         }
 
         // ── 2. Debt card (Q10, question_code='Q10_debt', sub_answers JSON) ────────
         $debtLabelMap = self::debtLabelMap();
-        $debtFreq  = [];
-        $debtTotal = 0.0;
+        $debtKeyTotals = [];
+        $debtTotal     = 0.0;
 
         $debtRows = DetailedAnswer::whereIn('survey_response_id', $surveyResponseIds)
             ->where('question_code', 'Q10_debt')
@@ -1135,28 +1138,29 @@ class DashboardController extends Controller
             }
             foreach ($subAnswers as $key => $info) {
                 if (is_array($info) && isset($info['amount']) && is_numeric($info['amount']) && (float) $info['amount'] > 0) {
-                    $debtFreq[$key] = ($debtFreq[$key] ?? 0) + 1;
+                    $debtKeyTotals[$key] = ($debtKeyTotals[$key] ?? 0.0) + (float) $info['amount'];
                     $debtTotal += (float) $info['amount'];
                 } elseif (is_numeric($info) && (float) $info > 0) {
-                    $debtFreq[$key] = ($debtFreq[$key] ?? 0) + 1;
+                    $debtKeyTotals[$key] = ($debtKeyTotals[$key] ?? 0.0) + (float) $info;
                     $debtTotal += (float) $info;
                 }
             }
         }
+        $debtSum = (int) round($debtTotal);
         $debtAvg = $denominator > 0 ? (int) round($debtTotal / $denominator) : 0;
-        arsort($debtFreq);
+        arsort($debtKeyTotals);
         $debtTop = [];
-        foreach (array_slice($debtFreq, 0, 3, true) as $key => $count) {
+        foreach (array_slice($debtKeyTotals, 0, 3, true) as $key => $keyTotal) {
             $debtTop[] = [
-                'label'   => $debtLabelMap[$key] ?? $key,
-                'percent' => round($count / $denominator * 100, 1),
+                'label'        => $debtLabelMap[$key] ?? $key,
+                'total_amount' => (int) round($keyTotal),
             ];
         }
 
-        // ── 3. Savings card (Q9_savings detailed_answers, savings types by respondent count) ──
+        // ── 3. Savings card (Q9_savings detailed_answers, savings types by amount total) ──
         $savingsLabelMap = self::savingsLabelMap();
-        $savingsFreq  = [];
-        $savingsTotal = 0.0;
+        $savingsKeyTotals = [];
+        $savingsTotal     = 0.0;
 
         $savingsDetailRows = DetailedAnswer::whereIn('survey_response_id', $surveyResponseIds)
             ->where('question_code', 'Q9_savings')
@@ -1170,18 +1174,19 @@ class DashboardController extends Controller
             }
             foreach ($subAnswers as $key => $value) {
                 if (is_numeric($value) && (float) $value > 0) {
-                    $savingsFreq[$key] = ($savingsFreq[$key] ?? 0) + 1;
+                    $savingsKeyTotals[$key] = ($savingsKeyTotals[$key] ?? 0.0) + (float) $value;
                     $savingsTotal += (float) $value;
                 }
             }
         }
+        $savingsSum = (int) round($savingsTotal);
         $savingsAvg = $denominator > 0 ? (int) round($savingsTotal / $denominator) : 0;
-        arsort($savingsFreq);
+        arsort($savingsKeyTotals);
         $savingsTop = [];
-        foreach (array_slice($savingsFreq, 0, 3, true) as $key => $count) {
+        foreach (array_slice($savingsKeyTotals, 0, 3, true) as $key => $keyTotal) {
             $savingsTop[] = [
-                'label'   => $savingsLabelMap[$key] ?? $key,
-                'percent' => round($count / $denominator * 100, 1),
+                'label'        => $savingsLabelMap[$key] ?? $key,
+                'total_amount' => (int) round($keyTotal),
             ];
         }
 
@@ -1189,6 +1194,7 @@ class DashboardController extends Controller
             'expenses' => [
                 'title'       => 'รายจ่ายครัวเรือนปัจจุบัน',
                 'denominator' => $denominator,
+                'sum_amount'  => $expensesSum,
                 'avg_amount'  => $expensesAvg,
                 'top'         => $expenseTop,
                 'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
@@ -1196,6 +1202,7 @@ class DashboardController extends Controller
             'debt'     => [
                 'title'       => 'หนี้สินปัจจุบัน',
                 'denominator' => $denominator,
+                'sum_amount'  => $debtSum,
                 'avg_amount'  => $debtAvg,
                 'top'         => $debtTop,
                 'note'        => 'หมายเหตุ: 1 ครัวเรือนอาจมีหลายหมวด ทำให้ผลรวมเกิน 100%',
@@ -1203,6 +1210,7 @@ class DashboardController extends Controller
             'savings'  => [
                 'title'       => 'การออมปัจจุบัน',
                 'denominator' => $denominator,
+                'sum_amount'  => $savingsSum,
                 'avg_amount'  => $savingsAvg,
                 'top'         => $savingsTop,
                 'note'        => null,
