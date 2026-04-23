@@ -1177,7 +1177,8 @@ function computeQuestionScore(q) {
   // Q3: "ไม่มี" (exclusive) => 0, any non-exclusive skill => full score (20)
   if (q.question_key === 'Q3') {
     if (selChoices.some(c => c.is_exclusive)) return 0
-    return q.max_score || 0
+    const hasNonExclusive = selChoices.some(c => !c.is_exclusive)
+    return hasNonExclusive ? (q.max_score || 0) : 0
   }
 
   if (selChoices.some(c => c.is_exclusive)) {

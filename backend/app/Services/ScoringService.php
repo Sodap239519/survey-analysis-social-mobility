@@ -56,6 +56,10 @@ class ScoringService
             if ($choices->where('is_exclusive', true)->isNotEmpty()) {
                 return 0.0;
             }
+            // Return full score only when at least one valid non-exclusive choice is confirmed
+            if ($choices->where('is_exclusive', false)->isEmpty()) {
+                return 0.0;
+            }
             return (float) $question->max_score;
         }
 
