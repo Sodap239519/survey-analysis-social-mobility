@@ -115,8 +115,8 @@ class ScoringServiceTest extends TestCase
 
         $score = $this->service->scoreQuestion($question, [$choice1->id, $choice2->id]);
 
-        // Both have weight 2 each => 4
-        $this->assertEqualsWithDelta(4.0, $score, 0.001);
+        // Q3 new rule: any non-exclusive skill(s) selected => full score (20)
+        $this->assertEqualsWithDelta(20.0, $score, 0.001);
     }
 
     public function test_multi_select_exclusive_choice_gives_zero(): void
@@ -132,6 +132,32 @@ class ScoringServiceTest extends TestCase
         // Selecting exclusive choice together with other choices => 0
         $score = $this->service->scoreQuestion($question, [$exclusiveChoice->id, $otherChoice->id]);
         $this->assertEquals(0.0, $score);
+    }
+
+    public function test_q3_exclusive_only_gives_zero(): void
+    {
+        $question = Question::where('question_key', 'Q3')->first();
+        $this->assertNotNull($question);
+
+        $exclusiveChoice = Choice::where('question_id', $question->id)->where('is_exclusive', true)->first();
+        $this->assertNotNull($exclusiveChoice, 'Q3 should have an exclusive "ไม่มี" choice');
+
+        // Selecting only the exclusive "ไม่มี" choice => 0
+        $score = $this->service->scoreQuestion($question, [$exclusiveChoice->id]);
+        $this->assertEquals(0.0, $score);
+    }
+
+    public function test_q3_single_non_exclusive_choice_gives_full_score(): void
+    {
+        $question = Question::where('question_key', 'Q3')->first();
+        $this->assertNotNull($question);
+
+        $choice1 = Choice::where('question_id', $question->id)->where('choice_key', '1')->first();
+        $this->assertNotNull($choice1);
+
+        // Selecting only one non-exclusive skill => full score (20)
+        $score = $this->service->scoreQuestion($question, [$choice1->id]);
+        $this->assertEqualsWithDelta(20.0, $score, 0.001);
     }
 
     public function test_multi_select_max_score_cap(): void
