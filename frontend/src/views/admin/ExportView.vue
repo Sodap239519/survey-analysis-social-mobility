@@ -165,7 +165,7 @@ function quickExportComp(format) {
 
 function triggerDownload(path, filename) {
   const token = localStorage.getItem('auth_token')
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  const baseUrl = import.meta.env.VITE_API_URL || '/api/v1'
   fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${token}` } })
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
