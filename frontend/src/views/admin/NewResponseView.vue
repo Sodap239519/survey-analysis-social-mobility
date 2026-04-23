@@ -61,29 +61,7 @@
           <!-- Model name -->
           <div class="form-group">
             <label>ชื่อโมเดล</label>
-            <select v-model="form.model_name">
-              <option value="">-- เลือกโมเดล (เช่น โมเดลพริกจินดา) --</option>
-              <optgroup label="LC">
-                <option value="โมเดลไข่ผำ แก้จน">โมเดลไข่ผำ แก้จน</option>
-                <option value="โมเดลกล้าไม้แก้จน">โมเดลกล้าไม้แก้จน</option>
-                <option value="โมเดลผักยกแคร่สร้างสุข">โมเดลผักยกแคร่สร้างสุข</option>
-                <option value="โมเดล Korat Handy Care">โมเดล Korat Handy Care</option>
-                <option value="โมเดลผักไร้ดิน กินปลอดภัย">โมเดลผักไร้ดิน กินปลอดภัย</option>
-              </optgroup>
-              <optgroup label="PPVC">
-                <option value="โมเดลมหัศจรรย์ไข่ผำ">โมเดลมหัศจรรย์ไข่ผำ</option>
-                <option value="โมเดลมะขามป้อม">โมเดลมะขามป้อม</option>
-                <option value="โมเดล Veggies to Value ผักคุณค่า พายั่งยืน">โมเดล Veggies to Value ผักคุณค่า พายั่งยืน</option>
-              </optgroup>
-              <optgroup label="SSN">
-                <option value="กองทุนแก้จน">กองทุนแก้จน</option>
-                <option value="ตะไคร้ดี ลดหนี้ชุมชน">ตะไคร้ดี ลดหนี้ชุมชน</option>
-                <option value="ผักเขียว เหนี่ยวทรัพย์">ผักเขียว เหนี่ยวทรัพย์</option>
-              </optgroup>
-              <optgroup label="ABI">
-                <option value="โมเดลพริกจินดา">โมเดลพริกจินดา</option>
-              </optgroup>
-            </select>
+            <ModelNameSelect v-model="form.model_name" empty-label="-- เลือกโมเดล (เช่น โมเดลพริกจินดา) --" />
           </div>
           <!-- Survey meta -->
           <div class="form-group" :class="{ 'has-error': errors.period }">
@@ -669,6 +647,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '../../api'
+import ModelNameSelect from '../../components/ModelNameSelect.vue'
 
 const router = useRouter()
 const route = useRoute()
