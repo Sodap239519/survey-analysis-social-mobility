@@ -11,8 +11,10 @@ use App\Models\Question;
 use App\Models\SurveyResponse;
 use App\Services\CompareHouseholdSurveyLogic;
 use App\Services\ScoringService;
+use App\Enums\ModelName;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SurveyResponseController extends Controller
 {
@@ -256,7 +258,7 @@ class SurveyResponseController extends Controller
             'survey_round'  => 'nullable|integer',
             'surveyed_at'   => 'nullable|date',
             'surveyor_name' => 'nullable|string',
-            'model_name'    => 'nullable|string|max:255',
+            'model_name'    => ['nullable', Rule::in(ModelName::VALID_NAMES)],
             'answers'       => 'nullable|array',
             'answers.*.selected_choice_ids' => 'nullable|array',
             'answers.*.value_text'          => 'nullable|string',
@@ -409,7 +411,7 @@ class SurveyResponseController extends Controller
             'survey_round'  => 'nullable|integer',
             'surveyed_at'   => 'nullable|date',
             'surveyor_name' => 'nullable|string',
-            'model_name'    => 'nullable|string|max:255',
+            'model_name'    => ['nullable', Rule::in(ModelName::VALID_NAMES)],
             'answers'       => 'nullable|array',
             'answers.*.selected_choice_ids' => 'nullable|array',
             'answers.*.value_text'          => 'nullable|string',
