@@ -13,6 +13,7 @@ use App\Models\SurveyResponse;
 use App\Services\CompareHouseholdSurveyLogic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * DashboardController
@@ -42,132 +43,147 @@ class DashboardController extends Controller
         $surveyYear  = $request->query('survey_year') ? (int) $request->query('survey_year') : null;
         $modelName   = $request->query('model_name');
 
-        // จำนวนรหัสบ้านที่มีการสำรวจ (DISTINCT house_code from responses only)
-        $totalHouseCodes = SurveyResponse::query()
-            ->join('households', 'survey_responses.household_id', '=', 'households.id')
-            ->distinct('households.house_code')
-            ->count('households.house_code');
+        $cacheKey = 'dashboard:' . md5(json_encode(compact('period', 'surveyYear', 'district', 'subdistrict', 'modelName')));
+        $ttl      = max(0, (int) config('app.dashboard_cache_ttl', 120));
 
-        // Filter survey responses
-        $responseQuery = SurveyResponse::query()->where('period', $period);
+        $data = Cache::remember($cacheKey, $ttl, function () use ($district, $subdistrict, $period, $surveyYear, $modelName) {
+            // จำนวนรหัสบ้านที่มีการสำรวจ (DISTINCT house_code from responses only)
+            $totalHouseCodes = SurveyResponse::query()
+                ->join('households', 'survey_responses.household_id', '=', 'households.id')
+                ->distinct('households.house_code')
+                ->count('households.house_code');
 
-        if ($surveyYear) {
-            $responseQuery->where('survey_year', $surveyYear);
-        }
+            // Filter survey responses
+            $responseQuery = SurveyResponse::query()->where('period', $period);
 
-        if ($district) {
-            $responseQuery->whereHas('household', function ($q) use ($district) {
-                $q->where('district_name', 'like', "%{$district}%")
-                  ->orWhere('district_code', $district);
-            });
-        }
+            if ($surveyYear) {
+                $responseQuery->where('survey_year', $surveyYear);
+            }
 
-        if ($subdistrict) {
-            $responseQuery->whereHas('household', function ($q) use ($subdistrict) {
-                $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
-                  ->orWhere('subdistrict_code', $subdistrict);
-            });
-        }
+            if ($district) {
+                $responseQuery->whereHas('household', function ($q) use ($district) {
+                    $q->where('district_name', 'like', "%{$district}%")
+                      ->orWhere('district_code', $district);
+                });
+            }
 
-        if ($modelName) {
-            $responseQuery->where('model_name', $modelName);
-        }
+            if ($subdistrict) {
+                $responseQuery->whereHas('household', function ($q) use ($subdistrict) {
+                    $q->where('subdistrict_name', 'like', "%{$subdistrict}%")
+                      ->orWhere('subdistrict_code', $subdistrict);
+                });
+            }
 
-        // จำนวนผู้ตอบ (distinct person_id, or household_id if no person)
-        $totalRespondents = (clone $responseQuery)
-            ->whereNotNull('person_id')
-            ->distinct('person_id')
-            ->count('person_id');
+            if ($modelName) {
+                $responseQuery->where('model_name', $modelName);
+            }
 
-        $totalResponses = (clone $responseQuery)->count();
+            // จำนวนผู้ตอบ (distinct person_id – responses that have a linked person record)
+            $totalRespondents = (clone $responseQuery)
+                ->whereNotNull('person_id')
+                ->distinct('person_id')
+                ->count('person_id');
 
-        // จำนวนโมเดลที่ไม่ซ้ำกัน (distinct model_name from filtered responses)
-        $totalModels = (clone $responseQuery)
-            ->whereNotNull('model_name')
-            ->distinct('model_name')
-            ->count('model_name');
+            $totalResponses = (clone $responseQuery)->count();
 
-        // Poverty level distribution per capital
-        $povertyByCapital = $this->getPovertyByCapital(clone $responseQuery);
+            // Responses without a linked person_id (explains gap between 801 and 822)
+            $totalResponsesNullPerson = (clone $responseQuery)
+                ->whereNull('person_id')
+                ->count();
 
-        // Mobility counts (before vs after) – household-based
-        $mobility = $this->getMobilityCounts($district, $subdistrict, $surveyYear, $modelName);
+            // จำนวนโมเดลที่ไม่ซ้ำกัน (distinct model_name from filtered responses)
+            $totalModels = (clone $responseQuery)
+                ->whereNotNull('model_name')
+                ->distinct('model_name')
+                ->count('model_name');
 
-        // Mobility counts – people-based (respondents per mobility category)
-        $mobilityPeople = $this->getMobilityPeopleCounts($district, $subdistrict, $surveyYear, $modelName);
+            // Poverty level distribution per capital
+            $povertyByCapital = $this->getPovertyByCapital(clone $responseQuery);
 
-        // Per-capital mobility counts (before vs after for each capital)
-        $mobilityByCapital = $this->getMobilityByCapital($district, $subdistrict, $surveyYear, $modelName);
-        $mobilityByCapitalByLevel = $this->getMobilityByCapitalByLevel($district, $subdistrict, $surveyYear, $modelName);
+            // Mobility counts (before vs after) – household-based
+            $mobility = $this->getMobilityCounts($district, $subdistrict, $surveyYear, $modelName);
 
-        // District/subdistrict breakdown
-        $byDistrict = $this->getByDistrict($period, $district, $subdistrict, $surveyYear, $modelName);
+            // Mobility counts – people-based (respondents per mobility category)
+            $mobilityPeople = $this->getMobilityPeopleCounts($district, $subdistrict, $surveyYear, $modelName);
 
-        // Model breakdown (by_model: per model, mobility by capital level)
-        $byModel = $this->getByModel($period, $district, $subdistrict, $surveyYear, $modelName);
+            // Per-capital mobility counts (before vs after for each capital)
+            $mobilityByCapital        = $this->getMobilityByCapital($district, $subdistrict, $surveyYear, $modelName);
+            $mobilityByCapitalByLevel = $this->getMobilityByCapitalByLevel($district, $subdistrict, $surveyYear, $modelName);
 
-        // Summary poverty levels across all responses
-        $overallPoverty = $this->getOverallPovertyLevels(clone $responseQuery);
+            // District/subdistrict breakdown
+            $byDistrict = $this->getByDistrict($period, $district, $subdistrict, $surveyYear, $modelName);
 
-        // Geographic totals (districts, subdistricts, villages, households)
-        $geoTotals = $this->getGeographicTotals($period, $district, $subdistrict, $surveyYear, $modelName);
+            // Model breakdown (by_model: per model, mobility by capital level)
+            $byModel = $this->getByModel($period, $district, $subdistrict, $surveyYear, $modelName);
 
-        // Average scores per capital (for Radar Chart)
-        $capitalAverages = $this->getCapitalAverages(clone $responseQuery);
-        $capitalStats    = $this->getCapitalStats(clone $responseQuery);
+            // Summary poverty levels across all responses
+            $overallPoverty = $this->getOverallPovertyLevels(clone $responseQuery);
 
-        // Before/After comparison summary (for paired households)
-        $comparisonSummary = $this->getComparisonSummary($district, $subdistrict, $surveyYear, $modelName);
+            // Geographic totals (districts, subdistricts, villages, households)
+            $geoTotals = $this->getGeographicTotals($period, $district, $subdistrict, $surveyYear, $modelName);
 
-        // Income averages: baseline (from Person) and survey (from Answer Q4/04)
-        $incomeAverages = $this->getIncomeAverages(clone $responseQuery);
+            // Average scores per capital (for Radar Chart)
+            $capitalAverages = $this->getCapitalAverages(clone $responseQuery);
+            $capitalStats    = $this->getCapitalStats(clone $responseQuery);
 
-        // Income breakdown per model
-        $incomeByModel = $this->getIncomeByModel(clone $responseQuery);
+            // Before/After comparison summary (for paired households)
+            $comparisonSummary = $this->getComparisonSummary($district, $subdistrict, $surveyYear, $modelName);
 
-        // Overview insights: top multi-select choices for 4 key questions
-        $overviewInsights = $this->getOverviewInsights(clone $responseQuery);
+            // Income averages: baseline (from Person) and survey (from Answer Q4/04)
+            $incomeAverages = $this->getIncomeAverages(clone $responseQuery);
 
-        // Financial summary cards: expenses (Q8), debt (Q10), savings (Q9)
-        $financialSummaryCards = $this->getFinancialSummaryCards(clone $responseQuery);
+            // Income breakdown per model
+            $incomeByModel = $this->getIncomeByModel(clone $responseQuery);
 
-        // Financial averages by model: income, expenses, debt, savings
-        $financialByModel = $this->getFinancialByModel(clone $responseQuery);
+            // Overview insights: top multi-select choices for 4 key questions
+            $overviewInsights = $this->getOverviewInsights(clone $responseQuery);
 
-        return response()->json([
-            'total_house_codes'    => $totalHouseCodes,
-            'total_models'         => $totalModels,
-            'total_respondents'    => $totalRespondents,
-            'total_responses'      => $totalResponses,
-            'total_districts'      => $geoTotals['districts'],
-            'total_subdistricts'   => $geoTotals['subdistricts'],
-            'total_villages'       => $geoTotals['villages'],
-            'total_households'     => $geoTotals['households'],
-            'capital_averages'     => $capitalAverages,
-            'capital_stats'        => $capitalStats,
-            'poverty_by_capital'   => $povertyByCapital,
-            'overall_poverty'      => $overallPoverty,
-            'mobility'             => $mobility,
-            'mobility_people'      => $mobilityPeople,
-            'mobility_by_capital'          => $mobilityByCapital,
-            'mobility_by_capital_by_level' => $mobilityByCapitalByLevel,
-            'comparison_summary'           => $comparisonSummary,
-            'by_district'                  => $byDistrict,
-            'by_model'                     => $byModel,
-            'income_baseline_avg'          => $incomeAverages['baseline_avg'],
-            'income_baseline_sum'          => $incomeAverages['baseline_sum'],
-            'income_survey_avg'            => $incomeAverages['survey_avg'],
-            'income_survey_sum'            => $incomeAverages['survey_sum'],
-            'income_baseline_count'        => $incomeAverages['baseline_count'],
-            'income_survey_count'          => $incomeAverages['survey_count'],
-            'income_household_members'     => $incomeAverages['household_members'],
-            'income_diff_sum'              => $incomeAverages['diff_sum'],
-            'income_diff_avg'              => $incomeAverages['diff_avg'],
-            'income_by_model'              => $incomeByModel,
-            'overview_insights'            => $overviewInsights,
-            'financial_summary_cards'      => $financialSummaryCards,
-            'financial_by_model'           => $financialByModel,
-        ]);
+            // Financial summary cards: expenses (Q8), debt (Q10), savings (Q9)
+            $financialSummaryCards = $this->getFinancialSummaryCards(clone $responseQuery);
+
+            // Financial averages by model: income, expenses, debt, savings
+            $financialByModel = $this->getFinancialByModel(clone $responseQuery);
+
+            return [
+                'total_house_codes'             => $totalHouseCodes,
+                'total_models'                  => $totalModels,
+                'total_respondents'             => $totalRespondents,
+                'total_responses'               => $totalResponses,
+                'total_responses_null_person'   => $totalResponsesNullPerson,
+                'total_districts'               => $geoTotals['districts'],
+                'total_subdistricts'            => $geoTotals['subdistricts'],
+                'total_villages'                => $geoTotals['villages'],
+                'total_households'              => $geoTotals['households'],
+                'capital_averages'              => $capitalAverages,
+                'capital_stats'                 => $capitalStats,
+                'poverty_by_capital'            => $povertyByCapital,
+                'overall_poverty'               => $overallPoverty,
+                'mobility'                      => $mobility,
+                'mobility_people'               => $mobilityPeople,
+                'mobility_by_capital'           => $mobilityByCapital,
+                'mobility_by_capital_by_level'  => $mobilityByCapitalByLevel,
+                'comparison_summary'            => $comparisonSummary,
+                'by_district'                   => $byDistrict,
+                'by_model'                      => $byModel,
+                'income_baseline_avg'           => $incomeAverages['baseline_avg'],
+                'income_baseline_sum'           => $incomeAverages['baseline_sum'],
+                'income_survey_avg'             => $incomeAverages['survey_avg'],
+                'income_survey_sum'             => $incomeAverages['survey_sum'],
+                'income_baseline_count'         => $incomeAverages['baseline_count'],
+                'income_survey_count'           => $incomeAverages['survey_count'],
+                'income_household_members'      => $incomeAverages['household_members'],
+                'income_diff_sum'               => $incomeAverages['diff_sum'],
+                'income_diff_avg'               => $incomeAverages['diff_avg'],
+                'income_baseline_source'        => $incomeAverages['baseline_source'],
+                'income_baseline_note'          => $incomeAverages['baseline_note'],
+                'income_by_model'               => $incomeByModel,
+                'overview_insights'             => $overviewInsights,
+                'financial_summary_cards'       => $financialSummaryCards,
+                'financial_by_model'            => $financialByModel,
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function years(): JsonResponse
@@ -188,8 +204,15 @@ class DashboardController extends Controller
      * (from Answer question_key Q4 or 04) for the filtered response set.
      * Also returns counts of records with valid income data.
      *
+     * Baseline income lookup strategy:
+     *  1. Primary:  use persons directly linked via survey_responses.person_id.
+     *  2. Fallback: when person_id is NULL in survey_responses, look up household
+     *               members (persons.household_id = survey_responses.household_id)
+     *               so that baseline income from the legacy Excel import is still visible
+     *               even when the SQLite migration did not populate person_id links.
+     *
      * @param  \Illuminate\Database\Eloquent\Builder  $query  Filtered SurveyResponse query
-     * @return array{baseline_avg: float|null, baseline_sum: float|null, survey_avg: float|null, survey_sum: float|null, baseline_count: int, survey_count: int, household_members: int, diff_sum: int|null, diff_avg: int|null}
+     * @return array{baseline_avg: float|null, baseline_sum: float|null, survey_avg: float|null, survey_sum: float|null, baseline_count: int, survey_count: int, household_members: int, diff_sum: int|null, diff_avg: int|null, baseline_source: string, baseline_note: string|null}
      */
     private function getIncomeAverages($query): array
     {
@@ -199,19 +222,52 @@ class DashboardController extends Controller
         // Total household members in scope (all persons linked to survey responses)
         $householdMembers = $personIds->unique()->count();
 
-        $baselineAvg   = null;
-        $baselineSum   = null;
-        $baselineCount = 0;
+        $baselineAvg    = null;
+        $baselineSum    = null;
+        $baselineCount  = 0;
+        $baselineSource = 'none';
+
         if ($personIds->isNotEmpty()) {
             $row = Person::whereIn('id', $personIds)
                 ->whereNotNull('baseline_income_monthly')
                 ->selectRaw('AVG(baseline_income_monthly) AS avg_val, SUM(baseline_income_monthly) AS sum_val, COUNT(*) AS cnt')
                 ->first();
-            if ($row) {
-                $baselineAvg   = $row->avg_val !== null ? (float) $row->avg_val : null;
-                $baselineSum   = $row->sum_val !== null ? (float) $row->sum_val : null;
-                $baselineCount = (int) $row->cnt;
+            if ($row && (int) $row->cnt > 0) {
+                $baselineAvg    = $row->avg_val !== null ? (float) $row->avg_val : null;
+                $baselineSum    = $row->sum_val !== null ? (float) $row->sum_val : null;
+                $baselineCount  = (int) $row->cnt;
+                $baselineSource = 'person_direct';
             }
+        }
+
+        // Fallback: responses that have no person_id link – look up household members instead.
+        // This ensures baseline income from a legacy Excel import is shown even when the
+        // production SQLite data does not populate survey_responses.person_id.
+        if ($baselineCount === 0) {
+            $nullPersonHouseholdIds = (clone $query)->whereNull('person_id')->pluck('household_id')->unique();
+
+            if ($nullPersonHouseholdIds->isNotEmpty()) {
+                $row = Person::whereIn('household_id', $nullPersonHouseholdIds)
+                    ->whereNotNull('baseline_income_monthly')
+                    ->selectRaw('AVG(baseline_income_monthly) AS avg_val, SUM(baseline_income_monthly) AS sum_val, COUNT(*) AS cnt')
+                    ->first();
+                if ($row && (int) $row->cnt > 0) {
+                    $baselineAvg    = $row->avg_val !== null ? (float) $row->avg_val : null;
+                    $baselineSum    = $row->sum_val !== null ? (float) $row->sum_val : null;
+                    $baselineCount  = (int) $row->cnt;
+                    $baselineSource = 'household_fallback';
+                    // Update members count to reflect persons found via household fallback
+                    $householdMembers = $baselineCount;
+                }
+            }
+        }
+
+        // Build human-readable diagnostic note
+        $baselineNote = null;
+        if ($baselineSource === 'none') {
+            $baselineNote = 'ไม่พบข้อมูลรายได้เดิม — กรุณานำเข้าไฟล์ Excel ข้อมูลเดิม (ข้อมูลนำเข้า_ข้อมูลเดิม) ผ่านหน้า Admin → นำเข้าข้อมูล';
+        } elseif ($baselineSource === 'household_fallback') {
+            $baselineNote = "รายได้เดิมอ้างอิงจากสมาชิกครัวเรือน ({$baselineCount} คน) เนื่องจาก survey_responses ไม่มีการผูก person_id";
         }
 
         // Survey income: average + sum + count from answers.value_numeric for question_key Q4/04
@@ -254,6 +310,8 @@ class DashboardController extends Controller
             'household_members' => $householdMembers,
             'diff_sum'          => $diffSum,
             'diff_avg'          => $diffAvg,
+            'baseline_source'   => $baselineSource,
+            'baseline_note'     => $baselineNote,
         ];
     }
 

@@ -123,4 +123,16 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard Cache TTL
+    |--------------------------------------------------------------------------
+    |
+    | The number of seconds to cache the /api/v1/dashboard response. A value
+    | of 0 disables caching entirely. Increase this for production to reduce
+    | database load on slow connections (e.g. 300 = 5 minutes).
+    |
+    */
+    'dashboard_cache_ttl' => (int) env('DASHBOARD_CACHE_TTL', 120),
+
 ];
