@@ -138,13 +138,16 @@
           <div class="stat-icon-wrap" style="--ic:#6366f1"><i class="fi fi-rr-user"></i></div>
           <div class="stat-label">จำนวนผู้ตอบ</div>
           <div class="stat-value">{{ store.data.total_respondents.toLocaleString() }}</div>
-          <div class="stat-sub">ผู้ตอบแบบสอบถาม</div>
+          <div class="stat-sub">บุคคลที่ไม่ซ้ำกัน (distinct person_id)</div>
+          <div v-if="store.data.total_responses_null_person > 0" class="stat-note">
+            มี {{ store.data.total_responses_null_person.toLocaleString() }} รายการไม่มีข้อมูลบุคคล
+          </div>
         </div>
         <div class="bento-stat card">
           <div class="stat-icon-wrap" style="--ic:#10b981"><i class="fi fi-rr-document"></i></div>
           <div class="stat-label">จำนวนการสำรวจ</div>
           <div class="stat-value">{{ store.data.total_responses.toLocaleString() }}</div>
-          <div class="stat-sub">ครั้งที่บันทึก</div>
+          <div class="stat-sub">ครั้งที่บันทึกทั้งหมด (รวมทุกรายการ)</div>
         </div>
       </div>
 
@@ -280,6 +283,7 @@
               <div class="income-card-value">{{ store.data.income_baseline_sum != null ? money(store.data.income_baseline_sum) : '—' }}</div>
               <div class="income-card-sub">บาท/เดือน (รวม)</div>
               <div class="income-card-count">เฉลี่ย {{ store.data.income_baseline_avg != null ? money(store.data.income_baseline_avg) : '—' }} บาท/คน</div>
+              <div v-if="store.data.income_baseline_note" class="income-card-note">{{ store.data.income_baseline_note }}</div>
             </div>
           </div>
           <div class="card income-card">
@@ -851,6 +855,7 @@
                 <div class="income-card-value">{{ store.data.income_baseline_sum != null ? money(store.data.income_baseline_sum) : '—' }}</div>
                 <div class="income-card-sub">บาท/เดือน (รวม)</div>
                 <div class="income-card-count">เฉลี่ย {{ store.data.income_baseline_avg != null ? money(store.data.income_baseline_avg) : '—' }} บาท/คน</div>
+                <div v-if="store.data.income_baseline_note" class="income-card-note">{{ store.data.income_baseline_note }}</div>
               </div>
             </div>
             <div class="card income-card">
@@ -1331,7 +1336,9 @@ const incomeModelChart = computed(() => {
     xaxis: {
       categories,
       labels: {
-        rotate: -30,
+        rotate: -45,
+        rotateAlways: true,
+        trim: false,
         style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' },
       },
     },
@@ -1442,7 +1449,7 @@ const finModelChart = computed(() => {
     },
     xaxis: {
       categories: models.map(m => m.model_name),
-      labels: { rotate: -30, style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' } },
+      labels: { rotate: -45, rotateAlways: true, trim: false, style: { fontSize: '11px', fontFamily: 'Prompt, sans-serif', colors: '#475569' } },
     },
     yaxis: {
       labels: {
@@ -1819,6 +1826,7 @@ watch(() => route.fullPath, async () => {
 .stat-label { font-size: 0.775rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .stat-value { font-size: 2rem; font-weight: 800; color: var(--color-primary); line-height: 1.1; }
 .stat-sub { font-size: 0.75rem; color: var(--color-text-muted); }
+.stat-note { font-size: 0.7rem; color: var(--color-text-muted); font-style: italic; margin-top: 0.15rem; }
 
 .bento-poverty { grid-column: span 2; }
 .bento-radar { grid-column: span 1; }
@@ -1915,6 +1923,12 @@ watch(() => route.fullPath, async () => {
   color: var(--color-text-muted);
   margin-top: 0.2rem;
   font-style: italic;
+}
+.income-card-note {
+  font-size: 0.65rem;
+  color: #f97316;
+  margin-top: 0.25rem;
+  line-height: 1.35;
 }
 .income-chart-card {
   padding: 1rem 1.25rem;
