@@ -1174,6 +1174,12 @@ function computeQuestionScore(q) {
     return parent1 ? (parent1.weight || 0) : 0
   }
 
+  // Q3: "ไม่มี" (exclusive) => 0, any non-exclusive skill => full score (20)
+  if (q.question_key === 'Q3') {
+    if (selChoices.some(c => c.is_exclusive)) return 0
+    return q.max_score || 0
+  }
+
   if (selChoices.some(c => c.is_exclusive)) {
     return q.type === 'special_q6' ? (q.max_score || 0) : 0
   }

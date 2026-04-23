@@ -20,9 +20,13 @@ use Illuminate\Support\Collection;
  *  Level 3: 2.50 <= X < 3.25  (อยู่พอได้)
  *  Level 4: 3.25 <= X <= 4.00 (อยู่ดี)
  *
- * Multi-select scoring rule:
+ * Multi-select scoring rule (default):
  *  score_question = min(max_score, sum(weights_of_selected_choices))
  *  If exclusive option selected => 0
+ *
+ * Question 3 (Human capital skills question, 20 pts):
+ *  If "ไม่มี" (is_exclusive) selected => 0
+ *  If >= 1 non-exclusive skill selected => 20 (full score)
  *
  * Question 6 (Physical capital, 30 pts) - "ดี=มาก" policy:
  *  If "ไม่มีปัญหา" (choice_key=0) => full 30
@@ -43,6 +47,16 @@ class ScoringService
     {
         if (empty($selectedChoiceIds)) {
             return 0.0;
+        }
+
+        // Special rule for Q3 (Human capital skills question)
+        // Any exclusive "ไม่มี" selected => 0; any non-exclusive skill selected => full score
+        if ($question->question_key === 'Q3') {
+            $choices = $question->choices()->whereIn('id', $selectedChoiceIds)->get();
+            if ($choices->where('is_exclusive', true)->isNotEmpty()) {
+                return 0.0;
+            }
+            return (float) $question->max_score;
         }
 
         // Special rule for Q6 (Physical capital land-problem question)
