@@ -165,7 +165,7 @@ function doExport() {
   const params = new URLSearchParams({ format: exportFormat.value })
   if (search.value) params.append('search', search.value)
   const token = localStorage.getItem('auth_token')
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  const baseUrl = import.meta.env.VITE_API_URL || '/api/v1'
   fetch(`${baseUrl}/export/persons?${params}`, { headers: { Authorization: `Bearer ${token}` } })
     .then(r => r.blob())
     .then(blob => {

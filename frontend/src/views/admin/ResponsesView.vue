@@ -1042,7 +1042,7 @@ function doExport() {
   if (filterYear.value) params.append('survey_year', filterYear.value)
   if (filterPeriod.value) params.append('period', filterPeriod.value)
   const token = localStorage.getItem('auth_token')
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  const baseUrl = import.meta.env.VITE_API_URL || '/api/v1'
   fetch(`${baseUrl}/export/responses?${params}`, { headers: { Authorization: `Bearer ${token}` } })
     .then(r => r.blob())
     .then(blob => {
